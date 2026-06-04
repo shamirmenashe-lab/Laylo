@@ -9,306 +9,99 @@
   <title>Laylo</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
-    /* ── TEMP: Sprint 1 test build — not final production UI ── */
-
+    /* TEMP: Sprint 1 — refactored data model (ArrayBuffer + sections/layers split) */
     :root {
-      --teal: #0d9488;
-      --teal2: #14b8a6;
-      --bg: #080e1a;
-      --s1: #0f1c2e;
-      --s2: #162438;
-      --border: #1e3347;
-      --text: #e2e8f0;
-      --muted: #5a7a94;
-      --red: #ef4444;
-      --green: #22c55e;
-      --r: 14px;
+      --teal: #0d9488; --teal2: #14b8a6;
+      --bg: #080e1a; --s1: #0f1c2e; --s2: #162438;
+      --border: #1e3347; --text: #e2e8f0; --muted: #5a7a94;
+      --red: #ef4444; --green: #22c55e; --r: 14px;
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Heebo', sans-serif; direction: rtl; }
 
-    html, body {
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Heebo', sans-serif;
-      direction: rtl;
-    }
-
-    .screen {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.2s;
-    }
+    .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .screen.active { opacity: 1; pointer-events: all; }
 
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 20px 12px;
-      flex-shrink: 0;
-    }
-    .logo {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 20px; font-weight: 600;
-      color: var(--teal2);
-      letter-spacing: -0.04em;
-    }
-    .badge {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px; color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 2px 7px; border-radius: 20px;
-    }
-    .btn {
-      border: none; border-radius: var(--r);
-      font-family: 'Heebo', sans-serif;
-      font-weight: 700; cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-      user-select: none;
-    }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; flex-shrink: 0; }
+    .logo { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; color: var(--teal2); letter-spacing: -0.04em; }
+    .badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 7px; border-radius: 20px; }
+    .btn { border: none; border-radius: var(--r); font-family: 'Heebo', sans-serif; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; user-select: none; }
     .btn:active { opacity: 0.75; transform: scale(0.97); }
-    .btn-primary {
-      background: var(--teal); color: #fff;
-      font-size: 16px; padding: 16px 24px; width: 100%;
-    }
-    .btn-ghost {
-      background: var(--s2); color: var(--text);
-      font-size: 15px; padding: 14px 24px; width: 100%;
-      border: 1px solid var(--border);
-    }
-    .btn-danger {
-      background: rgba(239,68,68,0.12); color: var(--red);
-      font-size: 15px; padding: 14px 24px; width: 100%;
-      border: 1px solid rgba(239,68,68,0.2);
-    }
-    .btn-icon {
-      background: none; border: none;
-      color: var(--muted); font-size: 18px;
-      padding: 8px; cursor: pointer; border-radius: 8px;
-      transition: color 0.15s;
-    }
+    .btn-primary { background: var(--teal); color: #fff; font-size: 16px; padding: 16px 24px; width: 100%; }
+    .btn-ghost { background: var(--s2); color: var(--text); font-size: 15px; padding: 14px 24px; width: 100%; border: 1px solid var(--border); }
+    .btn-danger { background: rgba(239,68,68,0.12); color: var(--red); font-size: 15px; padding: 14px 24px; width: 100%; border: 1px solid rgba(239,68,68,0.2); }
+    .btn-icon { background: none; border: none; color: var(--muted); font-size: 18px; padding: 8px; cursor: pointer; border-radius: 8px; }
     .btn-icon:active { color: var(--text); }
     .gap { gap: 10px; display: flex; flex-direction: column; }
+    .back-btn { font-size: 22px; background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px 8px; }
 
-    #screen-home .scroll-area {
-      flex: 1; overflow-y: auto; padding: 0 16px;
-    }
-    .empty-state {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      height: 100%; gap: 12px; text-align: center;
-      padding-bottom: 60px;
-    }
+    #screen-home .scroll-area { flex: 1; overflow-y: auto; padding: 0 16px; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; text-align: center; padding-bottom: 60px; }
     .empty-icon { font-size: 52px; opacity: 0.3; }
     .empty-title { font-size: 18px; font-weight: 700; color: var(--muted); }
     .empty-sub { font-size: 13px; color: var(--muted); opacity: 0.7; line-height: 1.5; }
-
     .section-list { padding-bottom: 8px; }
-    .section-card {
-      background: var(--s1); border: 1px solid var(--border);
-      border-radius: var(--r); margin-bottom: 10px;
-      overflow: hidden;
-    }
-    .section-main {
-      display: flex; align-items: center;
-      padding: 14px 16px; gap: 12px;
-    }
-    .section-play {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: var(--s2); border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; cursor: pointer; flex-shrink: 0;
-      transition: background 0.15s;
-    }
-    .section-play:active { background: var(--teal); }
-    .section-play.playing { background: var(--teal); }
+    .section-card { background: var(--s1); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 10px; }
+    .section-main { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
+    .section-play { width: 40px; height: 40px; border-radius: 50%; background: var(--s2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+    .section-play:active, .section-play.playing { background: var(--teal); }
     .section-info { flex: 1; min-width: 0; }
-    .section-name {
-      font-size: 15px; font-weight: 700;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .section-meta {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px; color: var(--muted); margin-top: 2px;
-    }
+    .section-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .section-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
     .section-actions { display: flex; gap: 4px; align-items: center; }
     .order-btns { display: flex; flex-direction: column; gap: 2px; }
-    .order-btn {
-      background: none; border: none; cursor: pointer;
-      color: var(--muted); font-size: 12px; padding: 2px 4px;
-      line-height: 1;
-    }
+    .order-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 12px; padding: 2px 4px; line-height: 1; }
     .order-btn:active { color: var(--text); }
-
-    #screen-home .bottom-bar {
-      padding: 12px 16px;
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
-      background: linear-gradient(to top, var(--bg) 60%, transparent);
-      flex-shrink: 0;
-    }
-    .play-all-row {
-      display: flex; gap: 10px; margin-bottom: 10px;
-    }
+    #screen-home .bottom-bar { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 60%, transparent); flex-shrink: 0; }
+    .play-all-row { display: flex; gap: 10px; margin-bottom: 10px; }
     .play-all-row .btn { flex: 1; }
 
-    #screen-record {
-      align-items: center;
-      text-align: center;
-    }
+    #screen-record { align-items: center; text-align: center; }
     #screen-record .topbar { width: 100%; }
-    .back-btn {
-      font-size: 22px; background: none; border: none;
-      color: var(--muted); cursor: pointer; padding: 4px 8px;
-    }
-    .rec-section-name {
-      font-size: 22px; font-weight: 900;
-      margin: 8px 0 4px;
-    }
-    .rec-instruction {
-      font-size: 13px; color: var(--muted); margin-bottom: 32px;
-    }
-
     .rec-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
-
-    .rec-timer {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 52px; font-weight: 600;
-      letter-spacing: -0.03em;
-      color: var(--text);
-    }
+    .rec-section-name { font-size: 22px; font-weight: 900; margin: 8px 0 4px; }
+    .rec-instruction { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+    .rec-timer { font-family: 'IBM Plex Mono', monospace; font-size: 52px; font-weight: 600; letter-spacing: -0.03em; }
     .rec-timer.recording { color: var(--red); }
-
-    .rec-indicator {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: var(--muted);
-    }
-    .rec-indicator.recording {
-      background: var(--red);
-      animation: blink 1s infinite;
-    }
+    .rec-indicator { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); }
+    .rec-indicator.recording { background: var(--red); animation: blink 1s infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-    .rec-big-btn {
-      width: 88px; height: 88px; border-radius: 50%;
-      border: 3px solid var(--teal); background: none;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 32px; cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      flex-shrink: 0;
-    }
+    .rec-big-btn { width: 88px; height: 88px; border-radius: 50%; border: 3px solid var(--teal); background: none; display: flex; align-items: center; justify-content: center; font-size: 32px; cursor: pointer; transition: background 0.15s, transform 0.1s; flex-shrink: 0; }
     .rec-big-btn:active { transform: scale(0.92); background: rgba(13,148,136,0.15); }
     .rec-big-btn.recording { border-color: var(--red); }
-    .rec-big-btn.recording:active { background: rgba(239,68,68,0.1); }
+    #screen-record .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 
-    #screen-record .bottom-bar {
-      width: 100%; padding: 16px;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
-    }
-
-    #screen-review {
-      align-items: center; text-align: center;
-    }
+    #screen-review { align-items: center; text-align: center; }
     #screen-review .topbar { width: 100%; justify-content: center; }
-    .review-label {
-      font-size: 12px; font-family: 'IBM Plex Mono', monospace;
-      color: var(--teal); letter-spacing: 0.1em; text-transform: uppercase;
-      margin-bottom: 6px;
-    }
+    .review-label { font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: var(--teal); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
     .review-name { font-size: 24px; font-weight: 900; margin-bottom: 28px; }
-    .review-center {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 24px;
-    }
-    .review-play-btn {
-      width: 72px; height: 72px; border-radius: 50%;
-      background: var(--s2); border: 2px solid var(--border);
-      font-size: 28px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s;
-    }
+    .review-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+    .review-play-btn { width: 72px; height: 72px; border-radius: 50%; background: var(--s2); border: 2px solid var(--border); font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .review-play-btn.playing { background: var(--teal); border-color: var(--teal); }
     .review-play-btn:active { transform: scale(0.92); }
-    .review-duration {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 16px; color: var(--muted);
-    }
-    #screen-review .bottom-bar {
-      width: 100%; padding: 16px;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
-    }
+    .review-duration { font-family: 'IBM Plex Mono', monospace; font-size: 16px; color: var(--muted); }
+    #screen-review .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 
-    #screen-playing {
-      align-items: center; text-align: center;
-    }
+    #screen-playing { align-items: center; text-align: center; }
     #screen-playing .topbar { width: 100%; justify-content: center; }
-    .playing-label {
-      font-size: 11px; font-family: 'IBM Plex Mono', monospace;
-      color: var(--muted); letter-spacing: 0.12em; margin-bottom: 4px;
-    }
+    .playing-label { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); letter-spacing: 0.12em; margin-bottom: 4px; }
     .playing-name { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
-    .playing-counter {
-      font-size: 13px; color: var(--muted);
-      font-family: 'IBM Plex Mono', monospace;
-    }
-    .playing-center {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 20px;
-    }
-    .playing-waveform {
-      display: flex; gap: 4px; align-items: center; height: 40px;
-    }
-    .playing-waveform span {
-      width: 4px; background: var(--teal);
-      border-radius: 2px; animation: wave 1.2s infinite ease-in-out;
-    }
-    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s}
-    .playing-waveform span:nth-child(2){height:28px;animation-delay:0.15s}
-    .playing-waveform span:nth-child(3){height:36px;animation-delay:0.3s}
-    .playing-waveform span:nth-child(4){height:24px;animation-delay:0.45s}
-    .playing-waveform span:nth-child(5){height:16px;animation-delay:0.6s}
+    .playing-counter { font-size: 13px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+    .playing-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    .playing-waveform { display: flex; gap: 4px; align-items: center; height: 40px; }
+    .playing-waveform span { width: 4px; background: var(--teal); border-radius: 2px; animation: wave 1.2s infinite ease-in-out; }
+    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s} .playing-waveform span:nth-child(2){height:28px;animation-delay:0.15s} .playing-waveform span:nth-child(3){height:36px;animation-delay:0.3s} .playing-waveform span:nth-child(4){height:24px;animation-delay:0.45s} .playing-waveform span:nth-child(5){height:16px;animation-delay:0.6s}
     @keyframes wave { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.35)} }
+    .playing-progress { width: 80%; height: 3px; background: var(--s2); border-radius: 2px; overflow: hidden; }
+    .playing-progress-fill { height: 100%; background: var(--teal); border-radius: 2px; width: 0%; transition: width 0.5s linear; }
+    #screen-playing .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 
-    .playing-progress {
-      width: 80%; height: 3px;
-      background: var(--s2); border-radius: 2px; overflow: hidden;
-    }
-    .playing-progress-fill {
-      height: 100%; background: var(--teal);
-      border-radius: 2px; width: 0%;
-      transition: width 0.5s linear;
-    }
-    #screen-playing .bottom-bar {
-      width: 100%; padding: 16px;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
-    }
-
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
-      display: flex; align-items: flex-end;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.2s; z-index: 100;
-    }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 100; }
     .modal-overlay.open { opacity: 1; pointer-events: all; }
-    .modal-sheet {
-      background: var(--s1); border-radius: 20px 20px 0 0;
-      padding: 24px 20px; width: 100%;
-      transform: translateY(100%); transition: transform 0.25s ease-out;
-      padding-bottom: max(24px, env(safe-area-inset-bottom));
-    }
+    .modal-sheet { background: var(--s1); border-radius: 20px 20px 0 0; padding: 24px 20px; width: 100%; transform: translateY(100%); transition: transform 0.25s ease-out; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
     .modal-overlay.open .modal-sheet { transform: translateY(0); }
     .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
-    .modal-input {
-      width: 100%; background: var(--s2);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 14px 16px; font-size: 16px;
-      color: var(--text); font-family: 'Heebo', sans-serif;
-      direction: rtl; margin-bottom: 16px;
-      outline: none;
-    }
+    .modal-input { width: 100%; background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-size: 16px; color: var(--text); font-family: 'Heebo', sans-serif; direction: rtl; margin-bottom: 16px; outline: none; }
     .modal-input:focus { border-color: var(--teal); }
   </style>
 </head>
@@ -353,9 +146,7 @@
 </div>
 
 <div id="screen-review" class="screen">
-  <div class="topbar" style="width:100%;justify-content:center">
-    <span></span>
-  </div>
+  <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="review-center">
     <div>
       <div class="review-label">הקלטה הושלמה</div>
@@ -373,19 +164,13 @@
 </div>
 
 <div id="screen-playing" class="screen">
-  <div class="topbar" style="width:100%;justify-content:center">
-    <span class="logo">laylo</span>
-  </div>
+  <div class="topbar" style="width:100%;justify-content:center"><span class="logo">laylo</span></div>
   <div class="playing-center">
     <div class="playing-label">מנגן עכשיו</div>
     <div class="playing-name" id="playing-name">—</div>
     <div class="playing-counter" id="playing-counter">1 / 1</div>
-    <div class="playing-waveform">
-      <span></span><span></span><span></span><span></span><span></span>
-    </div>
-    <div class="playing-progress">
-      <div class="playing-progress-fill" id="playing-progress-fill"></div>
-    </div>
+    <div class="playing-waveform"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="playing-progress"><div class="playing-progress-fill" id="playing-progress-fill"></div></div>
   </div>
   <div class="bottom-bar">
     <button class="btn btn-danger" id="btn-stop-playing">■ עצור</button>
@@ -401,12 +186,23 @@
 </div>
 
 <script>
+// TEMP — Sprint 1 (refactored). Cleanup: הסר console.logs לפני production
+
+// ── AI GATEWAY ──────────────────────────
 async function callAI(prompt) {
   console.log('[callAI mock]', prompt);
-  return { text: '[mock] אין עדיין חיבור לClaude API' };
+  return { text: '[mock]' };
+  // Sprint 2+: const res = await fetch('/api/ai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt }) }); return res.json();
 }
 
-const DB_NAME = 'laylo-v1';
+// ── DATA MODEL ───────────────────────────
+// sections: { id, name, duration }
+// layers:   { id, sectionId, layerName, buffer: ArrayBuffer, mimeType }
+// arrangement: { key:'main', order:[sectionId,...] }
+// Sprint 1: כל section → layer אחד בשם 'guide'
+
+// ── DB ──────────────────────────────────
+const DB_NAME = 'laylo-v2';
 const DB_VER = 1;
 let db;
 
@@ -415,70 +211,64 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains('sections'))
-        d.createObjectStore('sections', { keyPath: 'id' });
-      if (!d.objectStoreNames.contains('meta'))
-        d.createObjectStore('meta', { keyPath: 'key' });
+      if (!d.objectStoreNames.contains('sections')) d.createObjectStore('sections', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('layers')) d.createObjectStore('layers', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'key' });
     };
     req.onsuccess = e => { db = e.target.result; res(db); };
     req.onerror = () => rej(req.error);
   });
 }
 
+const txStore = (store, mode = 'readonly') => db.transaction(store, mode).objectStore(store);
+
 function dbPut(store, val) {
   return new Promise((res, rej) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).put(val).onsuccess = () => res();
-    tx.onerror = () => rej(tx.error);
+    const t = db.transaction(store, 'readwrite');
+    t.objectStore(store).put(val).onsuccess = () => res();
+    t.onerror = () => rej(t.error);
   });
 }
 function dbGet(store, key) {
   return new Promise((res, rej) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).get(key);
+    const req = txStore(store).get(key);
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
   });
 }
 function dbGetAll(store) {
   return new Promise((res, rej) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).getAll();
+    const req = txStore(store).getAll();
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
   });
 }
 function dbDelete(store, key) {
   return new Promise((res, rej) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).delete(key).onsuccess = () => res();
-    tx.onerror = () => rej(tx.error);
+    const t = db.transaction(store, 'readwrite');
+    t.objectStore(store).delete(key).onsuccess = () => res();
+    t.onerror = () => rej(t.error);
   });
 }
 
-async function saveArrangement(order) {
-  await dbPut('meta', { key: 'arrangement', order });
-}
-async function loadArrangement() {
-  const rec = await dbGet('meta', 'arrangement');
-  return rec ? rec.order : [];
-}
+async function saveArrangement(order) { await dbPut('meta', { key: 'arrangement', order }); }
+async function loadArrangement() { const r = await dbGet('meta', 'arrangement'); return r ? r.order : []; }
 
+// ── STATE ────────────────────────────────
 let sections = [];
+let layers = [];
 let arrangement = [];
-let pendingName = '';
-let pendingBlob = null;
-let pendingMime = '';
-let pendingDuration = 0;
 
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function defaultName() {
-  const letters = ['A','B','C','D','E','F'];
-  return (letters[sections.length] || `${sections.length + 1}`) + '-part';
+  const L = ['A','B','C','D','E','F'];
+  return (L[sections.length] || String(sections.length + 1)) + '-part';
+}
+function getGuideLayer(sectionId) {
+  return layers.find(l => l.sectionId === sectionId && l.layerName === 'guide');
 }
 
+// ── AUDIO ────────────────────────────────
 let mediaRecorder = null;
 let recStream = null;
 let recChunks = [];
@@ -486,6 +276,11 @@ let recStartTime = 0;
 let recTimerInterval = null;
 let currentAudio = null;
 let stopPlayAllFlag = false;
+
+let pendingName = '';
+let pendingBuffer = null;
+let pendingMime = '';
+let pendingDuration = 0;
 
 async function startRecording() {
   try {
@@ -496,8 +291,7 @@ async function startRecording() {
     alert('לא ניתן לגשת למיקרופון. אפשר גישה בהגדרות הדפדפן.');
     return false;
   }
-  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? 'audio/webm;codecs=opus'
+  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
     : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
   mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : {});
   recChunks = [];
@@ -510,60 +304,47 @@ async function startRecording() {
 
 function stopRecording() {
   return new Promise(res => {
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       const blob = new Blob(recChunks, { type: pendingMime });
       pendingDuration = (Date.now() - recStartTime) / 1000;
-      pendingBlob = blob;
+      pendingBuffer = await blob.arrayBuffer();
       recStream.getTracks().forEach(t => t.stop());
-      res(blob);
+      res();
     };
     mediaRecorder.stop();
   });
 }
 
+function bufferToBlob(buffer, mimeType) { return new Blob([buffer], { type: mimeType }); }
+
 function playBlob(blob, onProgress) {
-  return new Promise((res) => {
+  return new Promise(res => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     currentAudio = audio;
-    if (onProgress) {
-      audio.ontimeupdate = () => {
-        if (audio.duration) onProgress(audio.currentTime / audio.duration);
-      };
-    }
+    if (onProgress) audio.ontimeupdate = () => { if (audio.duration) onProgress(audio.currentTime / audio.duration); };
     audio.onended = () => { URL.revokeObjectURL(url); res('ended'); };
     audio.onerror = () => { URL.revokeObjectURL(url); res('error'); };
     audio.play().catch(() => res('error'));
   });
 }
 
-function stopCurrentAudio() {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-}
+function stopCurrentAudio() { if (currentAudio) { currentAudio.pause(); currentAudio = null; } }
+function fmtTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 
-function fmtTime(secs) {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-
+// ── SCREENS ──────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
+// ── HOME ─────────────────────────────────
 function renderHome() {
   const empty = document.getElementById('empty-state');
   const list = document.getElementById('section-list');
   const playRow = document.getElementById('play-all-row');
-  if (sections.length === 0) {
-    empty.style.display = 'flex';
-    list.style.display = 'none';
-    playRow.style.display = 'none';
-    return;
-  }
-  empty.style.display = 'none';
-  list.style.display = 'block';
+  if (sections.length === 0) { empty.style.display = 'flex'; list.style.display = 'none'; playRow.style.display = 'none'; return; }
+  empty.style.display = 'none'; list.style.display = 'block';
   playRow.style.display = arrangement.length > 1 ? 'flex' : 'none';
   list.innerHTML = '';
   arrangement.forEach((id, idx) => {
@@ -573,24 +354,24 @@ function renderHome() {
     card.className = 'section-card';
     card.innerHTML = `
       <div class="section-main">
-        <button class="section-play" data-id="${sec.id}" title="נגן">▶</button>
+        <button class="section-play" data-id="${sec.id}">▶</button>
         <div class="section-info">
           <div class="section-name">${sec.name}</div>
           <div class="section-meta">${fmtTime(sec.duration)}</div>
         </div>
         <div class="section-actions">
           <div class="order-btns">
-            <button class="order-btn" data-up="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
-            <button class="order-btn" data-down="${idx}" ${idx === arrangement.length - 1 ? 'disabled' : ''}>▼</button>
+            <button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>▲</button>
+            <button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>▼</button>
           </div>
           <button class="btn-icon" data-delete="${sec.id}">🗑</button>
         </div>
-      </div>
-    `;
+      </div>`;
     list.appendChild(card);
   });
 }
 
+// ── RECORD ───────────────────────────────
 let isRecording = false;
 
 function enterRecord(name) {
@@ -626,6 +407,7 @@ async function toggleRecord() {
   }
 }
 
+// ── REVIEW ───────────────────────────────
 let reviewIsPlaying = false;
 
 function enterReview() {
@@ -639,15 +421,14 @@ function enterReview() {
 
 async function toggleReviewPlay() {
   if (reviewIsPlaying) {
-    stopCurrentAudio();
-    reviewIsPlaying = false;
+    stopCurrentAudio(); reviewIsPlaying = false;
     document.getElementById('review-play-btn').textContent = '▶';
     document.getElementById('review-play-btn').classList.remove('playing');
   } else {
     reviewIsPlaying = true;
     document.getElementById('review-play-btn').textContent = '■';
     document.getElementById('review-play-btn').classList.add('playing');
-    await playBlob(pendingBlob);
+    await playBlob(bufferToBlob(pendingBuffer, pendingMime));
     reviewIsPlaying = false;
     document.getElementById('review-play-btn').textContent = '▶';
     document.getElementById('review-play-btn').classList.remove('playing');
@@ -656,21 +437,23 @@ async function toggleReviewPlay() {
 
 async function keepSection() {
   stopCurrentAudio();
-  const id = uid();
-  const sec = { id, name: pendingName, blob: pendingBlob, mimeType: pendingMime, duration: pendingDuration };
+  const secId = uid();
+  const layerId = uid();
+  const sec = { id: secId, name: pendingName, duration: pendingDuration };
+  const layer = { id: layerId, sectionId: secId, layerName: 'guide', buffer: pendingBuffer, mimeType: pendingMime };
   sections.push(sec);
-  arrangement.push(id);
-  await dbPut('sections', { id, name: pendingName, blob: pendingBlob, mimeType: pendingMime, duration: pendingDuration });
+  layers.push(layer);
+  arrangement.push(secId);
+  await dbPut('sections', sec);
+  await dbPut('layers', layer);
   await saveArrangement(arrangement);
   renderHome();
   showScreen('screen-home');
 }
 
-function redoSection() {
-  stopCurrentAudio();
-  enterRecord(pendingName);
-}
+function redoSection() { stopCurrentAudio(); enterRecord(pendingName); }
 
+// ── PLAY ALL ─────────────────────────────
 async function playAll() {
   if (arrangement.length === 0) return;
   stopPlayAllFlag = false;
@@ -678,46 +461,39 @@ async function playAll() {
   for (let i = 0; i < arrangement.length; i++) {
     if (stopPlayAllFlag) break;
     const sec = sections.find(s => s.id === arrangement[i]);
-    if (!sec) continue;
+    const layer = getGuideLayer(arrangement[i]);
+    if (!sec || !layer) continue;
     document.getElementById('playing-name').textContent = sec.name;
-    document.getElementById('playing-counter').textContent = `${i + 1} / ${arrangement.length}`;
+    document.getElementById('playing-counter').textContent = `${i+1} / ${arrangement.length}`;
     document.getElementById('playing-progress-fill').style.width = '0%';
-    await playBlob(sec.blob, pct => {
+    await playBlob(bufferToBlob(layer.buffer, layer.mimeType), pct => {
       document.getElementById('playing-progress-fill').style.width = (pct * 100) + '%';
     });
   }
   if (!stopPlayAllFlag) showScreen('screen-home');
 }
 
+// ── MODAL ────────────────────────────────
 function openNameModal() {
-  const modal = document.getElementById('name-modal');
   const input = document.getElementById('modal-input');
   input.value = defaultName();
-  modal.classList.add('open');
+  document.getElementById('name-modal').classList.add('open');
   setTimeout(() => input.focus(), 300);
 }
-function closeNameModal() {
-  document.getElementById('name-modal').classList.remove('open');
-}
+function closeNameModal() { document.getElementById('name-modal').classList.remove('open'); }
 
+// ── EVENTS ───────────────────────────────
 document.getElementById('btn-new-section').addEventListener('click', openNameModal);
 document.getElementById('modal-confirm').addEventListener('click', () => {
   const val = document.getElementById('modal-input').value.trim();
   if (!val) return;
-  pendingName = val;
-  closeNameModal();
-  enterRecord(pendingName);
+  pendingName = val; closeNameModal(); enterRecord(pendingName);
 });
-document.getElementById('modal-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('modal-confirm').click();
-});
-document.getElementById('name-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('name-modal')) closeNameModal();
-});
+document.getElementById('modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('modal-confirm').click(); });
+document.getElementById('name-modal').addEventListener('click', e => { if (e.target === document.getElementById('name-modal')) closeNameModal(); });
 document.getElementById('rec-back').addEventListener('click', () => {
-  if (isRecording) { clearInterval(recTimerInterval); stopRecording().then(() => {}); isRecording = false; }
-  stopCurrentAudio();
-  showScreen('screen-home');
+  if (isRecording) { clearInterval(recTimerInterval); stopRecording(); isRecording = false; }
+  stopCurrentAudio(); showScreen('screen-home');
 });
 document.getElementById('rec-btn').addEventListener('click', toggleRecord);
 document.getElementById('review-play-btn').addEventListener('click', toggleReviewPlay);
@@ -725,9 +501,7 @@ document.getElementById('btn-keep').addEventListener('click', keepSection);
 document.getElementById('btn-redo').addEventListener('click', redoSection);
 document.getElementById('btn-play-all').addEventListener('click', playAll);
 document.getElementById('btn-stop-playing').addEventListener('click', () => {
-  stopPlayAllFlag = true;
-  stopCurrentAudio();
-  showScreen('screen-home');
+  stopPlayAllFlag = true; stopCurrentAudio(); showScreen('screen-home');
 });
 
 document.getElementById('section-list').addEventListener('click', async e => {
@@ -738,48 +512,42 @@ document.getElementById('section-list').addEventListener('click', async e => {
 
   if (playBtn) {
     const id = playBtn.dataset.id;
-    const sec = sections.find(s => s.id === id);
-    if (!sec) return;
-    playBtn.classList.add('playing');
-    playBtn.textContent = '■';
-    await playBlob(sec.blob);
-    playBtn.classList.remove('playing');
-    playBtn.textContent = '▶';
+    const layer = getGuideLayer(id);
+    if (!layer) return;
+    playBtn.classList.add('playing'); playBtn.textContent = '■';
+    await playBlob(bufferToBlob(layer.buffer, layer.mimeType));
+    playBtn.classList.remove('playing'); playBtn.textContent = '▶';
   }
   if (delBtn) {
     const id = delBtn.dataset.delete;
     if (!confirm('למחוק את הקטע הזה?')) return;
+    const layersToDelete = layers.filter(l => l.sectionId === id);
     sections = sections.filter(s => s.id !== id);
+    layers = layers.filter(l => l.sectionId !== id);
     arrangement = arrangement.filter(i => i !== id);
     await dbDelete('sections', id);
+    for (const l of layersToDelete) await dbDelete('layers', l.id);
     await saveArrangement(arrangement);
     renderHome();
   }
   if (upBtn) {
     const idx = parseInt(upBtn.dataset.up);
-    if (idx > 0) {
-      [arrangement[idx], arrangement[idx - 1]] = [arrangement[idx - 1], arrangement[idx]];
-      await saveArrangement(arrangement);
-      renderHome();
-    }
+    if (idx > 0) { [arrangement[idx], arrangement[idx-1]] = [arrangement[idx-1], arrangement[idx]]; await saveArrangement(arrangement); renderHome(); }
   }
   if (downBtn) {
     const idx = parseInt(downBtn.dataset.down);
-    if (idx < arrangement.length - 1) {
-      [arrangement[idx], arrangement[idx + 1]] = [arrangement[idx + 1], arrangement[idx]];
-      await saveArrangement(arrangement);
-      renderHome();
-    }
+    if (idx < arrangement.length-1) { [arrangement[idx], arrangement[idx+1]] = [arrangement[idx+1], arrangement[idx]]; await saveArrangement(arrangement); renderHome(); }
   }
 });
 
+// ── INIT ─────────────────────────────────
 async function init() {
   await openDB();
-  const saved = await dbGetAll('sections');
-  const savedArrangement = await loadArrangement();
-  sections = saved;
+  sections = await dbGetAll('sections');
+  layers = await dbGetAll('layers');
+  const savedArr = await loadArrangement();
   const ids = new Set(sections.map(s => s.id));
-  arrangement = savedArrangement.filter(id => ids.has(id));
+  arrangement = savedArr.filter(id => ids.has(id));
   sections.forEach(s => { if (!arrangement.includes(s.id)) arrangement.push(s.id); });
   renderHome();
 }
