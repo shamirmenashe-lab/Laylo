@@ -3,402 +3,788 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>מבחן Latency</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#080e1a">
+  <title>Laylo</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@400;700;900&display=swap');
+    /* ── TEMP: Sprint 1 test build — not final production UI ── */
 
     :root {
       --teal: #0d9488;
-      --teal-dim: #0f766e;
-      --bg: #090f1a;
-      --surface: #111827;
-      --surface2: #1c2a3a;
-      --border: #1e3a4a;
+      --teal2: #14b8a6;
+      --bg: #080e1a;
+      --s1: #0f1c2e;
+      --s2: #162438;
+      --border: #1e3347;
       --text: #e2e8f0;
-      --muted: #64748b;
-      --green: #22c55e;
-      --yellow: #f59e0b;
+      --muted: #5a7a94;
       --red: #ef4444;
+      --green: #22c55e;
+      --r: 14px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-    body {
-      font-family: 'Heebo', sans-serif;
+    html, body {
+      height: 100%;
+      overflow: hidden;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      padding: 28px 18px 48px;
+      font-family: 'Heebo', sans-serif;
       direction: rtl;
     }
 
-    .header { margin-bottom: 28px; }
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .screen.active { opacity: 1; pointer-events: all; }
 
-    .label {
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px 12px;
+      flex-shrink: 0;
+    }
+    .logo {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--teal);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
+      font-size: 20px; font-weight: 600;
+      color: var(--teal2);
+      letter-spacing: -0.04em;
+    }
+    .badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px; color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .btn {
+      border: none; border-radius: var(--r);
+      font-family: 'Heebo', sans-serif;
+      font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      user-select: none;
+    }
+    .btn:active { opacity: 0.75; transform: scale(0.97); }
+    .btn-primary {
+      background: var(--teal); color: #fff;
+      font-size: 16px; padding: 16px 24px; width: 100%;
+    }
+    .btn-ghost {
+      background: var(--s2); color: var(--text);
+      font-size: 15px; padding: 14px 24px; width: 100%;
+      border: 1px solid var(--border);
+    }
+    .btn-danger {
+      background: rgba(239,68,68,0.12); color: var(--red);
+      font-size: 15px; padding: 14px 24px; width: 100%;
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+    .btn-icon {
+      background: none; border: none;
+      color: var(--muted); font-size: 18px;
+      padding: 8px; cursor: pointer; border-radius: 8px;
+      transition: color 0.15s;
+    }
+    .btn-icon:active { color: var(--text); }
+    .gap { gap: 10px; display: flex; flex-direction: column; }
+
+    #screen-home .scroll-area {
+      flex: 1; overflow-y: auto; padding: 0 16px;
+    }
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; gap: 12px; text-align: center;
+      padding-bottom: 60px;
+    }
+    .empty-icon { font-size: 52px; opacity: 0.3; }
+    .empty-title { font-size: 18px; font-weight: 700; color: var(--muted); }
+    .empty-sub { font-size: 13px; color: var(--muted); opacity: 0.7; line-height: 1.5; }
+
+    .section-list { padding-bottom: 8px; }
+    .section-card {
+      background: var(--s1); border: 1px solid var(--border);
+      border-radius: var(--r); margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .section-main {
+      display: flex; align-items: center;
+      padding: 14px 16px; gap: 12px;
+    }
+    .section-play {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--s2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; cursor: pointer; flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .section-play:active { background: var(--teal); }
+    .section-play.playing { background: var(--teal); }
+    .section-info { flex: 1; min-width: 0; }
+    .section-name {
+      font-size: 15px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .section-meta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+    .section-actions { display: flex; gap: 4px; align-items: center; }
+    .order-btns { display: flex; flex-direction: column; gap: 2px; }
+    .order-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 12px; padding: 2px 4px;
+      line-height: 1;
+    }
+    .order-btn:active { color: var(--text); }
+
+    #screen-home .bottom-bar {
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background: linear-gradient(to top, var(--bg) 60%, transparent);
+      flex-shrink: 0;
+    }
+    .play-all-row {
+      display: flex; gap: 10px; margin-bottom: 10px;
+    }
+    .play-all-row .btn { flex: 1; }
+
+    #screen-record {
+      align-items: center;
+      text-align: center;
+    }
+    #screen-record .topbar { width: 100%; }
+    .back-btn {
+      font-size: 22px; background: none; border: none;
+      color: var(--muted); cursor: pointer; padding: 4px 8px;
+    }
+    .rec-section-name {
+      font-size: 22px; font-weight: 900;
+      margin: 8px 0 4px;
+    }
+    .rec-instruction {
+      font-size: 13px; color: var(--muted); margin-bottom: 32px;
+    }
+
+    .rec-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+
+    .rec-timer {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 52px; font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .rec-timer.recording { color: var(--red); }
+
+    .rec-indicator {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .rec-indicator.recording {
+      background: var(--red);
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    .rec-big-btn {
+      width: 88px; height: 88px; border-radius: 50%;
+      border: 3px solid var(--teal); background: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .rec-big-btn:active { transform: scale(0.92); background: rgba(13,148,136,0.15); }
+    .rec-big-btn.recording { border-color: var(--red); }
+    .rec-big-btn.recording:active { background: rgba(239,68,68,0.1); }
+
+    #screen-record .bottom-bar {
+      width: 100%; padding: 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
+    #screen-review {
+      align-items: center; text-align: center;
+    }
+    #screen-review .topbar { width: 100%; justify-content: center; }
+    .review-label {
+      font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+      color: var(--teal); letter-spacing: 0.1em; text-transform: uppercase;
       margin-bottom: 6px;
     }
-
-    h1 { font-size: 26px; font-weight: 900; line-height: 1.1; color: var(--text); }
-
-    .instructions {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 24px;
-      font-size: 14px;
-      line-height: 1.8;
-      color: #94a3b8;
+    .review-name { font-size: 24px; font-weight: 900; margin-bottom: 28px; }
+    .review-center {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 24px;
+    }
+    .review-play-btn {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--s2); border: 2px solid var(--border);
+      font-size: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .review-play-btn.playing { background: var(--teal); border-color: var(--teal); }
+    .review-play-btn:active { transform: scale(0.92); }
+    .review-duration {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 16px; color: var(--muted);
+    }
+    #screen-review .bottom-bar {
+      width: 100%; padding: 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
 
-    .instructions strong { color: var(--text); }
-
-    .warn {
-      background: rgba(245, 158, 11, 0.08);
-      border: 1px solid rgba(245, 158, 11, 0.25);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: #fbbf24;
-      margin-top: 10px;
+    #screen-playing {
+      align-items: center; text-align: center;
     }
-
-    #startBtn {
-      width: 100%;
-      padding: 18px;
-      background: var(--teal);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-family: 'Heebo', sans-serif;
-      font-size: 17px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-bottom: 20px;
-      transition: background 0.2s;
+    #screen-playing .topbar { width: 100%; justify-content: center; }
+    .playing-label {
+      font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+      color: var(--muted); letter-spacing: 0.12em; margin-bottom: 4px;
     }
-    #startBtn:active { background: var(--teal-dim); }
-    #startBtn:disabled { background: var(--surface2); color: var(--muted); cursor: default; }
-
-    .status {
-      text-align: center;
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 16px;
-      min-height: 20px;
+    .playing-name { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
+    .playing-counter {
+      font-size: 13px; color: var(--muted);
       font-family: 'IBM Plex Mono', monospace;
     }
+    .playing-center {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+    }
+    .playing-waveform {
+      display: flex; gap: 4px; align-items: center; height: 40px;
+    }
+    .playing-waveform span {
+      width: 4px; background: var(--teal);
+      border-radius: 2px; animation: wave 1.2s infinite ease-in-out;
+    }
+    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s}
+    .playing-waveform span:nth-child(2){height:28px;animation-delay:0.15s}
+    .playing-waveform span:nth-child(3){height:36px;animation-delay:0.3s}
+    .playing-waveform span:nth-child(4){height:24px;animation-delay:0.45s}
+    .playing-waveform span:nth-child(5){height:16px;animation-delay:0.6s}
+    @keyframes wave { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.35)} }
 
-    .dots {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 28px;
+    .playing-progress {
+      width: 80%; height: 3px;
+      background: var(--s2); border-radius: 2px; overflow: hidden;
+    }
+    .playing-progress-fill {
+      height: 100%; background: var(--teal);
+      border-radius: 2px; width: 0%;
+      transition: width 0.5s linear;
+    }
+    #screen-playing .bottom-bar {
+      width: 100%; padding: 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
 
-    .dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      transition: all 0.3s;
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s; z-index: 100;
     }
-    .dot.active { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 8px var(--teal); animation: pulse 0.8s infinite; }
-    .dot.done { background: var(--green); border-color: var(--green); }
-    .dot.error { background: var(--red); border-color: var(--red); }
-
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    .results-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-      display: none;
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-sheet {
+      background: var(--s1); border-radius: 20px 20px 0 0;
+      padding: 24px 20px; width: 100%;
+      transform: translateY(100%); transition: transform 0.25s ease-out;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
     }
-
-    .card-title {
-      font-size: 12px;
-      font-family: 'IBM Plex Mono', monospace;
-      color: var(--teal);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
+    .modal-overlay.open .modal-sheet { transform: translateY(0); }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+    .modal-input {
+      width: 100%; background: var(--s2);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px; font-size: 16px;
+      color: var(--text); font-family: 'Heebo', sans-serif;
+      direction: rtl; margin-bottom: 16px;
+      outline: none;
     }
-
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 9px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 14px;
-    }
-    .row:last-child { border-bottom: none; }
-    .row-label { color: var(--muted); }
-    .row-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--text); }
-    .row-value.good { color: var(--green); }
-    .row-value.marginal { color: var(--yellow); }
-    .row-value.bad { color: var(--red); }
-    .divider { border: none; border-top: 1px solid #2a3d52; margin: 4px 0; }
-    .row.summary .row-label { font-weight: 700; color: var(--text); }
-
-    .verdict-card {
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      display: none;
-      margin-bottom: 16px;
-    }
-    .verdict-card.good { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.3); }
-    .verdict-card.marginal { background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.3); }
-    .verdict-card.bad { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.3); }
-
-    .verdict-icon { font-size: 36px; margin-bottom: 8px; }
-    .verdict-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
-    .verdict-body { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+    .modal-input:focus { border-color: var(--teal); }
   </style>
 </head>
 <body>
 
-  <div class="header">
-    <div class="label">Audio Latency Test · v3</div>
-    <h1>מבחן<br>עקביות שהיה</h1>
+<div id="screen-home" class="screen active">
+  <div class="topbar">
+    <span class="logo">laylo</span>
+    <span class="badge">sprint 1</span>
   </div>
-
-  <div class="instructions">
-    <strong>לפני שמתחילים:</strong><br>
-    🔊 עוצמת קול למקסימום<br>
-    🎧 ללא אוזניות — רמקול + מיקרופון ישיר<br>
-    🤫 סביבה שקטה ככל האפשר<br>
-    📱 אחזק את הטלפון רגיל
-    <div class="warn">⚠️ אם מבחנים נכשלים — נסה לכסות את תחתית הטלפון בכף היד לחיבור טוב יותר בין הרמקול למיקרופון</div>
+  <div class="scroll-area" id="home-scroll">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🎸</div>
+      <div class="empty-title">אין קטעים עדיין</div>
+      <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל.<br>הקלט A-part, B-part — קטע קטע.</div>
+    </div>
+    <div class="section-list" id="section-list" style="display:none"></div>
   </div>
-
-  <button id="startBtn">▶ התחל 5 מבחנים</button>
-  <div class="status" id="status">מוכן</div>
-
-  <div class="dots">
-    <div class="dot" id="d0"></div>
-    <div class="dot" id="d1"></div>
-    <div class="dot" id="d2"></div>
-    <div class="dot" id="d3"></div>
-    <div class="dot" id="d4"></div>
+  <div class="bottom-bar">
+    <div class="play-all-row" id="play-all-row" style="display:none">
+      <button class="btn btn-ghost" id="btn-play-all">▶ הפעל הכל</button>
+    </div>
+    <button class="btn btn-primary" id="btn-new-section">⊕ קטע חדש</button>
   </div>
+</div>
 
-  <div class="results-card" id="resultsCard">
-    <div class="card-title">תוצאות</div>
-    <div id="rows"></div>
+<div id="screen-record" class="screen">
+  <div class="topbar">
+    <button class="back-btn" id="rec-back">←</button>
+    <span></span>
   </div>
-
-  <div class="verdict-card" id="verdictCard">
-    <div class="verdict-icon" id="vIcon"></div>
-    <div class="verdict-title" id="vTitle"></div>
-    <div class="verdict-body" id="vBody"></div>
+  <div class="rec-center">
+    <div class="rec-section-name" id="rec-section-name">A-part</div>
+    <div class="rec-instruction" id="rec-instruction">לחץ להתחיל הקלטה</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="rec-indicator" id="rec-indicator"></div>
+      <div class="rec-timer" id="rec-timer">00:00</div>
+    </div>
+    <button class="rec-big-btn" id="rec-btn">●</button>
   </div>
+  <div class="bottom-bar"></div>
+</div>
 
-  <script>
-    const startBtn = document.getElementById('startBtn');
-    const statusEl = document.getElementById('status');
-    const rowsEl = document.getElementById('rows');
-    const resultsCard = document.getElementById('resultsCard');
-    const verdictCard = document.getElementById('verdictCard');
+<div id="screen-review" class="screen">
+  <div class="topbar" style="width:100%;justify-content:center">
+    <span></span>
+  </div>
+  <div class="review-center">
+    <div>
+      <div class="review-label">הקלטה הושלמה</div>
+      <div class="review-name" id="review-name">A-part</div>
+    </div>
+    <button class="review-play-btn" id="review-play-btn">▶</button>
+    <div class="review-duration" id="review-duration">0:00</div>
+  </div>
+  <div class="bottom-bar">
+    <div class="gap">
+      <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
+      <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
+    </div>
+  </div>
+</div>
 
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
+<div id="screen-playing" class="screen">
+  <div class="topbar" style="width:100%;justify-content:center">
+    <span class="logo">laylo</span>
+  </div>
+  <div class="playing-center">
+    <div class="playing-label">מנגן עכשיו</div>
+    <div class="playing-name" id="playing-name">—</div>
+    <div class="playing-counter" id="playing-counter">1 / 1</div>
+    <div class="playing-waveform">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="playing-progress">
+      <div class="playing-progress-fill" id="playing-progress-fill"></div>
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn btn-danger" id="btn-stop-playing">■ עצור</button>
+  </div>
+</div>
 
-    function setDot(i, state) {
-      const d = document.getElementById('d' + i);
-      d.className = 'dot ' + (state || '');
+<div class="modal-overlay" id="name-modal">
+  <div class="modal-sheet">
+    <div class="modal-title">שם הקטע</div>
+    <input class="modal-input" id="modal-input" type="text" placeholder="למשל: A-part, ברידג׳, ורס...">
+    <button class="btn btn-primary" id="modal-confirm">המשך להקלטה →</button>
+  </div>
+</div>
+
+<script>
+async function callAI(prompt) {
+  console.log('[callAI mock]', prompt);
+  return { text: '[mock] אין עדיין חיבור לClaude API' };
+}
+
+const DB_NAME = 'laylo-v1';
+const DB_VER = 1;
+let db;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('sections'))
+        d.createObjectStore('sections', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('meta'))
+        d.createObjectStore('meta', { keyPath: 'key' });
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+function dbPut(store, val) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(val).onsuccess = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+function dbGet(store, key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbGetAll(store) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbDelete(store, key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key).onsuccess = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function saveArrangement(order) {
+  await dbPut('meta', { key: 'arrangement', order });
+}
+async function loadArrangement() {
+  const rec = await dbGet('meta', 'arrangement');
+  return rec ? rec.order : [];
+}
+
+let sections = [];
+let arrangement = [];
+let pendingName = '';
+let pendingBlob = null;
+let pendingMime = '';
+let pendingDuration = 0;
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+function defaultName() {
+  const letters = ['A','B','C','D','E','F'];
+  return (letters[sections.length] || `${sections.length + 1}`) + '-part';
+}
+
+let mediaRecorder = null;
+let recStream = null;
+let recChunks = [];
+let recStartTime = 0;
+let recTimerInterval = null;
+let currentAudio = null;
+let stopPlayAllFlag = false;
+
+async function startRecording() {
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch (e) {
+    alert('לא ניתן לגשת למיקרופון. אפשר גישה בהגדרות הדפדפן.');
+    return false;
+  }
+  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : {});
+  recChunks = [];
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.start(100);
+  recStartTime = Date.now();
+  pendingMime = mediaRecorder.mimeType;
+  return true;
+}
+
+function stopRecording() {
+  return new Promise(res => {
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recChunks, { type: pendingMime });
+      pendingDuration = (Date.now() - recStartTime) / 1000;
+      pendingBlob = blob;
+      recStream.getTracks().forEach(t => t.stop());
+      res(blob);
+    };
+    mediaRecorder.stop();
+  });
+}
+
+function playBlob(blob, onProgress) {
+  return new Promise((res) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    if (onProgress) {
+      audio.ontimeupdate = () => {
+        if (audio.duration) onProgress(audio.currentTime / audio.duration);
+      };
     }
+    audio.onended = () => { URL.revokeObjectURL(url); res('ended'); };
+    audio.onerror = () => { URL.revokeObjectURL(url); res('error'); };
+    audio.play().catch(() => res('error'));
+  });
+}
 
-    function scheduleClick(ctx, when) {
-      const dur = 0.03;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 1100;
-      gain.gain.setValueAtTime(0, when);
-      gain.gain.linearRampToValueAtTime(1.0, when + 0.003);
-      gain.gain.setValueAtTime(1.0, when + 0.015);
-      gain.gain.linearRampToValueAtTime(0, when + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(when);
-      osc.stop(when + dur + 0.05);
+function stopCurrentAudio() {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+}
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function renderHome() {
+  const empty = document.getElementById('empty-state');
+  const list = document.getElementById('section-list');
+  const playRow = document.getElementById('play-all-row');
+  if (sections.length === 0) {
+    empty.style.display = 'flex';
+    list.style.display = 'none';
+    playRow.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  list.style.display = 'block';
+  playRow.style.display = arrangement.length > 1 ? 'flex' : 'none';
+  list.innerHTML = '';
+  arrangement.forEach((id, idx) => {
+    const sec = sections.find(s => s.id === id);
+    if (!sec) return;
+    const card = document.createElement('div');
+    card.className = 'section-card';
+    card.innerHTML = `
+      <div class="section-main">
+        <button class="section-play" data-id="${sec.id}" title="נגן">▶</button>
+        <div class="section-info">
+          <div class="section-name">${sec.name}</div>
+          <div class="section-meta">${fmtTime(sec.duration)}</div>
+        </div>
+        <div class="section-actions">
+          <div class="order-btns">
+            <button class="order-btn" data-up="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
+            <button class="order-btn" data-down="${idx}" ${idx === arrangement.length - 1 ? 'disabled' : ''}>▼</button>
+          </div>
+          <button class="btn-icon" data-delete="${sec.id}">🗑</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+let isRecording = false;
+
+function enterRecord(name) {
+  document.getElementById('rec-section-name').textContent = name;
+  document.getElementById('rec-instruction').textContent = 'לחץ להתחיל הקלטה';
+  document.getElementById('rec-timer').textContent = '00:00';
+  document.getElementById('rec-timer').classList.remove('recording');
+  document.getElementById('rec-indicator').classList.remove('recording');
+  document.getElementById('rec-btn').textContent = '●';
+  document.getElementById('rec-btn').classList.remove('recording');
+  isRecording = false;
+  showScreen('screen-record');
+}
+
+async function toggleRecord() {
+  if (!isRecording) {
+    const ok = await startRecording();
+    if (!ok) return;
+    isRecording = true;
+    document.getElementById('rec-instruction').textContent = 'מקליט... לחץ לעצור';
+    document.getElementById('rec-timer').classList.add('recording');
+    document.getElementById('rec-indicator').classList.add('recording');
+    document.getElementById('rec-btn').textContent = '■';
+    document.getElementById('rec-btn').classList.add('recording');
+    recTimerInterval = setInterval(() => {
+      document.getElementById('rec-timer').textContent = fmtTime((Date.now() - recStartTime) / 1000);
+    }, 250);
+  } else {
+    clearInterval(recTimerInterval);
+    await stopRecording();
+    isRecording = false;
+    enterReview();
+  }
+}
+
+let reviewIsPlaying = false;
+
+function enterReview() {
+  document.getElementById('review-name').textContent = pendingName;
+  document.getElementById('review-duration').textContent = fmtTime(pendingDuration);
+  reviewIsPlaying = false;
+  document.getElementById('review-play-btn').textContent = '▶';
+  document.getElementById('review-play-btn').classList.remove('playing');
+  showScreen('screen-review');
+}
+
+async function toggleReviewPlay() {
+  if (reviewIsPlaying) {
+    stopCurrentAudio();
+    reviewIsPlaying = false;
+    document.getElementById('review-play-btn').textContent = '▶';
+    document.getElementById('review-play-btn').classList.remove('playing');
+  } else {
+    reviewIsPlaying = true;
+    document.getElementById('review-play-btn').textContent = '■';
+    document.getElementById('review-play-btn').classList.add('playing');
+    await playBlob(pendingBlob);
+    reviewIsPlaying = false;
+    document.getElementById('review-play-btn').textContent = '▶';
+    document.getElementById('review-play-btn').classList.remove('playing');
+  }
+}
+
+async function keepSection() {
+  stopCurrentAudio();
+  const id = uid();
+  const sec = { id, name: pendingName, blob: pendingBlob, mimeType: pendingMime, duration: pendingDuration };
+  sections.push(sec);
+  arrangement.push(id);
+  await dbPut('sections', { id, name: pendingName, blob: pendingBlob, mimeType: pendingMime, duration: pendingDuration });
+  await saveArrangement(arrangement);
+  renderHome();
+  showScreen('screen-home');
+}
+
+function redoSection() {
+  stopCurrentAudio();
+  enterRecord(pendingName);
+}
+
+async function playAll() {
+  if (arrangement.length === 0) return;
+  stopPlayAllFlag = false;
+  showScreen('screen-playing');
+  for (let i = 0; i < arrangement.length; i++) {
+    if (stopPlayAllFlag) break;
+    const sec = sections.find(s => s.id === arrangement[i]);
+    if (!sec) continue;
+    document.getElementById('playing-name').textContent = sec.name;
+    document.getElementById('playing-counter').textContent = `${i + 1} / ${arrangement.length}`;
+    document.getElementById('playing-progress-fill').style.width = '0%';
+    await playBlob(sec.blob, pct => {
+      document.getElementById('playing-progress-fill').style.width = (pct * 100) + '%';
+    });
+  }
+  if (!stopPlayAllFlag) showScreen('screen-home');
+}
+
+function openNameModal() {
+  const modal = document.getElementById('name-modal');
+  const input = document.getElementById('modal-input');
+  input.value = defaultName();
+  modal.classList.add('open');
+  setTimeout(() => input.focus(), 300);
+}
+function closeNameModal() {
+  document.getElementById('name-modal').classList.remove('open');
+}
+
+document.getElementById('btn-new-section').addEventListener('click', openNameModal);
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  const val = document.getElementById('modal-input').value.trim();
+  if (!val) return;
+  pendingName = val;
+  closeNameModal();
+  enterRecord(pendingName);
+});
+document.getElementById('modal-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('modal-confirm').click();
+});
+document.getElementById('name-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('name-modal')) closeNameModal();
+});
+document.getElementById('rec-back').addEventListener('click', () => {
+  if (isRecording) { clearInterval(recTimerInterval); stopRecording().then(() => {}); isRecording = false; }
+  stopCurrentAudio();
+  showScreen('screen-home');
+});
+document.getElementById('rec-btn').addEventListener('click', toggleRecord);
+document.getElementById('review-play-btn').addEventListener('click', toggleReviewPlay);
+document.getElementById('btn-keep').addEventListener('click', keepSection);
+document.getElementById('btn-redo').addEventListener('click', redoSection);
+document.getElementById('btn-play-all').addEventListener('click', playAll);
+document.getElementById('btn-stop-playing').addEventListener('click', () => {
+  stopPlayAllFlag = true;
+  stopCurrentAudio();
+  showScreen('screen-home');
+});
+
+document.getElementById('section-list').addEventListener('click', async e => {
+  const playBtn = e.target.closest('[data-id]');
+  const delBtn = e.target.closest('[data-delete]');
+  const upBtn = e.target.closest('[data-up]');
+  const downBtn = e.target.closest('[data-down]');
+
+  if (playBtn) {
+    const id = playBtn.dataset.id;
+    const sec = sections.find(s => s.id === id);
+    if (!sec) return;
+    playBtn.classList.add('playing');
+    playBtn.textContent = '■';
+    await playBlob(sec.blob);
+    playBtn.classList.remove('playing');
+    playBtn.textContent = '▶';
+  }
+  if (delBtn) {
+    const id = delBtn.dataset.delete;
+    if (!confirm('למחוק את הקטע הזה?')) return;
+    sections = sections.filter(s => s.id !== id);
+    arrangement = arrangement.filter(i => i !== id);
+    await dbDelete('sections', id);
+    await saveArrangement(arrangement);
+    renderHome();
+  }
+  if (upBtn) {
+    const idx = parseInt(upBtn.dataset.up);
+    if (idx > 0) {
+      [arrangement[idx], arrangement[idx - 1]] = [arrangement[idx - 1], arrangement[idx]];
+      await saveArrangement(arrangement);
+      renderHome();
     }
-
-    function detectOnset(samples, sr, startIdx) {
-      const ambientLen = Math.min(startIdx - 100, Math.round(0.3 * sr));
-      let sumSq = 0;
-      for (let i = 0; i < ambientLen; i++) sumSq += samples[i] * samples[i];
-      const ambientRMS = Math.sqrt(sumSq / Math.max(ambientLen, 1));
-      const threshold = Math.max(ambientRMS * 7, 0.018);
-
-      const endIdx = Math.min(startIdx + Math.round(0.7 * sr), samples.length - 64);
-      const win = 64;
-
-      for (let i = startIdx; i < endIdx; i += 2) {
-        let rms = 0;
-        for (let j = 0; j < win; j++) rms += (samples[i + j] || 0) ** 2;
-        rms = Math.sqrt(rms / win);
-        if (rms > threshold) {
-          return ((i - startIdx) / sr) * 1000;
-        }
-      }
-      return null;
+  }
+  if (downBtn) {
+    const idx = parseInt(downBtn.dataset.down);
+    if (idx < arrangement.length - 1) {
+      [arrangement[idx], arrangement[idx + 1]] = [arrangement[idx + 1], arrangement[idx]];
+      await saveArrangement(arrangement);
+      renderHome();
     }
+  }
+});
 
-    async function runOne(ctx, stream, sr, idx) {
-      setDot(idx, 'active');
-      statusEl.textContent = `מבחן ${idx + 1}/5 — מקשיב...`;
+async function init() {
+  await openDB();
+  const saved = await dbGetAll('sections');
+  const savedArrangement = await loadArrangement();
+  sections = saved;
+  const ids = new Set(sections.map(s => s.id));
+  arrangement = savedArrangement.filter(id => ids.has(id));
+  sections.forEach(s => { if (!arrangement.includes(s.id)) arrangement.push(s.id); });
+  renderHome();
+}
 
-      return new Promise(resolve => {
-        const BUF = 512;
-        const TOTAL_SEC = 2.0;
-        const CLICK_DELAY = 0.65;
-        const maxSamples = Math.round(TOTAL_SEC * sr);
-        const clickSampleIdx = Math.round(CLICK_DELAY * sr);
-
-        const acc = [];
-        const src = ctx.createMediaStreamSource(stream);
-        const proc = ctx.createScriptProcessor(BUF, 1, 1);
-        const mute = ctx.createGain();
-        mute.gain.value = 0;
-
-        proc.onaudioprocess = e => {
-          const ch = e.inputBuffer.getChannelData(0);
-          for (let s of ch) acc.push(s);
-          if (acc.length >= maxSamples) {
-            src.disconnect(); proc.disconnect(); mute.disconnect();
-            const flat = new Float32Array(acc.slice(0, maxSamples));
-            const lat = detectOnset(flat, sr, clickSampleIdx);
-            if (lat !== null && lat >= 0 && lat < 700) {
-              setDot(idx, 'done');
-              resolve(Math.round(lat));
-            } else {
-              setDot(idx, 'error');
-              resolve(null);
-            }
-          }
-        };
-
-        src.connect(proc);
-        proc.connect(mute);
-        mute.connect(ctx.destination);
-
-        scheduleClick(ctx, ctx.currentTime + CLICK_DELAY);
-      });
-    }
-
-    function addRow(label, value, cls) {
-      const r = document.createElement('div');
-      r.className = 'row';
-      r.innerHTML = `<span class="row-label">${label}</span><span class="row-value ${cls || ''}">${value}</span>`;
-      rowsEl.appendChild(r);
-      return r;
-    }
-
-    function showVerdict(mean, jitter) {
-      verdictCard.style.display = 'block';
-      const icon = document.getElementById('vIcon');
-      const title = document.getElementById('vTitle');
-      const body = document.getElementById('vBody');
-
-      if (jitter <= 20) {
-        verdictCard.className = 'verdict-card good';
-        icon.textContent = '✅';
-        title.textContent = 'Web Audio עובד — ממשיכים';
-        body.textContent = `ג׳יטר ${jitter}ms, ממוצע ${mean}ms. ה-offset עקבי מספיק. בונים על Web PWA.`;
-      } else if (jitter <= 40) {
-        verdictCard.className = 'verdict-card marginal';
-        icon.textContent = '⚠️';
-        title.textContent = 'גבולי — תקליט ושמע';
-        body.textContent = `ג׳יטר ${jitter}ms. תבדוק בהקלטה אמיתית אם זה מורגש. אם כן — עוברים ל-Capacitor.`;
-      } else {
-        verdictCard.className = 'verdict-card bad';
-        icon.textContent = '❌';
-        title.textContent = 'Web Audio לא מספיק';
-        body.textContent = `ג׳יטר ${jitter}ms. יש לעטוף עם Capacitor + native audio bridge לפני שממשיכים.`;
-      }
-    }
-
-    async function run() {
-      startBtn.disabled = true;
-      resultsCard.style.display = 'none';
-      verdictCard.style.display = 'none';
-      rowsEl.innerHTML = '';
-      [0,1,2,3,4].forEach(i => setDot(i, ''));
-
-      let ctx, stream;
-      try {
-        statusEl.textContent = 'מבקש גישה למיקרופון...';
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            channelCount: 1
-          }
-        });
-
-        ctx = new (window.AudioContext || window.webkitAudioContext)();
-        await ctx.resume();
-        const sr = ctx.sampleRate;
-
-        const results = [];
-        for (let i = 0; i < 5; i++) {
-          const r = await runOne(ctx, stream, sr, i);
-          results.push(r);
-          addRow(`מבחן ${i + 1}`, r !== null ? `${r} ms` : '❌ לא זוהה');
-          resultsCard.style.display = 'block';
-          if (i < 4) await sleep(900);
-        }
-
-        stream.getTracks().forEach(t => t.stop());
-        await ctx.close();
-
-        const valid = results.filter(r => r !== null);
-        if (valid.length < 2) {
-          statusEl.textContent = 'לא מספיק מדידות — הגבר קול ונסה שוב';
-          startBtn.disabled = false;
-          startBtn.textContent = 'נסה שוב';
-          return;
-        }
-
-        const mean = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
-        const jitter = Math.max(...valid) - Math.min(...valid);
-
-        const hr = document.createElement('hr');
-        hr.className = 'divider';
-        rowsEl.appendChild(hr);
-
-        const mRow = addRow('ממוצע', `${mean} ms`);
-        mRow.classList.add('summary');
-
-        const jRow = addRow('ג׳יטר (max–min)', `${jitter} ms`);
-        jRow.classList.add('summary');
-        const jVal = jRow.querySelector('.row-value');
-        jVal.className = 'row-value ' + (jitter <= 20 ? 'good' : jitter <= 40 ? 'marginal' : 'bad');
-
-        showVerdict(mean, jitter);
-        statusEl.textContent = 'הושלם';
-
-      } catch (err) {
-        statusEl.textContent = 'שגיאה: ' + err.message;
-        try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch {}
-        try { if (ctx) await ctx.close(); } catch {}
-      }
-
-      startBtn.disabled = false;
-      startBtn.textContent = '↺ הרץ שוב';
-    }
-
-    startBtn.addEventListener('click', run);
-  </script>
+init().catch(console.error);
+</script>
 </body>
 </html>
