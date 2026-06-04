@@ -1,0 +1,77 @@
+```html
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Laylo — מבחן Latency</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@400;700;900&display=swap');
+    :root{--teal:#0d9488;--teal-dim:#0f766e;--bg:#090f1a;--surface:#111827;--surface2:#1c2a3a;--border:#1e3a4a;--text:#e2e8f0;--muted:#64748b;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:28px 18px 48px;direction:rtl}
+    .label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px}
+    h1{font-size:26px;font-weight:900;line-height:1.1;margin-bottom:28px}
+    .instructions{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:24px;font-size:14px;line-height:1.8;color:#94a3b8}
+    .instructions strong{color:var(--text)}
+    .warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 14px;font-size:13px;color:#fbbf24;margin-top:10px}
+    #startBtn{width:100%;padding:18px;background:var(--teal);color:#fff;border:none;border-radius:12px;font-family:'Heebo',sans-serif;font-size:17px;font-weight:700;cursor:pointer;margin-bottom:20px}
+    #startBtn:disabled{background:var(--surface2);color:var(--muted)}
+    .status{text-align:center;font-size:14px;color:var(--muted);margin-bottom:16px;min-height:20px;font-family:'IBM Plex Mono',monospace}
+    .dots{display:flex;justify-content:center;gap:10px;margin-bottom:28px}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);transition:all .3s}
+    .dot.active{background:var(--teal);border-color:var(--teal);box-shadow:0 0 8px var(--teal);animation:pulse .8s infinite}
+    .dot.done{background:var(--green);border-color:var(--green)}
+    .dot.error{background:var(--red);border-color:var(--red)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .results-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;display:none}
+    .card-title{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+    .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+    .row:last-child{border-bottom:none}
+    .row-label{color:var(--muted)}
+    .row-value{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--text)}
+    .row-value.good{color:var(--green)}.row-value.marginal{color:var(--yellow)}.row-value.bad{color:var(--red)}
+    .divider{border:none;border-top:1px solid #2a3d52;margin:4px 0}
+    .row.summary .row-label{font-weight:700;color:var(--text)}
+    .verdict-card{border-radius:12px;padding:20px;text-align:center;display:none;margin-bottom:16px}
+    .verdict-card.good{background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.3)}
+    .verdict-card.marginal{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.3)}
+    .verdict-card.bad{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3)}
+    .verdict-icon{font-size:36px;margin-bottom:8px}
+    .verdict-title{font-size:17px;font-weight:700;margin-bottom:6px}
+    .verdict-body{font-size:13px;color:#94a3b8;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="label">Laylo · Audio Latency Test</div>
+  <h1>מבחן<br>עקביות שהייה</h1>
+  <div class="instructions">
+    <strong>לפני שמתחילים:</strong><br>
+    🔊 עוצמת קול למקסימום<br>
+    🎧 ללא אוזניות — רמקול + מיקרופון ישיר<br>
+    🤫 סביבה שקטה ככל האפשר<br>
+    📱 אחזק את הטלפון רגיל
+    <div class="warn">⚠️ אם מבחנים נכשלים — כסה את תחתית הטלפון בכף היד</div>
+  </div>
+  <button id="startBtn">▶ התחל 5 מבחנים</button>
+  <div class="status" id="status">מוכן</div>
+  <div class="dots">
+    <div class="dot" id="d0"></div><div class="dot" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div><div class="dot" id="d4"></div>
+  </div>
+  <div class="results-card" id="resultsCard"><div class="card-title">תוצאות</div><div id="rows"></div></div>
+  <div class="verdict-card" id="verdictCard"><div class="verdict-icon" id="vIcon"></div><div class="verdict-title" id="vTitle"></div><div class="verdict-body" id="vBody"></div></div>
+  <script>
+    const startBtn=document.getElementById('startBtn'),statusEl=document.getElementById('status'),rowsEl=document.getElementById('rows'),resultsCard=document.getElementById('resultsCard'),verdictCard=document.getElementById('verdictCard');
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    function setDot(i,s){document.getElementById('d'+i).className='dot '+(s||'')}
+    function scheduleClick(ctx,when){const dur=.03,osc=ctx.createOscillator(),gain=ctx.createGain();osc.frequency.value=1100;gain.gain.setValueAtTime(0,when);gain.gain.linearRampToValueAtTime(1,when+.003);gain.gain.setValueAtTime(1,when+.015);gain.gain.linearRampToValueAtTime(0,when+dur);osc.connect(gain);gain.connect(ctx.destination);osc.start(when);osc.stop(when+dur+.05)}
+    function detectOnset(samples,sr,startIdx){const ambLen=Math.min(startIdx-100,Math.round(.3*sr));let sq=0;for(let i=0;i<ambLen;i++)sq+=samples[i]*samples[i];const thr=Math.max(Math.sqrt(sq/Math.max(ambLen,1))*7,.018);const end=Math.min(startIdx+Math.round(.7*sr),samples.length-64);for(let i=startIdx;i<end;i+=2){let r=0;for(let j=0;j<64;j++)r+=(samples[i+j]||0)**2;if(Math.sqrt(r/64)>thr)return((i-startIdx)/sr)*1000}return null}
+    async function runOne(ctx,stream,sr,idx){setDot(idx,'active');statusEl.textContent=`מבחן ${idx+1}/5 — מקשיב...`;return new Promise(resolve=>{const acc=[],src=ctx.createMediaStreamSource(stream),proc=ctx.createScriptProcessor(512,1,1),mute=ctx.createGain();mute.gain.value=0;const max=Math.round(2*sr),ci=Math.round(.65*sr);proc.onaudioprocess=e=>{for(let s of e.inputBuffer.getChannelData(0))acc.push(s);if(acc.length>=max){src.disconnect();proc.disconnect();mute.disconnect();const flat=new Float32Array(acc.slice(0,max)),lat=detectOnset(flat,sr,ci);if(lat!==null&&lat>=0&&lat<700){setDot(idx,'done');resolve(Math.round(lat))}else{setDot(idx,'error');resolve(null)}}};src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);scheduleClick(ctx,ctx.currentTime+.65)})}
+    function addRow(label,value,cls){const r=document.createElement('div');r.className='row';r.innerHTML=`<span class="row-label">${label}</span><span class="row-value ${cls||''}">${value}</span>`;rowsEl.appendChild(r);return r}
+    function showVerdict(mean,jitter){verdictCard.style.display='block';const icon=document.getElementById('vIcon'),title=document.getElementById('vTitle'),body=document.getElementById('vBody');if(jitter<=20){verdictCard.className='verdict-card good';icon.textContent='✅';title.textContent='Web Audio עובד — ממשיכים';body.textContent=`ג׳יטר ${jitter}ms, ממוצע ${mean}ms. בונים על Web PWA.`}else if(jitter<=40){verdictCard.className='verdict-card marginal';icon.textContent='⚠️';title.textContent='גבולי — תקליט ושמע';body.textContent=`ג׳יטר ${jitter}ms. תבדוק בהקלטה אמיתית.`}else{verdictCard.className='verdict-card bad';icon.textContent='❌';title.textContent='Web Audio לא מספיק';body.textContent=`ג׳יטר ${jitter}ms. צריך Capacitor + native audio bridge.`}}
+    async function run(){startBtn.disabled=true;resultsCard.style.display='none';verdictCard.style.display='none';rowsEl.innerHTML='';[0,1,2,3,4].forEach(i=>setDot(i,''));let ctx,stream;try{statusEl.textContent='מבקש גישה למיקרופון...';stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});ctx=new(window.AudioContext||window.webkitAudioContext)();await ctx.resume();const sr=ctx.sampleRate,results=[];for(let i=0;i<5;i++){const r=await runOne(ctx,stream,sr,i);results.push(r);addRow(`מבחן ${i+1}`,r!==null?`${r} ms`:'❌ לא זוהה');resultsCard.style.display='block';if(i<4)await sleep(900)}stream.getTracks().forEach(t=>t.stop());await ctx.close();const valid=results.filter(r=>r!==null);if(valid.length<2){statusEl.textContent='לא מספיק מדידות — הגבר קול ונסה שוב';startBtn.disabled=false;startBtn.textContent='נסה שוב';return}const mean=Math.round(valid.reduce((a,b)=>a+b,0)/valid.length),jitter=Math.max(...valid)-Math.min(...valid);const hr=document.createElement('hr');hr.className='divider';rowsEl.appendChild(hr);const mRow=addRow('ממוצע',`${mean} ms`);mRow.classList.add('summary');const jRow=addRow('ג׳יטר (max–min)',`${jitter} ms`);jRow.classList.add('summary');jRow.querySelector('.row-value').className='row-value '+(jitter<=20?'good':jitter<=40?'marginal':'bad');showVerdict(mean,jitter);statusEl.textContent='הושלם'}catch(err){statusEl.textContent='שגיאה: '+err.message;try{if(stream)stream.getTracks().forEach(t=>t.stop())}catch{}try{if(ctx)await ctx.close()}catch{}}startBtn.disabled=false;startBtn.textContent='↺ הרץ שוב'}
+    startBtn.addEventListener('click',run);
+  </script>
+</body>
+</html>
+```
