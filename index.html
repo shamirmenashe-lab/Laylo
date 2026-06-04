@@ -291,7 +291,7 @@ const defaultName=()=>(['A','B','C','D','E','F'][sections.length]||String(sectio
 const getGuideLayer=sid=>layers.find(l=>l.sectionId===sid&&l.layerName==='guide');
 
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
-let currentAudio=null, stopPlayAllFlag=false;
+let currentAudio=null, stopPlayAllFlag=false, activeSectionPlayBtn=null;
 
 async function startRecording() {
   try {
@@ -345,19 +345,36 @@ async function detectBPMFromBuffer(arrayBuffer) {
   }
   const onset=[];
   for(let i=1;i<env.length;i++) onset.push(Math.max(0,env[i]-env[i-1]));
-  const frameDur=0.01;
-  const minP=Math.round(60/180/frameDur);
-  const maxP=Math.round(60/50/frameDur);
-  let bestP=minP, bestScore=0;
+  const fd=0.01;
+  const minP=Math.round(60/180/fd);
+  const maxP=Math.round(60/50/fd);
+  // Normalized autocorrelation (avoid bias toward long periods)
+  const corr=new Float32Array(maxP+1);
   for(let p=minP;p<=maxP;p++){
-    let score=0;
-    for(let i=0;i<onset.length-p;i++) score+=onset[i]*onset[i+p];
-    if(score>bestScore){bestScore=score;bestP=p}
+    let s=0,n=onset.length-p;
+    for(let i=0;i<n;i++) s+=onset[i]*onset[i+p];
+    corr[p]=n>0?s/n:0;
   }
-  let bpm=Math.round(60/(bestP*frameDur));
-  while(bpm>180) bpm=Math.round(bpm/2);
-  while(bpm<50) bpm=Math.round(bpm*2);
-  return bpm;
+  // Find local peaks
+  const peaks=[];
+  for(let p=minP+1;p<maxP;p++)
+    if(corr[p]>corr[p-1]&&corr[p]>corr[p+1]) peaks.push({p,score:corr[p]});
+  peaks.sort((a,b)=>b.score-a.score);
+  if(!peaks.length) return 120;
+  // Filter to 60-180 BPM range
+  const cands=peaks.slice(0,12).map(pk=>({
+    bpm:Math.round(60/(pk.p*fd)), score:pk.score, p:pk.p
+  })).filter(c=>c.bpm>=60&&c.bpm<=180);
+  if(!cands.length) return 120;
+  // Harmonic boost: prefer higher BPM when sub-harmonic also scores well
+  for(const c of cands){
+    const hp=Math.round(c.p/2);
+    if(hp>=minP&&corr[hp]>corr[c.p]*0.4) c.score*=1.6;
+    // Tempo preference: 80-140 BPM is most common
+    if(c.bpm>=80&&c.bpm<=140) c.score*=1.2;
+  }
+  cands.sort((a,b)=>b.score-a.score);
+  return cands[0].bpm;
 }
 
 let clickCtx=null, clickTimeout=null, clickBeat=0, clickNextTime=0;
@@ -580,7 +597,14 @@ document.getElementById('section-list').addEventListener('click',async e=>{
   const delBtn=e.target.closest('[data-delete]');
   const upBtn=e.target.closest('[data-up]');
   const downBtn=e.target.closest('[data-down]');
-  if(playBtn){const id=playBtn.dataset.id;const layer=getGuideLayer(id);if(!layer)return;playBtn.classList.add('playing');playBtn.textContent='■';await playBlob(bufToBlob(layer.buffer,layer.mimeType));playBtn.classList.remove('playing');playBtn.textContent='▶'}
+  if(playBtn){
+    if(activeSectionPlayBtn===playBtn){stopCurrentAudio();playBtn.classList.remove('playing');playBtn.textContent='▶';activeSectionPlayBtn=null;return}
+    if(activeSectionPlayBtn){stopCurrentAudio();activeSectionPlayBtn.classList.remove('playing');activeSectionPlayBtn.textContent='▶';activeSectionPlayBtn=null}
+    const id=playBtn.dataset.id,layer=getGuideLayer(id);if(!layer)return;
+    activeSectionPlayBtn=playBtn;playBtn.classList.add('playing');playBtn.textContent='■';
+    await playBlob(bufToBlob(layer.buffer,layer.mimeType));
+    playBtn.classList.remove('playing');playBtn.textContent='▶';activeSectionPlayBtn=null;
+  }
   if(delBtn){const id=delBtn.dataset.delete;if(!confirm('למחוק?'))return;const toDel=layers.filter(l=>l.sectionId===id);sections=sections.filter(s=>s.id!==id);layers=layers.filter(l=>l.sectionId!==id);arrangement=arrangement.filter(i=>i!==id);await dbDelete('sections',id);for(const l of toDel)await dbDelete('layers',l.id);await saveArrangement(arrangement);renderHome()}
   if(upBtn){const i=parseInt(upBtn.dataset.up);if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
   if(downBtn){const i=parseInt(downBtn.dataset.down);if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
