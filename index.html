@@ -9,371 +9,532 @@
   <title>Laylo</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
-    /* TEMP: Sprint 1 — refactored data model (ArrayBuffer + sections/layers split) */
+    /* TEMP: Sprint 1.5 — BPM session + click track */
     :root {
-      --teal: #0d9488; --teal2: #14b8a6;
-      --bg: #080e1a; --s1: #0f1c2e; --s2: #162438;
-      --border: #1e3347; --text: #e2e8f0; --muted: #5a7a94;
-      --red: #ef4444; --green: #22c55e; --r: 14px;
+      --teal:#0d9488;--teal2:#14b8a6;--bg:#080e1a;--s1:#0f1c2e;--s2:#162438;
+      --border:#1e3347;--text:#e2e8f0;--muted:#5a7a94;--red:#ef4444;--r:14px;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Heebo', sans-serif; direction: rtl; }
-
-    .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-    .screen.active { opacity: 1; pointer-events: all; }
-
-    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; flex-shrink: 0; }
-    .logo { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; color: var(--teal2); letter-spacing: -0.04em; }
-    .badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 7px; border-radius: 20px; }
-    .btn { border: none; border-radius: var(--r); font-family: 'Heebo', sans-serif; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; user-select: none; }
-    .btn:active { opacity: 0.75; transform: scale(0.97); }
-    .btn-primary { background: var(--teal); color: #fff; font-size: 16px; padding: 16px 24px; width: 100%; }
-    .btn-ghost { background: var(--s2); color: var(--text); font-size: 15px; padding: 14px 24px; width: 100%; border: 1px solid var(--border); }
-    .btn-danger { background: rgba(239,68,68,0.12); color: var(--red); font-size: 15px; padding: 14px 24px; width: 100%; border: 1px solid rgba(239,68,68,0.2); }
-    .btn-icon { background: none; border: none; color: var(--muted); font-size: 18px; padding: 8px; cursor: pointer; border-radius: 8px; }
-    .btn-icon:active { color: var(--text); }
-    .gap { gap: 10px; display: flex; flex-direction: column; }
-    .back-btn { font-size: 22px; background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px 8px; }
-
-    #screen-home .scroll-area { flex: 1; overflow-y: auto; padding: 0 16px; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; text-align: center; padding-bottom: 60px; }
-    .empty-icon { font-size: 52px; opacity: 0.3; }
-    .empty-title { font-size: 18px; font-weight: 700; color: var(--muted); }
-    .empty-sub { font-size: 13px; color: var(--muted); opacity: 0.7; line-height: 1.5; }
-    .section-list { padding-bottom: 8px; }
-    .section-card { background: var(--s1); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 10px; }
-    .section-main { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
-    .section-play { width: 40px; height: 40px; border-radius: 50%; background: var(--s2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
-    .section-play:active, .section-play.playing { background: var(--teal); }
-    .section-info { flex: 1; min-width: 0; }
-    .section-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .section-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
-    .section-actions { display: flex; gap: 4px; align-items: center; }
-    .order-btns { display: flex; flex-direction: column; gap: 2px; }
-    .order-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 12px; padding: 2px 4px; line-height: 1; }
-    .order-btn:active { color: var(--text); }
-    #screen-home .bottom-bar { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 60%, transparent); flex-shrink: 0; }
-    .play-all-row { display: flex; gap: 10px; margin-bottom: 10px; }
-    .play-all-row .btn { flex: 1; }
-
-    #screen-record { align-items: center; text-align: center; }
-    #screen-record .topbar { width: 100%; }
-    .rec-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
-    .rec-section-name { font-size: 22px; font-weight: 900; margin: 8px 0 4px; }
-    .rec-instruction { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
-    .rec-timer { font-family: 'IBM Plex Mono', monospace; font-size: 52px; font-weight: 600; letter-spacing: -0.03em; }
-    .rec-timer.recording { color: var(--red); }
-    .rec-indicator { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); }
-    .rec-indicator.recording { background: var(--red); animation: blink 1s infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-    .rec-big-btn { width: 88px; height: 88px; border-radius: 50%; border: 3px solid var(--teal); background: none; display: flex; align-items: center; justify-content: center; font-size: 32px; cursor: pointer; transition: background 0.15s, transform 0.1s; flex-shrink: 0; }
-    .rec-big-btn:active { transform: scale(0.92); background: rgba(13,148,136,0.15); }
-    .rec-big-btn.recording { border-color: var(--red); }
-    #screen-record .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-
-    #screen-review { align-items: center; text-align: center; }
-    #screen-review .topbar { width: 100%; justify-content: center; }
-    .review-label { font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: var(--teal); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
-    .review-name { font-size: 24px; font-weight: 900; margin-bottom: 28px; }
-    .review-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
-    .review-play-btn { width: 72px; height: 72px; border-radius: 50%; background: var(--s2); border: 2px solid var(--border); font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-    .review-play-btn.playing { background: var(--teal); border-color: var(--teal); }
-    .review-play-btn:active { transform: scale(0.92); }
-    .review-duration { font-family: 'IBM Plex Mono', monospace; font-size: 16px; color: var(--muted); }
-    #screen-review .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-
-    #screen-playing { align-items: center; text-align: center; }
-    #screen-playing .topbar { width: 100%; justify-content: center; }
-    .playing-label { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); letter-spacing: 0.12em; margin-bottom: 4px; }
-    .playing-name { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
-    .playing-counter { font-size: 13px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
-    .playing-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
-    .playing-waveform { display: flex; gap: 4px; align-items: center; height: 40px; }
-    .playing-waveform span { width: 4px; background: var(--teal); border-radius: 2px; animation: wave 1.2s infinite ease-in-out; }
-    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s} .playing-waveform span:nth-child(2){height:28px;animation-delay:0.15s} .playing-waveform span:nth-child(3){height:36px;animation-delay:0.3s} .playing-waveform span:nth-child(4){height:24px;animation-delay:0.45s} .playing-waveform span:nth-child(5){height:16px;animation-delay:0.6s}
-    @keyframes wave { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.35)} }
-    .playing-progress { width: 80%; height: 3px; background: var(--s2); border-radius: 2px; overflow: hidden; }
-    .playing-progress-fill { height: 100%; background: var(--teal); border-radius: 2px; width: 0%; transition: width 0.5s linear; }
-    #screen-playing .bottom-bar { width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 100; }
-    .modal-overlay.open { opacity: 1; pointer-events: all; }
-    .modal-sheet { background: var(--s1); border-radius: 20px 20px 0 0; padding: 24px 20px; width: 100%; transform: translateY(100%); transition: transform 0.25s ease-out; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
-    .modal-overlay.open .modal-sheet { transform: translateY(0); }
-    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
-    .modal-input { width: 100%; background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-size: 16px; color: var(--text); font-family: 'Heebo', sans-serif; direction: rtl; margin-bottom: 16px; outline: none; }
-    .modal-input:focus { border-color: var(--teal); }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Heebo',sans-serif;direction:rtl}
+    .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);opacity:0;pointer-events:none;transition:opacity .2s}
+    .screen.active{opacity:1;pointer-events:all}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0}
+    .logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
+    .badge{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 7px;border-radius:20px}
+    .bpm-chip{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px;cursor:pointer}
+    .btn{border:none;border-radius:var(--r);font-family:'Heebo',sans-serif;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;user-select:none}
+    .btn:active{opacity:.75;transform:scale(.97)}
+    .btn-primary{background:var(--teal);color:#fff;font-size:16px;padding:16px 24px;width:100%}
+    .btn-ghost{background:var(--s2);color:var(--text);font-size:15px;padding:14px 24px;width:100%;border:1px solid var(--border)}
+    .btn-danger{background:rgba(239,68,68,.12);color:var(--red);font-size:15px;padding:14px 24px;width:100%;border:1px solid rgba(239,68,68,.2)}
+    .btn-icon{background:none;border:none;color:var(--muted);font-size:18px;padding:8px;cursor:pointer;border-radius:8px}
+    .btn-icon:active{color:var(--text)}
+    .gap{gap:10px;display:flex;flex-direction:column}
+    .back-btn{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px}
+    .center-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:0 24px}
+    .big-title{font-size:26px;font-weight:900;line-height:1.2}
+    .sub{font-size:14px;color:var(--muted);line-height:1.6}
+    .rec-timer{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;letter-spacing:-.03em}
+    .rec-timer.recording{color:var(--red)}
+    .rec-indicator{width:12px;height:12px;border-radius:50%;background:var(--muted)}
+    .rec-indicator.recording{background:var(--red);animation:blink 1s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+    .rec-big-btn{width:88px;height:88px;border-radius:50%;border:3px solid var(--teal);background:none;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;transition:background .15s,transform .1s;flex-shrink:0}
+    .rec-big-btn:active{transform:scale(.92);background:rgba(13,148,136,.15)}
+    .rec-big-btn.recording{border-color:var(--red)}
+    .bpm-number{font-family:'IBM Plex Mono',monospace;font-size:72px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
+    .bpm-label{font-size:14px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
+    .adjust-row{display:flex;align-items:center;gap:16px}
+    .adj-btn{width:52px;height:52px;border-radius:50%;background:var(--s2);border:1px solid var(--border);font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+    .adj-btn:active{background:var(--teal)}
+    .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
+    .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .1s}
+    .bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0}
+    #screen-home .scroll-area{flex:1;overflow-y:auto;padding:0 16px}
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;padding-bottom:60px}
+    .empty-icon{font-size:52px;opacity:.3}
+    .empty-title{font-size:18px;font-weight:700;color:var(--muted)}
+    .empty-sub{font-size:13px;color:var(--muted);opacity:.7;line-height:1.5}
+    .section-list{padding-bottom:8px}
+    .section-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px}
+    .section-main{display:flex;align-items:center;padding:14px 16px;gap:12px}
+    .section-play{width:40px;height:40px;border-radius:50%;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0;transition:background .15s}
+    .section-play:active,.section-play.playing{background:var(--teal)}
+    .section-info{flex:1;min-width:0}
+    .section-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .section-meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px}
+    .section-actions{display:flex;gap:4px;align-items:center}
+    .order-btns{display:flex;flex-direction:column;gap:2px}
+    .order-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 4px;line-height:1}
+    .order-btn:active{color:var(--text)}
+    #screen-home .bottom-bar{background:linear-gradient(to top,var(--bg) 60%,transparent)}
+    .play-all-row{display:flex;gap:10px;margin-bottom:10px}
+    .play-all-row .btn{flex:1}
+    #screen-playing{align-items:center;text-align:center}
+    #screen-playing .topbar{width:100%;justify-content:center}
+    .playing-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.12em;margin-bottom:4px}
+    .playing-name{font-size:26px;font-weight:900;margin-bottom:4px}
+    .playing-counter{font-size:13px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+    .playing-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+    .playing-waveform{display:flex;gap:4px;align-items:center;height:40px}
+    .playing-waveform span{width:4px;background:var(--teal);border-radius:2px;animation:wave 1.2s infinite ease-in-out}
+    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s}.playing-waveform span:nth-child(2){height:28px;animation-delay:.15s}.playing-waveform span:nth-child(3){height:36px;animation-delay:.3s}.playing-waveform span:nth-child(4){height:24px;animation-delay:.45s}.playing-waveform span:nth-child(5){height:16px;animation-delay:.6s}
+    @keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.35)}}
+    .playing-progress{width:80%;height:3px;background:var(--s2);border-radius:2px;overflow:hidden}
+    .playing-progress-fill{height:100%;background:var(--teal);border-radius:2px;width:0%;transition:width .5s linear}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
+    .modal-overlay.open{opacity:1;pointer-events:all}
+    .modal-sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:24px 20px;width:100%;transform:translateY(100%);transition:transform .25s ease-out;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+    .modal-overlay.open .modal-sheet{transform:translateY(0)}
+    .modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
+    .modal-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:16px;outline:none}
+    .modal-input:focus{border-color:var(--teal)}
   </style>
 </head>
 <body>
 
-<div id="screen-home" class="screen active">
+<div id="screen-bpm-welcome" class="screen">
+  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 1.5</span></div>
+  <div class="center-screen">
+    <div style="font-size:48px">&#127928;</div>
+    <div class="big-title">&#1504;&#1490;&#1503; &#1488;&#1514; &#1492;&#1513;&#1497;&#1512; &#1513;&#1500;&#1498;<br>&#1495;&#1493;&#1508;&#1513;&#1497;</div>
+    <div class="sub">&#1504;&#1490;&#1503; &#1499;&#1502;&#1492; &#1513;&#1504;&#1497;&#1493;&#1514; &#1506;&#1491; &#1513;&#1502;&#1512;&#1490;&#1497;&#1513;&#1497;&#1501; &#1488;&#1514; &#1492;&#1511;&#1510;&#1489; &#1492;&#1504;&#1499;&#1493;&#1503;.<br>&#1500;&#1495;&#1509; &#1492;&#1511;&#1500;&#1496;, &#1504;&#1490;&#1503;, &#1506;&#1510;&#1493;&#1512; &#8212; &#1504;&#1502;&#1510;&#1488; &#1488;&#1514; &#1492;-BPM.</div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn btn-primary" id="bpm-start-rec">&#9679; &#1492;&#1514;&#1495;&#1500; &#1492;&#1511;&#1500;&#1496;&#1492;</button>
+  </div>
+</div>
+
+<div id="screen-bpm-record" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-rec-back">&#8592;</button><span></span></div>
+  <div class="center-screen">
+    <div class="sub">&#1504;&#1490;&#1503; &#1495;&#1493;&#1508;&#1513;&#1497; &#8212; 8 &#1506;&#1491; 20 &#1513;&#1504;&#1497;&#1493;&#1514;</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="rec-indicator" id="bpm-indicator"></div>
+      <div class="rec-timer" id="bpm-timer">00:00</div>
+    </div>
+    <button class="rec-big-btn" id="bpm-rec-btn">&#9679;</button>
+  </div>
+  <div class="bottom-bar"></div>
+</div>
+
+<div id="screen-bpm-result" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
+  <div class="center-screen">
+    <div class="bpm-label">&#1494;&#1497;&#1492;&#1497;&#1514;&#1497;</div>
+    <div class="bpm-number" id="bpm-detected">&#8212;</div>
+    <div class="bpm-label">BPM</div>
+    <div class="sub">&#1513;&#1502;&#1506; &#1488;&#1514; &#1492;&#1511;&#1500;&#1497;&#1511; &#1493;&#1504;&#1490;&#1503; &#1506;&#1500;&#1497;&#1493;.<br>&#1488;&#1501; &#1502;&#1512;&#1490;&#1497;&#1513; &#1504;&#1499;&#1493;&#1503; &#8212; &#1488;&#1513;&#1512;.</div>
+  </div>
+  <div class="bottom-bar">
+    <div class="gap">
+      <button class="btn btn-primary" id="bpm-hear-click">&#9654; &#1513;&#1502;&#1506; &#1511;&#1500;&#1497;&#1511;</button>
+      <button class="btn btn-ghost" id="bpm-manual-adjust">&#1513;&#1504;&#1492; &#1497;&#1491;&#1504;&#1497;&#1514;</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-bpm-verify" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-verify-back">&#8592;</button><span></span></div>
+  <div class="center-screen">
+    <div class="bpm-label">&#1502;&#1504;&#1490;&#1503; &#1511;&#1500;&#1497;&#1511;</div>
+    <div class="bpm-number" id="bpm-verify-num">&#8212;</div>
+    <div class="bpm-label">BPM</div>
+    <div class="click-bars" id="click-bars">
+      <div class="click-bar" style="height:8px" id="cb0"></div>
+      <div class="click-bar" style="height:8px" id="cb1"></div>
+      <div class="click-bar" style="height:8px" id="cb2"></div>
+      <div class="click-bar" style="height:8px" id="cb3"></div>
+    </div>
+    <div class="sub">&#1504;&#1490;&#1503; &#1506;&#1500;&#1497;&#1493;. &#1502;&#1512;&#1490;&#1497;&#1513; &#1504;&#1499;&#1493;&#1503;?</div>
+  </div>
+  <div class="bottom-bar">
+    <div class="gap">
+      <button class="btn btn-primary" id="bpm-confirm">&#10003; &#1499;&#1503;, &#1494;&#1492; &#1492;BPM</button>
+      <button class="btn btn-ghost" id="bpm-tweak">&#1513;&#1504;&#1492;</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-bpm-adjust" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-adj-back">&#8592;</button><span></span></div>
+  <div class="center-screen">
+    <div class="bpm-label">&#1513;&#1504;&#1492; BPM</div>
+    <div class="adjust-row">
+      <button class="adj-btn" id="bpm-minus">&#8722;</button>
+      <div class="bpm-number" id="bpm-adj-num">&#8212;</div>
+      <button class="adj-btn" id="bpm-plus">+</button>
+    </div>
+    <div class="bpm-label">BPM</div>
+    <div class="sub">&#1500;&#1495;&#1509; &#9654; &#1500;&#1513;&#1502;&#1493;&#1506; &#1488;&#1514; &#1492;&#1511;&#1500;&#1497;&#1511; &#1492;&#1495;&#1491;&#1513;</div>
+  </div>
+  <div class="bottom-bar">
+    <div class="gap">
+      <button class="btn btn-ghost" id="bpm-adj-hear">&#9654; &#1513;&#1502;&#1506; &#1511;&#1500;&#1497;&#1511;</button>
+      <button class="btn btn-primary" id="bpm-adj-confirm">&#10003; &#1488;&#1513;&#1512;</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-home" class="screen">
   <div class="topbar">
     <span class="logo">laylo</span>
-    <span class="badge">sprint 1</span>
+    <span class="bpm-chip" id="bpm-chip" title="&#1513;&#1504;&#1492; BPM">&#9834; &#8212;</span>
   </div>
   <div class="scroll-area" id="home-scroll">
     <div class="empty-state" id="empty-state">
-      <div class="empty-icon">🎸</div>
-      <div class="empty-title">אין קטעים עדיין</div>
-      <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל.<br>הקלט A-part, B-part — קטע קטע.</div>
+      <div class="empty-icon">&#127928;</div>
+      <div class="empty-title">&#1488;&#1497;&#1503; &#1511;&#1496;&#1506;&#1497;&#1501; &#1506;&#1491;&#1497;&#1497;&#1503;</div>
+      <div class="empty-sub">&#1500;&#1495;&#1509; &#8220;&#1511;&#1496;&#1506; &#1495;&#1491;&#1513;&#8221; &#1499;&#1491;&#1497; &#1500;&#1492;&#1514;&#1495;&#1497;&#1500;.<br>&#1492;&#1511;&#1500;&#1496; A-part, B-part &#8212; &#1511;&#1496;&#1506; &#1511;&#1496;&#1506;.</div>
     </div>
     <div class="section-list" id="section-list" style="display:none"></div>
   </div>
   <div class="bottom-bar">
     <div class="play-all-row" id="play-all-row" style="display:none">
-      <button class="btn btn-ghost" id="btn-play-all">▶ הפעל הכל</button>
+      <button class="btn btn-ghost" id="btn-play-all">&#9654; &#1492;&#1508;&#1506;&#1500; &#1492;&#1499;&#1500;</button>
     </div>
-    <button class="btn btn-primary" id="btn-new-section">⊕ קטע חדש</button>
+    <button class="btn btn-primary" id="btn-new-section">&#8853; &#1511;&#1496;&#1506; &#1495;&#1491;&#1513;</button>
   </div>
 </div>
 
-<div id="screen-record" class="screen">
-  <div class="topbar">
-    <button class="back-btn" id="rec-back">←</button>
-    <span></span>
-  </div>
-  <div class="rec-center">
-    <div class="rec-section-name" id="rec-section-name">A-part</div>
-    <div class="rec-instruction" id="rec-instruction">לחץ להתחיל הקלטה</div>
+<div id="screen-record" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%"><button class="back-btn" id="rec-back">&#8592;</button><span></span></div>
+  <div class="center-screen">
+    <div id="rec-section-name" style="font-size:22px;font-weight:900;margin:8px 0 4px"></div>
+    <div id="rec-instruction" style="font-size:13px;color:var(--muted);margin-bottom:32px">&#1500;&#1495;&#1509; &#1500;&#1492;&#1514;&#1495;&#1497;&#1500; &#1492;&#1511;&#1500;&#1496;&#1492;</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="rec-indicator"></div>
       <div class="rec-timer" id="rec-timer">00:00</div>
     </div>
-    <button class="rec-big-btn" id="rec-btn">●</button>
+    <button class="rec-big-btn" id="rec-btn">&#9679;</button>
   </div>
   <div class="bottom-bar"></div>
 </div>
 
-<div id="screen-review" class="screen">
+<div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
-  <div class="review-center">
-    <div>
-      <div class="review-label">הקלטה הושלמה</div>
-      <div class="review-name" id="review-name">A-part</div>
-    </div>
-    <button class="review-play-btn" id="review-play-btn">▶</button>
-    <div class="review-duration" id="review-duration">0:00</div>
+  <div class="center-screen">
+    <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">&#1492;&#1511;&#1500;&#1496;&#1492; &#1492;&#1493;&#1513;&#1500;&#1502;&#1492;</div>
+    <div id="review-name" style="font-size:24px;font-weight:900;margin-bottom:28px"></div>
+    <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">&#9654;</button>
+    <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
-  <div class="bottom-bar">
-    <div class="gap">
-      <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
-      <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
-    </div>
-  </div>
+  <div class="bottom-bar"><div class="gap">
+    <button class="btn btn-primary" id="btn-keep">&#10003; &#1513;&#1502;&#1493;&#1512;</button>
+    <button class="btn btn-ghost" id="btn-redo">&#8634; &#1492;&#1511;&#1500;&#1496; &#1513;&#1493;&#1489;</button>
+  </div></div>
 </div>
 
 <div id="screen-playing" class="screen">
-  <div class="topbar" style="width:100%;justify-content:center"><span class="logo">laylo</span></div>
+  <div class="topbar"><span class="logo">laylo</span></div>
   <div class="playing-center">
-    <div class="playing-label">מנגן עכשיו</div>
-    <div class="playing-name" id="playing-name">—</div>
+    <div class="playing-label">&#1502;&#1504;&#1490;&#1503; &#1506;&#1499;&#1513;&#1497;&#1493;</div>
+    <div class="playing-name" id="playing-name">&#8212;</div>
     <div class="playing-counter" id="playing-counter">1 / 1</div>
     <div class="playing-waveform"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="playing-progress"><div class="playing-progress-fill" id="playing-progress-fill"></div></div>
   </div>
-  <div class="bottom-bar">
-    <button class="btn btn-danger" id="btn-stop-playing">■ עצור</button>
-  </div>
+  <div class="bottom-bar"><button class="btn btn-danger" id="btn-stop-playing">&#9632; &#1506;&#1510;&#1493;&#1512;</button></div>
 </div>
 
 <div class="modal-overlay" id="name-modal">
   <div class="modal-sheet">
-    <div class="modal-title">שם הקטע</div>
-    <input class="modal-input" id="modal-input" type="text" placeholder="למשל: A-part, ברידג׳, ורס...">
-    <button class="btn btn-primary" id="modal-confirm">המשך להקלטה →</button>
+    <div class="modal-title">&#1513;&#1501; &#1492;&#1511;&#1496;&#1506;</div>
+    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, &#1489;&#1512;&#1497;&#1491;&#1490;&#1468;, &#1493;&#1493;&#1512;&#1505;...">
+    <button class="btn btn-primary" id="modal-confirm">&#1492;&#1502;&#1513;&#1498; &#1500;&#1492;&#1511;&#1500;&#1496;&#1492; &#8592;</button>
   </div>
 </div>
 
 <script>
-// TEMP — Sprint 1 (refactored). Cleanup: הסר console.logs לפני production
+// TEMP — Sprint 1.5. Cleanup: remove console.logs before production
 
 // ── AI GATEWAY ──────────────────────────
 async function callAI(prompt) {
   console.log('[callAI mock]', prompt);
   return { text: '[mock]' };
-  // Sprint 2+: const res = await fetch('/api/ai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt }) }); return res.json();
+  // Sprint 2+: const res = await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});return res.json();
 }
 
-// ── DATA MODEL ───────────────────────────
-// sections: { id, name, duration }
-// layers:   { id, sectionId, layerName, buffer: ArrayBuffer, mimeType }
-// arrangement: { key:'main', order:[sectionId,...] }
-// Sprint 1: כל section → layer אחד בשם 'guide'
-
 // ── DB ──────────────────────────────────
-const DB_NAME = 'laylo-v2';
-const DB_VER = 1;
+// DATA MODEL:
+// sections: { id, name, duration }
+// layers:   { id, sectionId, layerName, buffer: ArrayBuffer, mimeType, offsetMs }
+// meta:     { key:'project', bpm } | { key:'arrangement', order:[...] }
+const DB_NAME = 'laylo-v2', DB_VER = 1;
 let db;
-
 function openDB() {
-  return new Promise((res, rej) => {
+  return new Promise((res,rej) => {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains('sections')) d.createObjectStore('sections', { keyPath: 'id' });
-      if (!d.objectStoreNames.contains('layers')) d.createObjectStore('layers', { keyPath: 'id' });
-      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'key' });
+      if (!d.objectStoreNames.contains('sections')) d.createObjectStore('sections', {keyPath:'id'});
+      if (!d.objectStoreNames.contains('layers')) d.createObjectStore('layers', {keyPath:'id'});
+      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath:'key'});
     };
     req.onsuccess = e => { db = e.target.result; res(db); };
     req.onerror = () => rej(req.error);
   });
 }
-
-const txStore = (store, mode = 'readonly') => db.transaction(store, mode).objectStore(store);
-
-function dbPut(store, val) {
-  return new Promise((res, rej) => {
-    const t = db.transaction(store, 'readwrite');
-    t.objectStore(store).put(val).onsuccess = () => res();
-    t.onerror = () => rej(t.error);
-  });
-}
-function dbGet(store, key) {
-  return new Promise((res, rej) => {
-    const req = txStore(store).get(key);
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-function dbGetAll(store) {
-  return new Promise((res, rej) => {
-    const req = txStore(store).getAll();
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-function dbDelete(store, key) {
-  return new Promise((res, rej) => {
-    const t = db.transaction(store, 'readwrite');
-    t.objectStore(store).delete(key).onsuccess = () => res();
-    t.onerror = () => rej(t.error);
-  });
-}
-
-async function saveArrangement(order) { await dbPut('meta', { key: 'arrangement', order }); }
-async function loadArrangement() { const r = await dbGet('meta', 'arrangement'); return r ? r.order : []; }
+const dbPut = (store,val) => new Promise((res,rej) => { const t=db.transaction(store,'readwrite'); t.objectStore(store).put(val).onsuccess=()=>res(); t.onerror=()=>rej(t.error); });
+const dbGet = (store,key) => new Promise((res,rej) => { const req=db.transaction(store,'readonly').objectStore(store).get(key); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); });
+const dbGetAll = (store) => new Promise((res,rej) => { const req=db.transaction(store,'readonly').objectStore(store).getAll(); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); });
+const dbDelete = (store,key) => new Promise((res,rej) => { const t=db.transaction(store,'readwrite'); t.objectStore(store).delete(key).onsuccess=()=>res(); t.onerror=()=>rej(t.error); });
+const saveArrangement = order => dbPut('meta', {key:'arrangement', order});
+const loadArrangement = async () => { const r = await dbGet('meta','arrangement'); return r ? r.order : []; };
 
 // ── STATE ────────────────────────────────
-let sections = [];
-let layers = [];
-let arrangement = [];
+let sections = [], layers = [], arrangement = [];
+let projectBPM = null;
+let pendingName = '', pendingBuffer = null, pendingMime = '', pendingDuration = 0;
+let bpmRecBuffer = null, bpmRecMime = '';
+let currentBPMForVerify = 0;
 
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-function defaultName() {
-  const L = ['A','B','C','D','E','F'];
-  return (L[sections.length] || String(sections.length + 1)) + '-part';
-}
-function getGuideLayer(sectionId) {
-  return layers.find(l => l.sectionId === sectionId && l.layerName === 'guide');
-}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const fmtTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const defaultName = () => (['A','B','C','D','E','F'][sections.length] || String(sections.length+1)) + '-part';
+const getGuideLayer = sid => layers.find(l => l.sectionId===sid && l.layerName==='guide');
 
-// ── AUDIO ────────────────────────────────
-let mediaRecorder = null;
-let recStream = null;
-let recChunks = [];
-let recStartTime = 0;
-let recTimerInterval = null;
-let currentAudio = null;
-let stopPlayAllFlag = false;
-
-let pendingName = '';
-let pendingBuffer = null;
-let pendingMime = '';
-let pendingDuration = 0;
+// ── AUDIO UTILS ─────────────────────────
+let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
+let currentAudio=null, stopPlayAllFlag=false;
 
 async function startRecording() {
   try {
-    recStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-    });
-  } catch (e) {
-    alert('לא ניתן לגשת למיקרופון. אפשר גישה בהגדרות הדפדפן.');
-    return false;
-  }
+    recStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  } catch(e) { alert('לא ניתן לגשת למיקרופון. אפשר גישה בהגדרות הדפדפן.'); return false; }
   const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
     : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
-  mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : {});
+  mediaRecorder = new MediaRecorder(recStream, mime ? {mimeType:mime} : {});
   recChunks = [];
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.ondataavailable = e => { if(e.data.size>0) recChunks.push(e.data); };
   mediaRecorder.start(100);
   recStartTime = Date.now();
-  pendingMime = mediaRecorder.mimeType;
   return true;
 }
 
-function stopRecording() {
-  return new Promise(res => {
-    mediaRecorder.onstop = async () => {
-      const blob = new Blob(recChunks, { type: pendingMime });
-      pendingDuration = (Date.now() - recStartTime) / 1000;
-      pendingBuffer = await blob.arrayBuffer();
-      recStream.getTracks().forEach(t => t.stop());
-      res();
-    };
-    mediaRecorder.stop();
-  });
+const stopRecording = (isBPM=false) => new Promise(res => {
+  mediaRecorder.onstop = async () => {
+    const blob = new Blob(recChunks, {type:mediaRecorder.mimeType});
+    const buf = await blob.arrayBuffer();
+    if (isBPM) { bpmRecBuffer=buf; bpmRecMime=mediaRecorder.mimeType; }
+    else { pendingDuration=(Date.now()-recStartTime)/1000; pendingBuffer=buf; pendingMime=mediaRecorder.mimeType; }
+    recStream.getTracks().forEach(t=>t.stop());
+    res();
+  };
+  mediaRecorder.stop();
+});
+
+const bufToBlob = (buf,mime) => new Blob([buf], {type:mime});
+const playBlob = (blob,onProgress) => new Promise(res => {
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  currentAudio = audio;
+  if (onProgress) audio.ontimeupdate = () => { if(audio.duration) onProgress(audio.currentTime/audio.duration); };
+  audio.onended = () => { URL.revokeObjectURL(url); res('ended'); };
+  audio.onerror = () => { URL.revokeObjectURL(url); res('error'); };
+  audio.play().catch(() => res('error'));
+});
+const stopCurrentAudio = () => { if(currentAudio) { currentAudio.pause(); currentAudio=null; } };
+
+// ── BPM DETECTION ───────────────────────
+// Onset strength autocorrelation — no external dependencies
+async function detectBPMFromBuffer(arrayBuffer) {
+  const tmpCtx = new (window.AudioContext||window.webkitAudioContext)();
+  let audioBuffer;
+  try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer.slice()); }
+  catch(e) { await tmpCtx.close(); return 120; }
+  await tmpCtx.close();
+
+  const samples = audioBuffer.getChannelData(0);
+  const sr = audioBuffer.sampleRate;
+  const FRAME = Math.round(0.01 * sr); // 10ms frames
+
+  // RMS envelope
+  const env = [];
+  for (let i=0; i<samples.length; i+=FRAME) {
+    let s = 0;
+    for (let j=0; j<FRAME && i+j<samples.length; j++) s += samples[i+j]**2;
+    env.push(Math.sqrt(s/FRAME));
+  }
+
+  // Onset strength = positive first-order difference of RMS envelope
+  const onset = [];
+  for (let i=1; i<env.length; i++) onset.push(Math.max(0, env[i]-env[i-1]));
+
+  // Autocorrelation over onset strength to find dominant period
+  const frameDur = 0.01;
+  const minP = Math.round(60/180/frameDur); // 180 BPM
+  const maxP = Math.round(60/50/frameDur);  // 50 BPM
+  let bestP = minP, bestScore = 0;
+  for (let p=minP; p<=maxP; p++) {
+    let score = 0;
+    for (let i=0; i<onset.length-p; i++) score += onset[i]*onset[i+p];
+    if (score > bestScore) { bestScore=score; bestP=p; }
+  }
+
+  let bpm = Math.round(60/(bestP*frameDur));
+  while (bpm > 180) bpm = Math.round(bpm/2);
+  while (bpm < 50) bpm = Math.round(bpm*2);
+  return bpm;
 }
 
-function bufferToBlob(buffer, mimeType) { return new Blob([buffer], { type: mimeType }); }
+// ── CLICK TRACK ─────────────────────────
+let clickCtx=null, clickTimeout=null, clickBeat=0, clickNextTime=0;
 
-function playBlob(blob, onProgress) {
-  return new Promise(res => {
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    currentAudio = audio;
-    if (onProgress) audio.ontimeupdate = () => { if (audio.duration) onProgress(audio.currentTime / audio.duration); };
-    audio.onended = () => { URL.revokeObjectURL(url); res('ended'); };
-    audio.onerror = () => { URL.revokeObjectURL(url); res('error'); };
-    audio.play().catch(() => res('error'));
-  });
+function startClick(bpm) {
+  stopClick();
+  clickCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const interval = 60/bpm;
+  clickBeat = 0;
+  clickNextTime = clickCtx.currentTime + 0.1;
+  function schedule() {
+    if (!clickCtx || clickCtx.state==='closed') return;
+    while (clickNextTime < clickCtx.currentTime + 0.3) {
+      const isAccent = (clickBeat % 4 === 0);
+      const osc = clickCtx.createOscillator();
+      const gain = clickCtx.createGain();
+      osc.frequency.value = isAccent ? 1200 : 900;
+      gain.gain.setValueAtTime(isAccent ? 0.8 : 0.5, clickNextTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, clickNextTime+0.04);
+      osc.connect(gain); gain.connect(clickCtx.destination);
+      osc.start(clickNextTime); osc.stop(clickNextTime+0.05);
+      const barIdx = clickBeat % 4;
+      setTimeout(() => animateClickBar(barIdx), Math.max(0, (clickNextTime-clickCtx.currentTime)*1000));
+      clickNextTime += interval;
+      clickBeat++;
+    }
+    clickTimeout = setTimeout(schedule, 100);
+  }
+  schedule();
 }
 
-function stopCurrentAudio() { if (currentAudio) { currentAudio.pause(); currentAudio = null; } }
-function fmtTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+function stopClick() {
+  if (clickTimeout) clearTimeout(clickTimeout);
+  if (clickCtx) { try { clickCtx.close(); } catch(e){} clickCtx=null; }
+}
+
+function animateClickBar(idx) {
+  const bar = document.getElementById('cb'+idx);
+  if (!bar) return;
+  bar.style.height = '32px';
+  setTimeout(() => { bar.style.height='8px'; }, 100);
+}
 
 // ── SCREENS ──────────────────────────────
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+const showScreen = id => { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); };
+
+// ── BPM FLOW ─────────────────────────────
+let isBPMRecording = false;
+
+document.getElementById('bpm-start-rec').addEventListener('click', () => showScreen('screen-bpm-record'));
+
+document.getElementById('bpm-rec-back').addEventListener('click', () => {
+  if (isBPMRecording) { clearInterval(recTimerInterval); mediaRecorder&&mediaRecorder.stop(); isBPMRecording=false; }
+  showScreen('screen-bpm-welcome');
+});
+
+document.getElementById('bpm-rec-btn').addEventListener('click', async () => {
+  if (!isBPMRecording) {
+    const ok = await startRecording(); if (!ok) return;
+    isBPMRecording = true;
+    document.getElementById('bpm-indicator').classList.add('recording');
+    document.getElementById('bpm-timer').classList.add('recording');
+    document.getElementById('bpm-rec-btn').textContent = '■';
+    document.getElementById('bpm-rec-btn').classList.add('recording');
+    recTimerInterval = setInterval(() => { document.getElementById('bpm-timer').textContent = fmtTime((Date.now()-recStartTime)/1000); }, 250);
+  } else {
+    clearInterval(recTimerInterval);
+    document.getElementById('bpm-rec-btn').textContent = '⏳';
+    await stopRecording(true);
+    isBPMRecording = false;
+    document.getElementById('bpm-indicator').classList.remove('recording');
+    document.getElementById('bpm-timer').classList.remove('recording');
+    document.getElementById('bpm-rec-btn').textContent = '●';
+    document.getElementById('bpm-rec-btn').classList.remove('recording');
+    const bpm = await detectBPMFromBuffer(bpmRecBuffer);
+    currentBPMForVerify = bpm;
+    document.getElementById('bpm-detected').textContent = bpm;
+    showScreen('screen-bpm-result');
+  }
+});
+
+document.getElementById('bpm-hear-click').addEventListener('click', () => {
+  document.getElementById('bpm-verify-num').textContent = currentBPMForVerify;
+  startClick(currentBPMForVerify);
+  showScreen('screen-bpm-verify');
+});
+
+document.getElementById('bpm-manual-adjust').addEventListener('click', () => {
+  stopClick();
+  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+  showScreen('screen-bpm-adjust');
+});
+
+document.getElementById('bpm-verify-back').addEventListener('click', () => { stopClick(); showScreen('screen-bpm-result'); });
+document.getElementById('bpm-confirm').addEventListener('click', async () => { stopClick(); await lockBPM(currentBPMForVerify); });
+document.getElementById('bpm-tweak').addEventListener('click', () => { stopClick(); document.getElementById('bpm-adj-num').textContent=currentBPMForVerify; showScreen('screen-bpm-adjust'); });
+document.getElementById('bpm-adj-back').addEventListener('click', () => { stopClick(); showScreen('screen-bpm-verify'); });
+
+document.getElementById('bpm-minus').addEventListener('click', () => {
+  currentBPMForVerify = Math.max(40, currentBPMForVerify-1);
+  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+  stopClick();
+});
+document.getElementById('bpm-plus').addEventListener('click', () => {
+  currentBPMForVerify = Math.min(220, currentBPMForVerify+1);
+  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+  stopClick();
+});
+document.getElementById('bpm-adj-hear').addEventListener('click', () => { startClick(currentBPMForVerify); });
+document.getElementById('bpm-adj-confirm').addEventListener('click', async () => { stopClick(); await lockBPM(currentBPMForVerify); });
+
+async function lockBPM(bpm) {
+  projectBPM = bpm;
+  await dbPut('meta', {key:'project', bpm});
+  document.getElementById('bpm-chip').textContent = '\u266a ' + bpm;
+  renderHome();
+  showScreen('screen-home');
 }
+
+document.getElementById('bpm-chip').addEventListener('click', () => {
+  currentBPMForVerify = projectBPM || 120;
+  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+  showScreen('screen-bpm-adjust');
+});
 
 // ── HOME ─────────────────────────────────
 function renderHome() {
   const empty = document.getElementById('empty-state');
   const list = document.getElementById('section-list');
   const playRow = document.getElementById('play-all-row');
-  if (sections.length === 0) { empty.style.display = 'flex'; list.style.display = 'none'; playRow.style.display = 'none'; return; }
-  empty.style.display = 'none'; list.style.display = 'block';
-  playRow.style.display = arrangement.length > 1 ? 'flex' : 'none';
+  if (sections.length===0) { empty.style.display='flex'; list.style.display='none'; playRow.style.display='none'; return; }
+  empty.style.display='none'; list.style.display='block';
+  playRow.style.display = arrangement.length>1 ? 'flex' : 'none';
   list.innerHTML = '';
-  arrangement.forEach((id, idx) => {
-    const sec = sections.find(s => s.id === id);
-    if (!sec) return;
+  arrangement.forEach((id,idx) => {
+    const sec = sections.find(s=>s.id===id); if (!sec) return;
     const card = document.createElement('div');
     card.className = 'section-card';
-    card.innerHTML = `
-      <div class="section-main">
-        <button class="section-play" data-id="${sec.id}">▶</button>
-        <div class="section-info">
-          <div class="section-name">${sec.name}</div>
-          <div class="section-meta">${fmtTime(sec.duration)}</div>
+    card.innerHTML = `<div class="section-main">
+      <button class="section-play" data-id="${sec.id}">&#9654;</button>
+      <div class="section-info">
+        <div class="section-name">${sec.name}</div>
+        <div class="section-meta">${fmtTime(sec.duration)}</div>
+      </div>
+      <div class="section-actions">
+        <div class="order-btns">
+          <button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>&#9650;</button>
+          <button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>&#9660;</button>
         </div>
-        <div class="section-actions">
-          <div class="order-btns">
-            <button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>▲</button>
-            <button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>▼</button>
-          </div>
-          <button class="btn-icon" data-delete="${sec.id}">🗑</button>
-        </div>
-      </div>`;
+        <button class="btn-icon" data-delete="${sec.id}">&#128465;</button>
+      </div>
+    </div>`;
     list.appendChild(card);
   });
 }
 
-// ── RECORD ───────────────────────────────
+// ── RECORD GUIDE ─────────────────────────
 let isRecording = false;
-
 function enterRecord(name) {
   document.getElementById('rec-section-name').textContent = name;
   document.getElementById('rec-instruction').textContent = 'לחץ להתחיל הקלטה';
@@ -386,172 +547,116 @@ function enterRecord(name) {
   showScreen('screen-record');
 }
 
-async function toggleRecord() {
+document.getElementById('rec-back').addEventListener('click', () => {
+  if (isRecording) { clearInterval(recTimerInterval); mediaRecorder&&mediaRecorder.stop(); isRecording=false; }
+  stopCurrentAudio(); showScreen('screen-home');
+});
+
+document.getElementById('rec-btn').addEventListener('click', async () => {
   if (!isRecording) {
-    const ok = await startRecording();
-    if (!ok) return;
+    const ok = await startRecording(); if (!ok) return;
     isRecording = true;
     document.getElementById('rec-instruction').textContent = 'מקליט... לחץ לעצור';
     document.getElementById('rec-timer').classList.add('recording');
     document.getElementById('rec-indicator').classList.add('recording');
     document.getElementById('rec-btn').textContent = '■';
     document.getElementById('rec-btn').classList.add('recording');
-    recTimerInterval = setInterval(() => {
-      document.getElementById('rec-timer').textContent = fmtTime((Date.now() - recStartTime) / 1000);
-    }, 250);
+    recTimerInterval = setInterval(() => { document.getElementById('rec-timer').textContent = fmtTime((Date.now()-recStartTime)/1000); }, 250);
   } else {
     clearInterval(recTimerInterval);
     await stopRecording();
     isRecording = false;
     enterReview();
   }
-}
+});
 
 // ── REVIEW ───────────────────────────────
-let reviewIsPlaying = false;
-
+let reviewPlaying = false;
 function enterReview() {
   document.getElementById('review-name').textContent = pendingName;
   document.getElementById('review-duration').textContent = fmtTime(pendingDuration);
-  reviewIsPlaying = false;
-  document.getElementById('review-play-btn').textContent = '▶';
-  document.getElementById('review-play-btn').classList.remove('playing');
+  reviewPlaying = false;
+  const btn = document.getElementById('review-play-btn');
+  btn.innerHTML = '&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
   showScreen('screen-review');
 }
-
-async function toggleReviewPlay() {
-  if (reviewIsPlaying) {
-    stopCurrentAudio(); reviewIsPlaying = false;
-    document.getElementById('review-play-btn').textContent = '▶';
-    document.getElementById('review-play-btn').classList.remove('playing');
+document.getElementById('review-play-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('review-play-btn');
+  if (reviewPlaying) {
+    stopCurrentAudio(); reviewPlaying=false; btn.innerHTML='&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
   } else {
-    reviewIsPlaying = true;
-    document.getElementById('review-play-btn').textContent = '■';
-    document.getElementById('review-play-btn').classList.add('playing');
-    await playBlob(bufferToBlob(pendingBuffer, pendingMime));
-    reviewIsPlaying = false;
-    document.getElementById('review-play-btn').textContent = '▶';
-    document.getElementById('review-play-btn').classList.remove('playing');
+    reviewPlaying=true; btn.innerHTML='&#9632;'; btn.style.background='var(--teal)'; btn.style.borderColor='var(--teal)';
+    await playBlob(bufToBlob(pendingBuffer, pendingMime));
+    reviewPlaying=false; btn.innerHTML='&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
   }
-}
-
-async function keepSection() {
+});
+document.getElementById('btn-keep').addEventListener('click', async () => {
   stopCurrentAudio();
-  const secId = uid();
-  const layerId = uid();
-  const sec = { id: secId, name: pendingName, duration: pendingDuration };
-  const layer = { id: layerId, sectionId: secId, layerName: 'guide', buffer: pendingBuffer, mimeType: pendingMime };
-  sections.push(sec);
-  layers.push(layer);
-  arrangement.push(secId);
-  await dbPut('sections', sec);
-  await dbPut('layers', layer);
-  await saveArrangement(arrangement);
-  renderHome();
-  showScreen('screen-home');
-}
-
-function redoSection() { stopCurrentAudio(); enterRecord(pendingName); }
+  const secId=uid(), layerId=uid();
+  const sec = {id:secId, name:pendingName, duration:pendingDuration};
+  const layer = {id:layerId, sectionId:secId, layerName:'guide', buffer:pendingBuffer, mimeType:pendingMime, offsetMs:0};
+  sections.push(sec); layers.push(layer); arrangement.push(secId);
+  await dbPut('sections',sec); await dbPut('layers',layer); await saveArrangement(arrangement);
+  renderHome(); showScreen('screen-home');
+});
+document.getElementById('btn-redo').addEventListener('click', () => { stopCurrentAudio(); enterRecord(pendingName); });
 
 // ── PLAY ALL ─────────────────────────────
 async function playAll() {
-  if (arrangement.length === 0) return;
-  stopPlayAllFlag = false;
-  showScreen('screen-playing');
-  for (let i = 0; i < arrangement.length; i++) {
+  if (!arrangement.length) return;
+  stopPlayAllFlag=false; showScreen('screen-playing');
+  for (let i=0; i<arrangement.length; i++) {
     if (stopPlayAllFlag) break;
-    const sec = sections.find(s => s.id === arrangement[i]);
+    const sec = sections.find(s=>s.id===arrangement[i]);
     const layer = getGuideLayer(arrangement[i]);
-    if (!sec || !layer) continue;
+    if (!sec||!layer) continue;
     document.getElementById('playing-name').textContent = sec.name;
     document.getElementById('playing-counter').textContent = `${i+1} / ${arrangement.length}`;
     document.getElementById('playing-progress-fill').style.width = '0%';
-    await playBlob(bufferToBlob(layer.buffer, layer.mimeType), pct => {
-      document.getElementById('playing-progress-fill').style.width = (pct * 100) + '%';
-    });
+    await playBlob(bufToBlob(layer.buffer,layer.mimeType), pct => { document.getElementById('playing-progress-fill').style.width=(pct*100)+'%'; });
   }
   if (!stopPlayAllFlag) showScreen('screen-home');
 }
-
-// ── MODAL ────────────────────────────────
-function openNameModal() {
-  const input = document.getElementById('modal-input');
-  input.value = defaultName();
-  document.getElementById('name-modal').classList.add('open');
-  setTimeout(() => input.focus(), 300);
-}
-function closeNameModal() { document.getElementById('name-modal').classList.remove('open'); }
-
-// ── EVENTS ───────────────────────────────
-document.getElementById('btn-new-section').addEventListener('click', openNameModal);
-document.getElementById('modal-confirm').addEventListener('click', () => {
-  const val = document.getElementById('modal-input').value.trim();
-  if (!val) return;
-  pendingName = val; closeNameModal(); enterRecord(pendingName);
-});
-document.getElementById('modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('modal-confirm').click(); });
-document.getElementById('name-modal').addEventListener('click', e => { if (e.target === document.getElementById('name-modal')) closeNameModal(); });
-document.getElementById('rec-back').addEventListener('click', () => {
-  if (isRecording) { clearInterval(recTimerInterval); stopRecording(); isRecording = false; }
-  stopCurrentAudio(); showScreen('screen-home');
-});
-document.getElementById('rec-btn').addEventListener('click', toggleRecord);
-document.getElementById('review-play-btn').addEventListener('click', toggleReviewPlay);
-document.getElementById('btn-keep').addEventListener('click', keepSection);
-document.getElementById('btn-redo').addEventListener('click', redoSection);
 document.getElementById('btn-play-all').addEventListener('click', playAll);
-document.getElementById('btn-stop-playing').addEventListener('click', () => {
-  stopPlayAllFlag = true; stopCurrentAudio(); showScreen('screen-home');
-});
+document.getElementById('btn-stop-playing').addEventListener('click', () => { stopPlayAllFlag=true; stopCurrentAudio(); showScreen('screen-home'); });
 
+// ── MODALS ───────────────────────────────
+const openNameModal = () => { const i=document.getElementById('modal-input'); i.value=defaultName(); document.getElementById('name-modal').classList.add('open'); setTimeout(()=>i.focus(),300); };
+const closeNameModal = () => document.getElementById('name-modal').classList.remove('open');
+document.getElementById('btn-new-section').addEventListener('click', openNameModal);
+document.getElementById('modal-confirm').addEventListener('click', () => { const v=document.getElementById('modal-input').value.trim(); if(!v)return; pendingName=v; closeNameModal(); enterRecord(pendingName); });
+document.getElementById('modal-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('modal-confirm').click(); });
+document.getElementById('name-modal').addEventListener('click', e => { if(e.target===document.getElementById('name-modal')) closeNameModal(); });
+
+// ── SECTION LIST EVENTS ──────────────────
 document.getElementById('section-list').addEventListener('click', async e => {
-  const playBtn = e.target.closest('[data-id]');
-  const delBtn = e.target.closest('[data-delete]');
-  const upBtn = e.target.closest('[data-up]');
-  const downBtn = e.target.closest('[data-down]');
-
-  if (playBtn) {
-    const id = playBtn.dataset.id;
-    const layer = getGuideLayer(id);
-    if (!layer) return;
-    playBtn.classList.add('playing'); playBtn.textContent = '■';
-    await playBlob(bufferToBlob(layer.buffer, layer.mimeType));
-    playBtn.classList.remove('playing'); playBtn.textContent = '▶';
-  }
-  if (delBtn) {
-    const id = delBtn.dataset.delete;
-    if (!confirm('למחוק את הקטע הזה?')) return;
-    const layersToDelete = layers.filter(l => l.sectionId === id);
-    sections = sections.filter(s => s.id !== id);
-    layers = layers.filter(l => l.sectionId !== id);
-    arrangement = arrangement.filter(i => i !== id);
-    await dbDelete('sections', id);
-    for (const l of layersToDelete) await dbDelete('layers', l.id);
-    await saveArrangement(arrangement);
-    renderHome();
-  }
-  if (upBtn) {
-    const idx = parseInt(upBtn.dataset.up);
-    if (idx > 0) { [arrangement[idx], arrangement[idx-1]] = [arrangement[idx-1], arrangement[idx]]; await saveArrangement(arrangement); renderHome(); }
-  }
-  if (downBtn) {
-    const idx = parseInt(downBtn.dataset.down);
-    if (idx < arrangement.length-1) { [arrangement[idx], arrangement[idx+1]] = [arrangement[idx+1], arrangement[idx]]; await saveArrangement(arrangement); renderHome(); }
-  }
+  const playBtn=e.target.closest('[data-id]'), delBtn=e.target.closest('[data-delete]');
+  const upBtn=e.target.closest('[data-up]'), downBtn=e.target.closest('[data-down]');
+  if (playBtn) { const id=playBtn.dataset.id; const layer=getGuideLayer(id); if(!layer)return; playBtn.classList.add('playing'); playBtn.innerHTML='&#9632;'; await playBlob(bufToBlob(layer.buffer,layer.mimeType)); playBtn.classList.remove('playing'); playBtn.innerHTML='&#9654;'; }
+  if (delBtn) { const id=delBtn.dataset.delete; if(!confirm('למחוק?'))return; const toDel=layers.filter(l=>l.sectionId===id); sections=sections.filter(s=>s.id!==id); layers=layers.filter(l=>l.sectionId!==id); arrangement=arrangement.filter(i=>i!==id); await dbDelete('sections',id); for(const l of toDel)await dbDelete('layers',l.id); await saveArrangement(arrangement); renderHome(); }
+  if (upBtn) { const i=parseInt(upBtn.dataset.up); if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome();} }
+  if (downBtn) { const i=parseInt(downBtn.dataset.down); if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome();} }
 });
 
 // ── INIT ─────────────────────────────────
 async function init() {
   await openDB();
+  const project = await dbGet('meta','project');
   sections = await dbGetAll('sections');
   layers = await dbGetAll('layers');
   const savedArr = await loadArrangement();
-  const ids = new Set(sections.map(s => s.id));
-  arrangement = savedArr.filter(id => ids.has(id));
-  sections.forEach(s => { if (!arrangement.includes(s.id)) arrangement.push(s.id); });
-  renderHome();
+  const ids = new Set(sections.map(s=>s.id));
+  arrangement = savedArr.filter(id=>ids.has(id));
+  sections.forEach(s => { if(!arrangement.includes(s.id)) arrangement.push(s.id); });
+  if (project && project.bpm) {
+    projectBPM = project.bpm;
+    document.getElementById('bpm-chip').textContent = '\u266a ' + projectBPM;
+    renderHome();
+    showScreen('screen-home');
+  } else {
+    showScreen('screen-bpm-welcome');
+  }
 }
-
 init().catch(console.error);
 </script>
 </body>
