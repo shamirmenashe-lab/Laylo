@@ -16,6 +16,7 @@
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Heebo',sans-serif;direction:rtl}
+
     .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);opacity:0;pointer-events:none;transition:opacity .2s}
     .screen.active{opacity:1;pointer-events:all}
     .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0}
@@ -50,6 +51,7 @@
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .1s}
     .bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0}
+
     #screen-home .scroll-area{flex:1;overflow-y:auto;padding:0 16px}
     .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;padding-bottom:60px}
     .empty-icon{font-size:52px;opacity:.3}
@@ -70,6 +72,7 @@
     #screen-home .bottom-bar{background:linear-gradient(to top,var(--bg) 60%,transparent)}
     .play-all-row{display:flex;gap:10px;margin-bottom:10px}
     .play-all-row .btn{flex:1}
+
     #screen-playing{align-items:center;text-align:center}
     #screen-playing .topbar{width:100%;justify-content:center}
     .playing-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.12em;margin-bottom:4px}
@@ -82,6 +85,7 @@
     @keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.35)}}
     .playing-progress{width:80%;height:3px;background:var(--s2);border-radius:2px;overflow:hidden}
     .playing-progress-fill{height:100%;background:var(--teal);border-radius:2px;width:0%;transition:width .5s linear}
+
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
     .modal-overlay.open{opacity:1;pointer-events:all}
     .modal-sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:24px 20px;width:100%;transform:translateY(100%);transition:transform .25s ease-out;padding-bottom:max(24px,env(safe-area-inset-bottom))}
@@ -96,24 +100,24 @@
 <div id="screen-bpm-welcome" class="screen">
   <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 1.5</span></div>
   <div class="center-screen">
-    <div style="font-size:48px">&#127928;</div>
-    <div class="big-title">&#1504;&#1490;&#1503; &#1488;&#1514; &#1492;&#1513;&#1497;&#1512; &#1513;&#1500;&#1498;<br>&#1495;&#1493;&#1508;&#1513;&#1497;</div>
-    <div class="sub">&#1504;&#1490;&#1503; &#1499;&#1502;&#1492; &#1513;&#1504;&#1497;&#1493;&#1514; &#1506;&#1491; &#1513;&#1502;&#1512;&#1490;&#1497;&#1513;&#1497;&#1501; &#1488;&#1514; &#1492;&#1511;&#1510;&#1489; &#1492;&#1504;&#1499;&#1493;&#1503;.<br>&#1500;&#1495;&#1509; &#1492;&#1511;&#1500;&#1496;, &#1504;&#1490;&#1503;, &#1506;&#1510;&#1493;&#1512; &#8212; &#1504;&#1502;&#1510;&#1488; &#1488;&#1514; &#1492;-BPM.</div>
+    <div style="font-size:48px">🎸</div>
+    <div class="big-title">נגן את השיר שלך<br>חופשי</div>
+    <div class="sub">נגן כמה שניות עד שמרגישים את הקצב הנכון.<br>לחץ הקלט, נגן, עצור — נמצא את ה-BPM.</div>
   </div>
   <div class="bottom-bar">
-    <button class="btn btn-primary" id="bpm-start-rec">&#9679; &#1492;&#1514;&#1495;&#1500; &#1492;&#1511;&#1500;&#1496;&#1492;</button>
+    <button class="btn btn-primary" id="bpm-start-rec">● התחל הקלטה</button>
   </div>
 </div>
 
 <div id="screen-bpm-record" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-rec-back">&#8592;</button><span></span></div>
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-rec-back">←</button><span></span></div>
   <div class="center-screen">
-    <div class="sub">&#1504;&#1490;&#1503; &#1495;&#1493;&#1508;&#1513;&#1497; &#8212; 8 &#1506;&#1491; 20 &#1513;&#1504;&#1497;&#1493;&#1514;</div>
+    <div class="sub">נגן חופשי — 8 עד 20 שניות</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="bpm-indicator"></div>
       <div class="rec-timer" id="bpm-timer">00:00</div>
     </div>
-    <button class="rec-big-btn" id="bpm-rec-btn">&#9679;</button>
+    <button class="rec-big-btn" id="bpm-rec-btn">●</button>
   </div>
   <div class="bottom-bar"></div>
 </div>
@@ -121,24 +125,24 @@
 <div id="screen-bpm-result" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
-    <div class="bpm-label">&#1494;&#1497;&#1492;&#1497;&#1514;&#1497;</div>
-    <div class="bpm-number" id="bpm-detected">&#8212;</div>
+    <div class="bpm-label">זיהיתי</div>
+    <div class="bpm-number" id="bpm-detected">—</div>
     <div class="bpm-label">BPM</div>
-    <div class="sub">&#1513;&#1502;&#1506; &#1488;&#1514; &#1492;&#1511;&#1500;&#1497;&#1511; &#1493;&#1504;&#1490;&#1503; &#1506;&#1500;&#1497;&#1493;.<br>&#1488;&#1501; &#1502;&#1512;&#1490;&#1497;&#1513; &#1504;&#1499;&#1493;&#1503; &#8212; &#1488;&#1513;&#1512;.</div>
+    <div class="sub">שמע את הקליק ונגן עליו.<br>אם מרגיש נכון — אשר.</div>
   </div>
   <div class="bottom-bar">
     <div class="gap">
-      <button class="btn btn-primary" id="bpm-hear-click">&#9654; &#1513;&#1502;&#1506; &#1511;&#1500;&#1497;&#1511;</button>
-      <button class="btn btn-ghost" id="bpm-manual-adjust">&#1513;&#1504;&#1492; &#1497;&#1491;&#1504;&#1497;&#1514;</button>
+      <button class="btn btn-primary" id="bpm-hear-click">▶ שמע קליק</button>
+      <button class="btn btn-ghost" id="bpm-manual-adjust">שנה ידנית</button>
     </div>
   </div>
 </div>
 
 <div id="screen-bpm-verify" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-verify-back">&#8592;</button><span></span></div>
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-verify-back">←</button><span></span></div>
   <div class="center-screen">
-    <div class="bpm-label">&#1502;&#1504;&#1490;&#1503; &#1511;&#1500;&#1497;&#1511;</div>
-    <div class="bpm-number" id="bpm-verify-num">&#8212;</div>
+    <div class="bpm-label">מנגן קליק</div>
+    <div class="bpm-number" id="bpm-verify-num">—</div>
     <div class="bpm-label">BPM</div>
     <div class="click-bars" id="click-bars">
       <div class="click-bar" style="height:8px" id="cb0"></div>
@@ -146,32 +150,32 @@
       <div class="click-bar" style="height:8px" id="cb2"></div>
       <div class="click-bar" style="height:8px" id="cb3"></div>
     </div>
-    <div class="sub">&#1504;&#1490;&#1503; &#1506;&#1500;&#1497;&#1493;. &#1502;&#1512;&#1490;&#1497;&#1513; &#1504;&#1499;&#1493;&#1503;?</div>
+    <div class="sub">נגן עליו. מרגיש נכון?</div>
   </div>
   <div class="bottom-bar">
     <div class="gap">
-      <button class="btn btn-primary" id="bpm-confirm">&#10003; &#1499;&#1503;, &#1494;&#1492; &#1492;BPM</button>
-      <button class="btn btn-ghost" id="bpm-tweak">&#1513;&#1504;&#1492;</button>
+      <button class="btn btn-primary" id="bpm-confirm">✓ כן, זה הBPM</button>
+      <button class="btn btn-ghost" id="bpm-tweak">שנה</button>
     </div>
   </div>
 </div>
 
 <div id="screen-bpm-adjust" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-adj-back">&#8592;</button><span></span></div>
+  <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-adj-back">←</button><span></span></div>
   <div class="center-screen">
-    <div class="bpm-label">&#1513;&#1504;&#1492; BPM</div>
+    <div class="bpm-label">שנה BPM</div>
     <div class="adjust-row">
-      <button class="adj-btn" id="bpm-minus">&#8722;</button>
-      <div class="bpm-number" id="bpm-adj-num">&#8212;</div>
+      <button class="adj-btn" id="bpm-minus">−</button>
+      <div class="bpm-number" id="bpm-adj-num">—</div>
       <button class="adj-btn" id="bpm-plus">+</button>
     </div>
     <div class="bpm-label">BPM</div>
-    <div class="sub">&#1500;&#1495;&#1509; &#9654; &#1500;&#1513;&#1502;&#1493;&#1506; &#1488;&#1514; &#1492;&#1511;&#1500;&#1497;&#1511; &#1492;&#1495;&#1491;&#1513;</div>
+    <div class="sub">לחץ ▶ לשמוע את הקליק החדש</div>
   </div>
   <div class="bottom-bar">
     <div class="gap">
-      <button class="btn btn-ghost" id="bpm-adj-hear">&#9654; &#1513;&#1502;&#1506; &#1511;&#1500;&#1497;&#1511;</button>
-      <button class="btn btn-primary" id="bpm-adj-confirm">&#10003; &#1488;&#1513;&#1512;</button>
+      <button class="btn btn-ghost" id="bpm-adj-hear">▶ שמע קליק</button>
+      <button class="btn btn-primary" id="bpm-adj-confirm">✓ אשר</button>
     </div>
   </div>
 </div>
@@ -179,34 +183,34 @@
 <div id="screen-home" class="screen">
   <div class="topbar">
     <span class="logo">laylo</span>
-    <span class="bpm-chip" id="bpm-chip" title="&#1513;&#1504;&#1492; BPM">&#9834; &#8212;</span>
+    <span class="bpm-chip" id="bpm-chip" title="שנה BPM">♩ —</span>
   </div>
   <div class="scroll-area" id="home-scroll">
     <div class="empty-state" id="empty-state">
-      <div class="empty-icon">&#127928;</div>
-      <div class="empty-title">&#1488;&#1497;&#1503; &#1511;&#1496;&#1506;&#1497;&#1501; &#1506;&#1491;&#1497;&#1497;&#1503;</div>
-      <div class="empty-sub">&#1500;&#1495;&#1509; &#8220;&#1511;&#1496;&#1506; &#1495;&#1491;&#1513;&#8221; &#1499;&#1491;&#1497; &#1500;&#1492;&#1514;&#1495;&#1497;&#1500;.<br>&#1492;&#1511;&#1500;&#1496; A-part, B-part &#8212; &#1511;&#1496;&#1506; &#1511;&#1496;&#1506;.</div>
+      <div class="empty-icon">🎸</div>
+      <div class="empty-title">אין קטעים עדיין</div>
+      <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל.<br>הקלט A-part, B-part — קטע קטע.</div>
     </div>
     <div class="section-list" id="section-list" style="display:none"></div>
   </div>
   <div class="bottom-bar">
     <div class="play-all-row" id="play-all-row" style="display:none">
-      <button class="btn btn-ghost" id="btn-play-all">&#9654; &#1492;&#1508;&#1506;&#1500; &#1492;&#1499;&#1500;</button>
+      <button class="btn btn-ghost" id="btn-play-all">▶ הפעל הכל</button>
     </div>
-    <button class="btn btn-primary" id="btn-new-section">&#8853; &#1511;&#1496;&#1506; &#1495;&#1491;&#1513;</button>
+    <button class="btn btn-primary" id="btn-new-section">⊕ קטע חדש</button>
   </div>
 </div>
 
 <div id="screen-record" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="rec-back">&#8592;</button><span></span></div>
+  <div class="topbar" style="width:100%"><button class="back-btn" id="rec-back">←</button><span></span></div>
   <div class="center-screen">
-    <div id="rec-section-name" style="font-size:22px;font-weight:900;margin:8px 0 4px"></div>
-    <div id="rec-instruction" style="font-size:13px;color:var(--muted);margin-bottom:32px">&#1500;&#1495;&#1509; &#1500;&#1492;&#1514;&#1495;&#1497;&#1500; &#1492;&#1511;&#1500;&#1496;&#1492;</div>
+    <div class="rec-section-name" id="rec-section-name" style="font-size:22px;font-weight:900;margin:8px 0 4px"></div>
+    <div id="rec-instruction" style="font-size:13px;color:var(--muted);margin-bottom:32px">לחץ להתחיל הקלטה</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="rec-indicator"></div>
       <div class="rec-timer" id="rec-timer">00:00</div>
     </div>
-    <button class="rec-big-btn" id="rec-btn">&#9679;</button>
+    <button class="rec-big-btn" id="rec-btn">●</button>
   </div>
   <div class="bottom-bar"></div>
 </div>
@@ -214,443 +218,386 @@
 <div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
-    <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">&#1492;&#1511;&#1500;&#1496;&#1492; &#1492;&#1493;&#1513;&#1500;&#1502;&#1492;</div>
+    <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">הקלטה הושלמה</div>
     <div id="review-name" style="font-size:24px;font-weight:900;margin-bottom:28px"></div>
-    <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">&#9654;</button>
+    <button class="review-play-btn" id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">▶</button>
     <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
   <div class="bottom-bar"><div class="gap">
-    <button class="btn btn-primary" id="btn-keep">&#10003; &#1513;&#1502;&#1493;&#1512;</button>
-    <button class="btn btn-ghost" id="btn-redo">&#8634; &#1492;&#1511;&#1500;&#1496; &#1513;&#1493;&#1489;</button>
+    <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
+    <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
   </div></div>
 </div>
 
 <div id="screen-playing" class="screen">
   <div class="topbar"><span class="logo">laylo</span></div>
   <div class="playing-center">
-    <div class="playing-label">&#1502;&#1504;&#1490;&#1503; &#1506;&#1499;&#1513;&#1497;&#1493;</div>
-    <div class="playing-name" id="playing-name">&#8212;</div>
+    <div class="playing-label">מנגן עכשיו</div>
+    <div class="playing-name" id="playing-name">—</div>
     <div class="playing-counter" id="playing-counter">1 / 1</div>
     <div class="playing-waveform"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="playing-progress"><div class="playing-progress-fill" id="playing-progress-fill"></div></div>
   </div>
-  <div class="bottom-bar"><button class="btn btn-danger" id="btn-stop-playing">&#9632; &#1506;&#1510;&#1493;&#1512;</button></div>
+  <div class="bottom-bar"><button class="btn btn-danger" id="btn-stop-playing">■ עצור</button></div>
 </div>
 
 <div class="modal-overlay" id="name-modal">
   <div class="modal-sheet">
-    <div class="modal-title">&#1513;&#1501; &#1492;&#1511;&#1496;&#1506;</div>
-    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, &#1489;&#1512;&#1497;&#1491;&#1490;&#1468;, &#1493;&#1493;&#1512;&#1505;...">
-    <button class="btn btn-primary" id="modal-confirm">&#1492;&#1502;&#1513;&#1498; &#1500;&#1492;&#1511;&#1500;&#1496;&#1492; &#8592;</button>
+    <div class="modal-title">שם הקטע</div>
+    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, ברידג׳, ורס...">
+    <button class="btn btn-primary" id="modal-confirm">המשך להקלטה →</button>
   </div>
 </div>
 
 <script>
 // TEMP — Sprint 1.5. Cleanup: remove console.logs before production
 
-// ── AI GATEWAY ──────────────────────────
 async function callAI(prompt) {
   console.log('[callAI mock]', prompt);
   return { text: '[mock]' };
-  // Sprint 2+: const res = await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});return res.json();
 }
 
-// ── DB ──────────────────────────────────
-// DATA MODEL:
-// sections: { id, name, duration }
-// layers:   { id, sectionId, layerName, buffer: ArrayBuffer, mimeType, offsetMs }
-// meta:     { key:'project', bpm } | { key:'arrangement', order:[...] }
-const DB_NAME = 'laylo-v2', DB_VER = 1;
+const DB_NAME='laylo-v2', DB_VER=1;
 let db;
 function openDB() {
-  return new Promise((res,rej) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = e => {
-      const d = e.target.result;
-      if (!d.objectStoreNames.contains('sections')) d.createObjectStore('sections', {keyPath:'id'});
-      if (!d.objectStoreNames.contains('layers')) d.createObjectStore('layers', {keyPath:'id'});
-      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath:'key'});
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('sections')) d.createObjectStore('sections',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('layers')) d.createObjectStore('layers',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'key'});
     };
-    req.onsuccess = e => { db = e.target.result; res(db); };
-    req.onerror = () => rej(req.error);
+    req.onsuccess=e=>{db=e.target.result;res(db)};
+    req.onerror=()=>rej(req.error);
   });
 }
-const dbPut = (store,val) => new Promise((res,rej) => { const t=db.transaction(store,'readwrite'); t.objectStore(store).put(val).onsuccess=()=>res(); t.onerror=()=>rej(t.error); });
-const dbGet = (store,key) => new Promise((res,rej) => { const req=db.transaction(store,'readonly').objectStore(store).get(key); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); });
-const dbGetAll = (store) => new Promise((res,rej) => { const req=db.transaction(store,'readonly').objectStore(store).getAll(); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); });
-const dbDelete = (store,key) => new Promise((res,rej) => { const t=db.transaction(store,'readwrite'); t.objectStore(store).delete(key).onsuccess=()=>res(); t.onerror=()=>rej(t.error); });
-const saveArrangement = order => dbPut('meta', {key:'arrangement', order});
-const loadArrangement = async () => { const r = await dbGet('meta','arrangement'); return r ? r.order : []; };
+const dbPut=(store,val)=>new Promise((res,rej)=>{const t=db.transaction(store,'readwrite');t.objectStore(store).put(val).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
+const dbGet=(store,key)=>new Promise((res,rej)=>{const req=db.transaction(store,'readonly').objectStore(store).get(key);req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
+const dbGetAll=(store)=>new Promise((res,rej)=>{const req=db.transaction(store,'readonly').objectStore(store).getAll();req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
+const dbDelete=(store,key)=>new Promise((res,rej)=>{const t=db.transaction(store,'readwrite');t.objectStore(store).delete(key).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
+const saveArrangement=order=>dbPut('meta',{key:'arrangement',order});
+const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return r?r.order:[]};
 
-// ── STATE ────────────────────────────────
-let sections = [], layers = [], arrangement = [];
-let projectBPM = null;
-let pendingName = '', pendingBuffer = null, pendingMime = '', pendingDuration = 0;
-let bpmRecBuffer = null, bpmRecMime = '';
-let currentBPMForVerify = 0;
+let sections=[], layers=[], arrangement=[];
+let projectBPM=null;
+let pendingName='', pendingBuffer=null, pendingMime='', pendingDuration=0;
+let bpmRecBuffer=null, bpmRecMime='';
+let currentBPMForVerify=0;
 
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-const fmtTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-const defaultName = () => (['A','B','C','D','E','F'][sections.length] || String(sections.length+1)) + '-part';
-const getGuideLayer = sid => layers.find(l => l.sectionId===sid && l.layerName==='guide');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const defaultName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
+const getGuideLayer=sid=>layers.find(l=>l.sectionId===sid&&l.layerName==='guide');
 
-// ── AUDIO UTILS ─────────────────────────
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
 let currentAudio=null, stopPlayAllFlag=false;
 
 async function startRecording() {
   try {
-    recStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
   } catch(e) { alert('לא ניתן לגשת למיקרופון. אפשר גישה בהגדרות הדפדפן.'); return false; }
-  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
-    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
-  mediaRecorder = new MediaRecorder(recStream, mime ? {mimeType:mime} : {});
-  recChunks = [];
-  mediaRecorder.ondataavailable = e => { if(e.data.size>0) recChunks.push(e.data); };
+  const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
+  mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
+  recChunks=[];
+  mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);
-  recStartTime = Date.now();
+  recStartTime=Date.now();
   return true;
 }
-
-const stopRecording = (isBPM=false) => new Promise(res => {
-  mediaRecorder.onstop = async () => {
-    const blob = new Blob(recChunks, {type:mediaRecorder.mimeType});
-    const buf = await blob.arrayBuffer();
-    if (isBPM) { bpmRecBuffer=buf; bpmRecMime=mediaRecorder.mimeType; }
-    else { pendingDuration=(Date.now()-recStartTime)/1000; pendingBuffer=buf; pendingMime=mediaRecorder.mimeType; }
+const stopRecording=(isBPM=false)=>new Promise(res=>{
+  mediaRecorder.onstop=async()=>{
+    const blob=new Blob(recChunks,{type:mediaRecorder.mimeType});
+    const buf=await blob.arrayBuffer();
+    if(isBPM){bpmRecBuffer=buf;bpmRecMime=mediaRecorder.mimeType;}
+    else{pendingDuration=(Date.now()-recStartTime)/1000;pendingBuffer=buf;pendingMime=mediaRecorder.mimeType;}
     recStream.getTracks().forEach(t=>t.stop());
     res();
   };
   mediaRecorder.stop();
 });
-
-const bufToBlob = (buf,mime) => new Blob([buf], {type:mime});
-const playBlob = (blob,onProgress) => new Promise(res => {
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  currentAudio = audio;
-  if (onProgress) audio.ontimeupdate = () => { if(audio.duration) onProgress(audio.currentTime/audio.duration); };
-  audio.onended = () => { URL.revokeObjectURL(url); res('ended'); };
-  audio.onerror = () => { URL.revokeObjectURL(url); res('error'); };
-  audio.play().catch(() => res('error'));
+const bufToBlob=(buf,mime)=>new Blob([buf],{type:mime});
+const playBlob=(blob,onProgress)=>new Promise(res=>{
+  const url=URL.createObjectURL(blob);
+  const audio=new Audio(url);
+  currentAudio=audio;
+  if(onProgress) audio.ontimeupdate=()=>{if(audio.duration)onProgress(audio.currentTime/audio.duration)};
+  audio.onended=()=>{URL.revokeObjectURL(url);res('ended')};
+  audio.onerror=()=>{URL.revokeObjectURL(url);res('error')};
+  audio.play().catch(()=>res('error'));
 });
-const stopCurrentAudio = () => { if(currentAudio) { currentAudio.pause(); currentAudio=null; } };
+const stopCurrentAudio=()=>{if(currentAudio){currentAudio.pause();currentAudio=null}};
 
-// ── BPM DETECTION ───────────────────────
-// Onset strength autocorrelation — no external dependencies
 async function detectBPMFromBuffer(arrayBuffer) {
-  const tmpCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const tmpCtx=new (window.AudioContext||window.webkitAudioContext)();
   let audioBuffer;
-  try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer.slice()); }
+  try { audioBuffer=await tmpCtx.decodeAudioData(arrayBuffer.slice()); }
   catch(e) { await tmpCtx.close(); return 120; }
   await tmpCtx.close();
-
-  const samples = audioBuffer.getChannelData(0);
-  const sr = audioBuffer.sampleRate;
-  const FRAME = Math.round(0.01 * sr); // 10ms frames
-
-  // RMS envelope
-  const env = [];
-  for (let i=0; i<samples.length; i+=FRAME) {
-    let s = 0;
-    for (let j=0; j<FRAME && i+j<samples.length; j++) s += samples[i+j]**2;
+  const samples=audioBuffer.getChannelData(0);
+  const sr=audioBuffer.sampleRate;
+  const FRAME=Math.round(0.01*sr);
+  const env=[];
+  for(let i=0;i<samples.length;i+=FRAME){
+    let s=0;
+    for(let j=0;j<FRAME&&i+j<samples.length;j++) s+=samples[i+j]**2;
     env.push(Math.sqrt(s/FRAME));
   }
-
-  // Onset strength = positive first-order difference of RMS envelope
-  const onset = [];
-  for (let i=1; i<env.length; i++) onset.push(Math.max(0, env[i]-env[i-1]));
-
-  // Autocorrelation over onset strength to find dominant period
-  const frameDur = 0.01;
-  const minP = Math.round(60/180/frameDur); // 180 BPM
-  const maxP = Math.round(60/50/frameDur);  // 50 BPM
-  let bestP = minP, bestScore = 0;
-  for (let p=minP; p<=maxP; p++) {
-    let score = 0;
-    for (let i=0; i<onset.length-p; i++) score += onset[i]*onset[i+p];
-    if (score > bestScore) { bestScore=score; bestP=p; }
+  const onset=[];
+  for(let i=1;i<env.length;i++) onset.push(Math.max(0,env[i]-env[i-1]));
+  const frameDur=0.01;
+  const minP=Math.round(60/180/frameDur);
+  const maxP=Math.round(60/50/frameDur);
+  let bestP=minP, bestScore=0;
+  for(let p=minP;p<=maxP;p++){
+    let score=0;
+    for(let i=0;i<onset.length-p;i++) score+=onset[i]*onset[i+p];
+    if(score>bestScore){bestScore=score;bestP=p}
   }
-
-  let bpm = Math.round(60/(bestP*frameDur));
-  while (bpm > 180) bpm = Math.round(bpm/2);
-  while (bpm < 50) bpm = Math.round(bpm*2);
+  let bpm=Math.round(60/(bestP*frameDur));
+  while(bpm>180) bpm=Math.round(bpm/2);
+  while(bpm<50) bpm=Math.round(bpm*2);
   return bpm;
 }
 
-// ── CLICK TRACK ─────────────────────────
 let clickCtx=null, clickTimeout=null, clickBeat=0, clickNextTime=0;
-
 function startClick(bpm) {
   stopClick();
-  clickCtx = new (window.AudioContext||window.webkitAudioContext)();
-  const interval = 60/bpm;
-  clickBeat = 0;
-  clickNextTime = clickCtx.currentTime + 0.1;
+  clickCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const interval=60/bpm;
+  clickBeat=0;
+  clickNextTime=clickCtx.currentTime+0.1;
   function schedule() {
-    if (!clickCtx || clickCtx.state==='closed') return;
-    while (clickNextTime < clickCtx.currentTime + 0.3) {
-      const isAccent = (clickBeat % 4 === 0);
-      const osc = clickCtx.createOscillator();
-      const gain = clickCtx.createGain();
-      osc.frequency.value = isAccent ? 1200 : 900;
-      gain.gain.setValueAtTime(isAccent ? 0.8 : 0.5, clickNextTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, clickNextTime+0.04);
-      osc.connect(gain); gain.connect(clickCtx.destination);
-      osc.start(clickNextTime); osc.stop(clickNextTime+0.05);
-      const barIdx = clickBeat % 4;
-      setTimeout(() => animateClickBar(barIdx), Math.max(0, (clickNextTime-clickCtx.currentTime)*1000));
-      clickNextTime += interval;
+    if(!clickCtx||clickCtx.state==='closed') return;
+    while(clickNextTime<clickCtx.currentTime+0.3){
+      const isAccent=(clickBeat%4===0);
+      const osc=clickCtx.createOscillator();
+      const gain=clickCtx.createGain();
+      osc.frequency.value=isAccent?1200:900;
+      gain.gain.setValueAtTime(isAccent?0.8:0.5,clickNextTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
+      osc.connect(gain);gain.connect(clickCtx.destination);
+      osc.start(clickNextTime);osc.stop(clickNextTime+0.05);
+      const barIdx=clickBeat%4;
+      setTimeout(()=>animateClickBar(barIdx),Math.max(0,(clickNextTime-clickCtx.currentTime)*1000));
+      clickNextTime+=interval;
       clickBeat++;
     }
-    clickTimeout = setTimeout(schedule, 100);
+    clickTimeout=setTimeout(schedule,100);
   }
   schedule();
 }
-
 function stopClick() {
-  if (clickTimeout) clearTimeout(clickTimeout);
-  if (clickCtx) { try { clickCtx.close(); } catch(e){} clickCtx=null; }
+  if(clickTimeout) clearTimeout(clickTimeout);
+  if(clickCtx){try{clickCtx.close()}catch(e){}clickCtx=null;}
 }
-
 function animateClickBar(idx) {
-  const bar = document.getElementById('cb'+idx);
-  if (!bar) return;
-  bar.style.height = '32px';
-  setTimeout(() => { bar.style.height='8px'; }, 100);
+  const bar=document.getElementById('cb'+idx);
+  if(!bar) return;
+  bar.style.height='32px';
+  setTimeout(()=>{bar.style.height='8px'},100);
 }
 
-// ── SCREENS ──────────────────────────────
-const showScreen = id => { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); };
+const showScreen=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')};
 
-// ── BPM FLOW ─────────────────────────────
-let isBPMRecording = false;
-
-document.getElementById('bpm-start-rec').addEventListener('click', () => showScreen('screen-bpm-record'));
-
-document.getElementById('bpm-rec-back').addEventListener('click', () => {
-  if (isBPMRecording) { clearInterval(recTimerInterval); mediaRecorder&&mediaRecorder.stop(); isBPMRecording=false; }
+let isBPMRecording=false;
+document.getElementById('bpm-start-rec').addEventListener('click',()=>showScreen('screen-bpm-record'));
+document.getElementById('bpm-rec-back').addEventListener('click',()=>{
+  if(isBPMRecording){clearInterval(recTimerInterval);stopRecording(true);isBPMRecording=false}
   showScreen('screen-bpm-welcome');
 });
-
-document.getElementById('bpm-rec-btn').addEventListener('click', async () => {
-  if (!isBPMRecording) {
-    const ok = await startRecording(); if (!ok) return;
-    isBPMRecording = true;
+document.getElementById('bpm-rec-btn').addEventListener('click',async()=>{
+  if(!isBPMRecording){
+    const ok=await startRecording(); if(!ok) return;
+    isBPMRecording=true;
     document.getElementById('bpm-indicator').classList.add('recording');
     document.getElementById('bpm-timer').classList.add('recording');
-    document.getElementById('bpm-rec-btn').textContent = '■';
+    document.getElementById('bpm-rec-btn').textContent='■';
     document.getElementById('bpm-rec-btn').classList.add('recording');
-    recTimerInterval = setInterval(() => { document.getElementById('bpm-timer').textContent = fmtTime((Date.now()-recStartTime)/1000); }, 250);
+    recTimerInterval=setInterval(()=>{document.getElementById('bpm-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
   } else {
     clearInterval(recTimerInterval);
-    document.getElementById('bpm-rec-btn').textContent = '⏳';
+    document.getElementById('bpm-rec-btn').textContent='⏳';
     await stopRecording(true);
-    isBPMRecording = false;
+    isBPMRecording=false;
     document.getElementById('bpm-indicator').classList.remove('recording');
     document.getElementById('bpm-timer').classList.remove('recording');
-    document.getElementById('bpm-rec-btn').textContent = '●';
+    document.getElementById('bpm-rec-btn').textContent='●';
     document.getElementById('bpm-rec-btn').classList.remove('recording');
-    const bpm = await detectBPMFromBuffer(bpmRecBuffer);
-    currentBPMForVerify = bpm;
-    document.getElementById('bpm-detected').textContent = bpm;
+    const bpm=await detectBPMFromBuffer(bpmRecBuffer);
+    currentBPMForVerify=bpm;
+    document.getElementById('bpm-detected').textContent=bpm;
     showScreen('screen-bpm-result');
   }
 });
-
-document.getElementById('bpm-hear-click').addEventListener('click', () => {
-  document.getElementById('bpm-verify-num').textContent = currentBPMForVerify;
+document.getElementById('bpm-hear-click').addEventListener('click',()=>{
+  document.getElementById('bpm-verify-num').textContent=currentBPMForVerify;
   startClick(currentBPMForVerify);
   showScreen('screen-bpm-verify');
 });
-
-document.getElementById('bpm-manual-adjust').addEventListener('click', () => {
+document.getElementById('bpm-manual-adjust').addEventListener('click',()=>{
   stopClick();
-  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+  document.getElementById('bpm-adj-num').textContent=currentBPMForVerify;
   showScreen('screen-bpm-adjust');
 });
-
-document.getElementById('bpm-verify-back').addEventListener('click', () => { stopClick(); showScreen('screen-bpm-result'); });
-document.getElementById('bpm-confirm').addEventListener('click', async () => { stopClick(); await lockBPM(currentBPMForVerify); });
-document.getElementById('bpm-tweak').addEventListener('click', () => { stopClick(); document.getElementById('bpm-adj-num').textContent=currentBPMForVerify; showScreen('screen-bpm-adjust'); });
-document.getElementById('bpm-adj-back').addEventListener('click', () => { stopClick(); showScreen('screen-bpm-verify'); });
-
-document.getElementById('bpm-minus').addEventListener('click', () => {
-  currentBPMForVerify = Math.max(40, currentBPMForVerify-1);
-  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
-  stopClick();
-});
-document.getElementById('bpm-plus').addEventListener('click', () => {
-  currentBPMForVerify = Math.min(220, currentBPMForVerify+1);
-  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
-  stopClick();
-});
-document.getElementById('bpm-adj-hear').addEventListener('click', () => { startClick(currentBPMForVerify); });
-document.getElementById('bpm-adj-confirm').addEventListener('click', async () => { stopClick(); await lockBPM(currentBPMForVerify); });
+document.getElementById('bpm-verify-back').addEventListener('click',()=>{stopClick();showScreen('screen-bpm-result')});
+document.getElementById('bpm-confirm').addEventListener('click',async()=>{stopClick();await lockBPM(currentBPMForVerify)});
+document.getElementById('bpm-tweak').addEventListener('click',()=>{stopClick();document.getElementById('bpm-adj-num').textContent=currentBPMForVerify;showScreen('screen-bpm-adjust')});
+document.getElementById('bpm-adj-back').addEventListener('click',()=>{stopClick();showScreen('screen-bpm-verify')});
+document.getElementById('bpm-minus').addEventListener('click',()=>{currentBPMForVerify=Math.max(40,currentBPMForVerify-1);document.getElementById('bpm-adj-num').textContent=currentBPMForVerify;stopClick()});
+document.getElementById('bpm-plus').addEventListener('click',()=>{currentBPMForVerify=Math.min(220,currentBPMForVerify+1);document.getElementById('bpm-adj-num').textContent=currentBPMForVerify;stopClick()});
+document.getElementById('bpm-adj-hear').addEventListener('click',()=>startClick(currentBPMForVerify));
+document.getElementById('bpm-adj-confirm').addEventListener('click',async()=>{stopClick();await lockBPM(currentBPMForVerify)});
 
 async function lockBPM(bpm) {
-  projectBPM = bpm;
-  await dbPut('meta', {key:'project', bpm});
-  document.getElementById('bpm-chip').textContent = '\u266a ' + bpm;
+  projectBPM=bpm;
+  await dbPut('meta',{key:'project',bpm});
+  document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
   renderHome();
   showScreen('screen-home');
 }
-
-document.getElementById('bpm-chip').addEventListener('click', () => {
-  currentBPMForVerify = projectBPM || 120;
-  document.getElementById('bpm-adj-num').textContent = currentBPMForVerify;
+document.getElementById('bpm-chip').addEventListener('click',()=>{
+  currentBPMForVerify=projectBPM||120;
+  document.getElementById('bpm-adj-num').textContent=currentBPMForVerify;
   showScreen('screen-bpm-adjust');
 });
 
-// ── HOME ─────────────────────────────────
 function renderHome() {
-  const empty = document.getElementById('empty-state');
-  const list = document.getElementById('section-list');
-  const playRow = document.getElementById('play-all-row');
-  if (sections.length===0) { empty.style.display='flex'; list.style.display='none'; playRow.style.display='none'; return; }
-  empty.style.display='none'; list.style.display='block';
-  playRow.style.display = arrangement.length>1 ? 'flex' : 'none';
-  list.innerHTML = '';
-  arrangement.forEach((id,idx) => {
-    const sec = sections.find(s=>s.id===id); if (!sec) return;
-    const card = document.createElement('div');
-    card.className = 'section-card';
-    card.innerHTML = `<div class="section-main">
-      <button class="section-play" data-id="${sec.id}">&#9654;</button>
+  const empty=document.getElementById('empty-state');
+  const list=document.getElementById('section-list');
+  const playRow=document.getElementById('play-all-row');
+  if(sections.length===0){empty.style.display='flex';list.style.display='none';playRow.style.display='none';return}
+  empty.style.display='none';list.style.display='block';
+  playRow.style.display=arrangement.length>1?'flex':'none';
+  list.innerHTML='';
+  arrangement.forEach((id,idx)=>{
+    const sec=sections.find(s=>s.id===id); if(!sec) return;
+    const card=document.createElement('div');
+    card.className='section-card';
+    card.innerHTML=`<div class="section-main">
+      <button class="section-play" data-id="${sec.id}">▶</button>
       <div class="section-info">
         <div class="section-name">${sec.name}</div>
         <div class="section-meta">${fmtTime(sec.duration)}</div>
       </div>
       <div class="section-actions">
         <div class="order-btns">
-          <button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>&#9650;</button>
-          <button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>&#9660;</button>
+          <button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>▲</button>
+          <button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>▼</button>
         </div>
-        <button class="btn-icon" data-delete="${sec.id}">&#128465;</button>
+        <button class="btn-icon" data-delete="${sec.id}">🗑</button>
       </div>
     </div>`;
     list.appendChild(card);
   });
 }
 
-// ── RECORD GUIDE ─────────────────────────
-let isRecording = false;
-function enterRecord(name) {
-  document.getElementById('rec-section-name').textContent = name;
-  document.getElementById('rec-instruction').textContent = 'לחץ להתחיל הקלטה';
-  document.getElementById('rec-timer').textContent = '00:00';
+let isRecording=false;
+function enterRecord(name){
+  document.getElementById('rec-section-name').textContent=name;
+  document.getElementById('rec-instruction').textContent='לחץ להתחיל הקלטה';
+  document.getElementById('rec-timer').textContent='00:00';
   document.getElementById('rec-timer').classList.remove('recording');
   document.getElementById('rec-indicator').classList.remove('recording');
-  document.getElementById('rec-btn').textContent = '●';
+  document.getElementById('rec-btn').textContent='●';
   document.getElementById('rec-btn').classList.remove('recording');
-  isRecording = false;
+  isRecording=false;
   showScreen('screen-record');
 }
-
-document.getElementById('rec-back').addEventListener('click', () => {
-  if (isRecording) { clearInterval(recTimerInterval); mediaRecorder&&mediaRecorder.stop(); isRecording=false; }
-  stopCurrentAudio(); showScreen('screen-home');
+document.getElementById('rec-back').addEventListener('click',()=>{
+  if(isRecording){clearInterval(recTimerInterval);stopRecording();isRecording=false}
+  stopCurrentAudio();showScreen('screen-home');
 });
-
-document.getElementById('rec-btn').addEventListener('click', async () => {
-  if (!isRecording) {
-    const ok = await startRecording(); if (!ok) return;
-    isRecording = true;
-    document.getElementById('rec-instruction').textContent = 'מקליט... לחץ לעצור';
+document.getElementById('rec-btn').addEventListener('click',async()=>{
+  if(!isRecording){
+    const ok=await startRecording();if(!ok)return;
+    isRecording=true;
+    document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('rec-timer').classList.add('recording');
     document.getElementById('rec-indicator').classList.add('recording');
-    document.getElementById('rec-btn').textContent = '■';
+    document.getElementById('rec-btn').textContent='■';
     document.getElementById('rec-btn').classList.add('recording');
-    recTimerInterval = setInterval(() => { document.getElementById('rec-timer').textContent = fmtTime((Date.now()-recStartTime)/1000); }, 250);
+    recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
   } else {
-    clearInterval(recTimerInterval);
-    await stopRecording();
-    isRecording = false;
-    enterReview();
+    clearInterval(recTimerInterval);await stopRecording();isRecording=false;enterReview();
   }
 });
 
-// ── REVIEW ───────────────────────────────
-let reviewPlaying = false;
-function enterReview() {
-  document.getElementById('review-name').textContent = pendingName;
-  document.getElementById('review-duration').textContent = fmtTime(pendingDuration);
-  reviewPlaying = false;
-  const btn = document.getElementById('review-play-btn');
-  btn.innerHTML = '&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
+let reviewPlaying=false;
+function enterReview(){
+  document.getElementById('review-name').textContent=pendingName;
+  document.getElementById('review-duration').textContent=fmtTime(pendingDuration);
+  reviewPlaying=false;
+  const btn=document.getElementById('review-play-btn');
+  btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';
   showScreen('screen-review');
 }
-document.getElementById('review-play-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('review-play-btn');
-  if (reviewPlaying) {
-    stopCurrentAudio(); reviewPlaying=false; btn.innerHTML='&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
-  } else {
-    reviewPlaying=true; btn.innerHTML='&#9632;'; btn.style.background='var(--teal)'; btn.style.borderColor='var(--teal)';
-    await playBlob(bufToBlob(pendingBuffer, pendingMime));
-    reviewPlaying=false; btn.innerHTML='&#9654;'; btn.style.background='var(--s2)'; btn.style.borderColor='var(--border)';
-  }
+document.getElementById('review-play-btn').addEventListener('click',async()=>{
+  const btn=document.getElementById('review-play-btn');
+  if(reviewPlaying){stopCurrentAudio();reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)'}
+  else{reviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';btn.style.borderColor='var(--teal)';
+    await playBlob(bufToBlob(pendingBuffer,pendingMime));
+    reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';}
 });
-document.getElementById('btn-keep').addEventListener('click', async () => {
+document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopCurrentAudio();
-  const secId=uid(), layerId=uid();
-  const sec = {id:secId, name:pendingName, duration:pendingDuration};
-  const layer = {id:layerId, sectionId:secId, layerName:'guide', buffer:pendingBuffer, mimeType:pendingMime, offsetMs:0};
-  sections.push(sec); layers.push(layer); arrangement.push(secId);
-  await dbPut('sections',sec); await dbPut('layers',layer); await saveArrangement(arrangement);
-  renderHome(); showScreen('screen-home');
+  const secId=uid(),layerId=uid();
+  const sec={id:secId,name:pendingName,duration:pendingDuration};
+  const layer={id:layerId,sectionId:secId,layerName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0};
+  sections.push(sec);layers.push(layer);arrangement.push(secId);
+  await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
+  renderHome();showScreen('screen-home');
 });
-document.getElementById('btn-redo').addEventListener('click', () => { stopCurrentAudio(); enterRecord(pendingName); });
+document.getElementById('btn-redo').addEventListener('click',()=>{stopCurrentAudio();enterRecord(pendingName)});
 
-// ── PLAY ALL ─────────────────────────────
-async function playAll() {
-  if (!arrangement.length) return;
-  stopPlayAllFlag=false; showScreen('screen-playing');
-  for (let i=0; i<arrangement.length; i++) {
-    if (stopPlayAllFlag) break;
-    const sec = sections.find(s=>s.id===arrangement[i]);
-    const layer = getGuideLayer(arrangement[i]);
-    if (!sec||!layer) continue;
-    document.getElementById('playing-name').textContent = sec.name;
-    document.getElementById('playing-counter').textContent = `${i+1} / ${arrangement.length}`;
-    document.getElementById('playing-progress-fill').style.width = '0%';
-    await playBlob(bufToBlob(layer.buffer,layer.mimeType), pct => { document.getElementById('playing-progress-fill').style.width=(pct*100)+'%'; });
+async function playAll(){
+  if(!arrangement.length) return;
+  stopPlayAllFlag=false;showScreen('screen-playing');
+  for(let i=0;i<arrangement.length;i++){
+    if(stopPlayAllFlag) break;
+    const sec=sections.find(s=>s.id===arrangement[i]);
+    const layer=getGuideLayer(arrangement[i]);
+    if(!sec||!layer) continue;
+    document.getElementById('playing-name').textContent=sec.name;
+    document.getElementById('playing-counter').textContent=`${i+1} / ${arrangement.length}`;
+    document.getElementById('playing-progress-fill').style.width='0%';
+    await playBlob(bufToBlob(layer.buffer,layer.mimeType),pct=>{document.getElementById('playing-progress-fill').style.width=(pct*100)+'%'});
   }
-  if (!stopPlayAllFlag) showScreen('screen-home');
+  if(!stopPlayAllFlag) showScreen('screen-home');
 }
-document.getElementById('btn-play-all').addEventListener('click', playAll);
-document.getElementById('btn-stop-playing').addEventListener('click', () => { stopPlayAllFlag=true; stopCurrentAudio(); showScreen('screen-home'); });
+document.getElementById('btn-play-all').addEventListener('click',playAll);
+document.getElementById('btn-stop-playing').addEventListener('click',()=>{stopPlayAllFlag=true;stopCurrentAudio();showScreen('screen-home')});
 
-// ── MODALS ───────────────────────────────
-const openNameModal = () => { const i=document.getElementById('modal-input'); i.value=defaultName(); document.getElementById('name-modal').classList.add('open'); setTimeout(()=>i.focus(),300); };
-const closeNameModal = () => document.getElementById('name-modal').classList.remove('open');
-document.getElementById('btn-new-section').addEventListener('click', openNameModal);
-document.getElementById('modal-confirm').addEventListener('click', () => { const v=document.getElementById('modal-input').value.trim(); if(!v)return; pendingName=v; closeNameModal(); enterRecord(pendingName); });
-document.getElementById('modal-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('modal-confirm').click(); });
-document.getElementById('name-modal').addEventListener('click', e => { if(e.target===document.getElementById('name-modal')) closeNameModal(); });
+const openNameModal=()=>{const i=document.getElementById('modal-input');i.value=defaultName();document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300)};
+const closeNameModal=()=>document.getElementById('name-modal').classList.remove('open');
+document.getElementById('btn-new-section').addEventListener('click',openNameModal);
+document.getElementById('modal-confirm').addEventListener('click',()=>{const v=document.getElementById('modal-input').value.trim();if(!v)return;pendingName=v;closeNameModal();enterRecord(pendingName)});
+document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-confirm').click()});
+document.getElementById('name-modal').addEventListener('click',e=>{if(e.target===document.getElementById('name-modal'))closeNameModal()});
 
-// ── SECTION LIST EVENTS ──────────────────
-document.getElementById('section-list').addEventListener('click', async e => {
-  const playBtn=e.target.closest('[data-id]'), delBtn=e.target.closest('[data-delete]');
-  const upBtn=e.target.closest('[data-up]'), downBtn=e.target.closest('[data-down]');
-  if (playBtn) { const id=playBtn.dataset.id; const layer=getGuideLayer(id); if(!layer)return; playBtn.classList.add('playing'); playBtn.innerHTML='&#9632;'; await playBlob(bufToBlob(layer.buffer,layer.mimeType)); playBtn.classList.remove('playing'); playBtn.innerHTML='&#9654;'; }
-  if (delBtn) { const id=delBtn.dataset.delete; if(!confirm('למחוק?'))return; const toDel=layers.filter(l=>l.sectionId===id); sections=sections.filter(s=>s.id!==id); layers=layers.filter(l=>l.sectionId!==id); arrangement=arrangement.filter(i=>i!==id); await dbDelete('sections',id); for(const l of toDel)await dbDelete('layers',l.id); await saveArrangement(arrangement); renderHome(); }
-  if (upBtn) { const i=parseInt(upBtn.dataset.up); if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome();} }
-  if (downBtn) { const i=parseInt(downBtn.dataset.down); if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome();} }
+document.getElementById('section-list').addEventListener('click',async e=>{
+  const playBtn=e.target.closest('[data-id]');
+  const delBtn=e.target.closest('[data-delete]');
+  const upBtn=e.target.closest('[data-up]');
+  const downBtn=e.target.closest('[data-down]');
+  if(playBtn){const id=playBtn.dataset.id;const layer=getGuideLayer(id);if(!layer)return;playBtn.classList.add('playing');playBtn.textContent='■';await playBlob(bufToBlob(layer.buffer,layer.mimeType));playBtn.classList.remove('playing');playBtn.textContent='▶'}
+  if(delBtn){const id=delBtn.dataset.delete;if(!confirm('למחוק?'))return;const toDel=layers.filter(l=>l.sectionId===id);sections=sections.filter(s=>s.id!==id);layers=layers.filter(l=>l.sectionId!==id);arrangement=arrangement.filter(i=>i!==id);await dbDelete('sections',id);for(const l of toDel)await dbDelete('layers',l.id);await saveArrangement(arrangement);renderHome()}
+  if(upBtn){const i=parseInt(upBtn.dataset.up);if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
+  if(downBtn){const i=parseInt(downBtn.dataset.down);if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
 });
 
-// ── INIT ─────────────────────────────────
-async function init() {
+async function init(){
   await openDB();
-  const project = await dbGet('meta','project');
-  sections = await dbGetAll('sections');
-  layers = await dbGetAll('layers');
-  const savedArr = await loadArrangement();
-  const ids = new Set(sections.map(s=>s.id));
-  arrangement = savedArr.filter(id=>ids.has(id));
-  sections.forEach(s => { if(!arrangement.includes(s.id)) arrangement.push(s.id); });
-  if (project && project.bpm) {
-    projectBPM = project.bpm;
-    document.getElementById('bpm-chip').textContent = '\u266a ' + projectBPM;
+  const project=await dbGet('meta','project');
+  sections=await dbGetAll('sections');
+  layers=await dbGetAll('layers');
+  const savedArr=await loadArrangement();
+  const ids=new Set(sections.map(s=>s.id));
+  arrangement=savedArr.filter(id=>ids.has(id));
+  sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
+  if(project&&project.bpm){
+    projectBPM=project.bpm;
+    document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;
     renderHome();
     showScreen('screen-home');
   } else {
