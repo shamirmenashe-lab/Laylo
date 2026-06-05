@@ -9,7 +9,7 @@
   <title>Laylo</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
-    /* Sprint 2 — Grid + Overdub + AI Chat */
+    /* Sprint 3 — Session View + Continuous Recording + Voice */
     :root{--teal:#0d9488;--teal2:#14b8a6;--bg:#080e1a;--s1:#0f1c2e;--s2:#162438;--border:#1e3347;--text:#e2e8f0;--muted:#5a7a94;--red:#ef4444;--r:14px}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Heebo',sans-serif;direction:rtl}
@@ -41,62 +41,73 @@
     .bpm-number{font-family:'IBM Plex Mono',monospace;font-size:72px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
     .bpm-label{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
     .adjust-row{display:flex;align-items:center;gap:8px}
-    .adj-btn{height:48px;border-radius:10px;background:var(--s2);border:1px solid var(--border);font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;color:var(--text);font-family:'Heebo',sans-serif;padding:0 14px}
+    .adj-btn{height:48px;border-radius:10px;background:var(--s2);border:1px solid var(--border);font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);font-family:'Heebo',sans-serif;padding:0 14px}
     .adj-btn:active{background:var(--teal);border-color:var(--teal)}
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .08s}
     .metro-wrap{display:flex;justify-content:center;align-items:flex-end;height:72px}
     .metro-arm{width:3px;height:60px;background:var(--teal);border-radius:2px;transform-origin:bottom center;animation:none;position:relative}
-    .metro-dot{width:10px;height:10px;border-radius:50%;background:var(--teal2);position:absolute;top:-5px;left:-3.5px}
+    .metro-dot-inner{width:10px;height:10px;border-radius:50%;background:var(--teal2);position:absolute;top:-5px;left:-3.5px}
     @keyframes metro-swing{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
-    #rec-waveform,#od-waveform{width:100%;max-width:340px;height:72px;border-radius:10px;background:var(--s2);display:block}
+    #rec-waveform,#od-waveform,#cont-waveform{width:100%;max-width:340px;height:72px;border-radius:10px;background:var(--s2);display:block}
     .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
-
-    /* ── GRID ── */
-    #screen-home{padding-bottom:0}
-    #screen-home .scroll-area{flex:1;overflow-y:auto;padding:0 0 8px}
-    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;text-align:center;padding:24px}
+    .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;padding:0 16px}
+    .tab{flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid transparent;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
+    .tab.active{color:var(--teal2);border-bottom-color:var(--teal)}
+    .content-area{flex:1;overflow-y:auto;overflow-x:hidden}
+    #panel-grid{height:100%}
+    #panel-session{height:100%;display:none;flex-direction:column}
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;padding:24px}
     .empty-icon{font-size:52px;opacity:.3}
     .empty-title{font-size:18px;font-weight:700;color:var(--muted)}
     .empty-sub{font-size:13px;color:var(--muted);opacity:.7;line-height:1.5}
-    .grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px}
-    .session-grid{border-collapse:collapse;width:max-content;min-width:calc(100% - 32px)}
+    .grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:12px 16px}
+    .session-grid{border-collapse:collapse;width:max-content;min-width:calc(100vw - 32px)}
     .grid-th{background:var(--s1);padding:8px 14px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);border:1px solid var(--border);white-space:nowrap;text-align:center}
     .grid-th.section-col{text-align:right;min-width:90px;position:sticky;left:0;z-index:2;background:var(--s1)}
-    .grid-td-label{background:var(--s1);padding:10px 14px;font-weight:700;font-size:14px;border:1px solid var(--border);white-space:nowrap;position:sticky;left:0;z-index:1}
+    .grid-td-label{background:var(--s1);padding:10px 14px;font-weight:700;font-size:14px;border:1px solid var(--border);white-space:nowrap;position:sticky;left:0;z-index:1;cursor:pointer}
+    .grid-td-label.focused{background:var(--teal);color:#fff}
     .grid-td{padding:8px;border:1px solid var(--border);text-align:center;min-width:72px;background:var(--bg)}
     .grid-play-btn{width:40px;height:40px;border-radius:50%;background:var(--s2);border:1px solid var(--border);font-size:15px;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;justify-content:center}
     .grid-play-btn:active,.grid-play-btn.playing{background:var(--teal)}
     .grid-add-btn{width:40px;height:40px;border-radius:50%;background:none;border:1px dashed var(--border);font-size:20px;color:var(--muted);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center}
     .grid-add-btn:active{border-color:var(--teal);color:var(--teal)}
-    .home-actions{padding:12px 16px;display:flex;gap:10px;flex-shrink:0}
-    .home-actions .btn{flex:1}
-
-    /* ── AI BAR ── */
-    .ai-bar{display:flex;gap:8px;padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:var(--s1);border-top:1px solid var(--border);flex-shrink:0}
+    .home-actions{padding:10px 16px;display:flex;gap:8px;flex-shrink:0}
+    .home-actions .btn{flex:1;font-size:14px;padding:12px 10px}
+    .session-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .session-section-name{font-size:13px;font-weight:700;color:var(--teal2)}
+    .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
+    .session-tracks{flex:1;overflow-y:auto;padding:8px 0}
+    .session-track-row{display:flex;align-items:center;padding:6px 16px;gap:10px;border-bottom:1px solid var(--border)}
+    .session-track-name{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:54px;flex-shrink:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .session-canvas-wrap{flex:1;position:relative;height:54px;background:var(--s2);border-radius:8px;overflow:hidden;cursor:crosshair}
+    .session-waveform{width:100%;height:100%;display:block}
+    .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);pointer-events:none}
+    .session-controls{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0}
+    .sess-play-btn{width:40px;height:40px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .mark-btn{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
+    .mark-btn:active{background:var(--teal)}
+    .ai-bar{display:flex;gap:8px;align-items:center;padding:8px 16px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--s1);border-top:1px solid var(--border);flex-shrink:0}
     .ai-input{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:15px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;outline:none}
     .ai-input:focus{border-color:var(--teal)}
-    .ai-send-btn{width:40px;height:40px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-    .ai-response{font-size:13px;color:var(--teal2);padding:6px 16px;font-family:'IBM Plex Mono',monospace;min-height:24px;flex-shrink:0}
-
-    /* ── PLAYING ALL ── */
+    .ai-send-btn,.ai-mic-btn{width:38px;height:38px;border-radius:50%;border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .ai-send-btn{background:var(--teal)}
+    .ai-mic-btn{background:var(--s2);color:var(--muted);border:1px solid var(--border)}
+    .ai-mic-btn.listening{background:var(--red);color:#fff;animation:blink .5s infinite}
+    .ai-response{font-size:12px;color:var(--teal2);padding:4px 16px;font-family:'IBM Plex Mono',monospace;min-height:20px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #screen-playing{align-items:center;text-align:center}
+    .playing-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
     .playing-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.12em;margin-bottom:4px}
     .playing-name{font-size:26px;font-weight:900;margin-bottom:4px}
     .playing-counter{font-size:13px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
-    .playing-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
     .playing-waveform{display:flex;gap:4px;align-items:center;height:40px}
     .playing-waveform span{width:4px;background:var(--teal);border-radius:2px;animation:wave 1.2s infinite ease-in-out}
     .playing-waveform span:nth-child(1){height:16px;animation-delay:0s}.playing-waveform span:nth-child(2){height:28px;animation-delay:.15s}.playing-waveform span:nth-child(3){height:36px;animation-delay:.3s}.playing-waveform span:nth-child(4){height:24px;animation-delay:.45s}.playing-waveform span:nth-child(5){height:16px;animation-delay:.6s}
     @keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.35)}}
     .playing-progress{width:80%;height:3px;background:var(--s2);border-radius:2px;overflow:hidden}
     .playing-progress-fill{height:100%;background:var(--teal);border-radius:2px;width:0%;transition:width .5s linear}
-
-    /* ── OVERDUB REVIEW ── */
     .od-review-layers{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0}
     .od-layer-tag{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px}
-
-    /* ── MODALS ── */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
     .modal-overlay.open{opacity:1;pointer-events:all}
     .modal-sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:24px 20px;width:100%;transform:translateY(100%);transition:transform .25s ease-out;padding-bottom:max(24px,env(safe-area-inset-bottom))}
@@ -111,11 +122,11 @@
 
 <!-- ══ BPM: ברוך הבא ══ -->
 <div id="screen-bpm-welcome" class="screen">
-  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 2</span></div>
+  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 3</span></div>
   <div class="center-screen">
     <div style="font-size:48px">🎸</div>
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
-    <div class="sub">תרגיש את הקצב הנכון.<br>לחץ "הפעל קליק" וכוון.</div>
+    <div class="sub">תרגיש את הקצב.<br>לחץ "הפעל קליק" וכוון.</div>
   </div>
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
 </div>
@@ -138,28 +149,47 @@
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
 </div>
 
-<!-- ══ HOME — GRID ══ -->
+<!-- ══ HOME ══ -->
 <div id="screen-home" class="screen">
   <div class="topbar">
     <span class="logo" id="home-logo">laylo</span>
     <span class="bpm-chip" id="bpm-chip">♩ —</span>
   </div>
-  <div class="scroll-area">
-    <div class="empty-state" id="empty-state">
-      <div class="empty-icon">🎸</div>
-      <div class="empty-title">אין קטעים עדיין</div>
-      <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל</div>
+  <div class="tab-bar">
+    <button class="tab active" data-tab="grid">Grid</button>
+    <button class="tab" data-tab="session">Session</button>
+  </div>
+  <div class="content-area">
+    <div id="panel-grid">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🎸</div>
+        <div class="empty-title">אין קטעים עדיין</div>
+        <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל</div>
+      </div>
+      <div class="grid-wrap" id="grid-wrap" style="display:none">
+        <table class="session-grid" id="session-grid"></table>
+      </div>
     </div>
-    <div class="grid-wrap" id="grid-wrap" style="display:none">
-      <table class="session-grid" id="session-grid"></table>
+    <div id="panel-session">
+      <div class="session-header">
+        <span class="session-section-name" id="session-section-label">בחר קטע מהgrid</span>
+        <span class="session-time" id="session-time-display">0:00</span>
+      </div>
+      <div class="session-tracks" id="session-tracks"></div>
+      <div class="session-controls">
+        <button class="sess-play-btn" id="sess-play-btn">▶</button>
+        <button class="mark-btn" id="sess-mark-btn">⟦ סמן אזור ⟧</button>
+      </div>
     </div>
   </div>
   <div class="home-actions">
-    <button class="btn btn-ghost" id="btn-play-all" style="display:none">▶ הפעל הכל</button>
-    <button class="btn btn-primary" id="btn-new-section">⊕ קטע חדש</button>
+    <button class="btn btn-ghost" id="btn-cont-rec" style="font-size:13px">⏺ הקלטה רצופה</button>
+    <button class="btn btn-ghost" id="btn-play-all" style="display:none">▶ הפעל</button>
+    <button class="btn btn-primary" id="btn-new-section">⊕ קטע</button>
   </div>
   <div class="ai-response" id="ai-response"></div>
   <div class="ai-bar">
+    <button class="ai-mic-btn" id="ai-mic-btn">🎤</button>
     <input class="ai-input" id="ai-input" type="text" placeholder="פקודה לAI...">
     <button class="ai-send-btn" id="ai-send">↑</button>
   </div>
@@ -171,7 +201,7 @@
   <div class="center-screen">
     <div id="rec-section-name" style="font-size:22px;font-weight:900"></div>
     <div class="rec-bpm-label" id="rec-bpm">♩ —</div>
-    <div class="metro-wrap"><div class="metro-dot" id="rec-metro-dot" style="position:initial;width:10px;height:10px;border-radius:50%;background:var(--teal2)"></div><div class="metro-arm" id="metro-arm"></div></div>
+    <div class="metro-wrap"><div class="metro-arm" id="metro-arm"><div class="metro-dot-inner"></div></div></div>
     <canvas id="rec-waveform"></canvas>
     <div id="rec-instruction" style="font-size:13px;color:var(--muted)">לחץ להתחיל הקלטה</div>
     <div style="display:flex;align-items:center;gap:10px">
@@ -189,13 +219,32 @@
   <div class="center-screen">
     <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">הקלטה הושלמה</div>
     <div id="review-name" style="font-size:24px;font-weight:900;margin-bottom:28px"></div>
-    <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">▶</button>
+    <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
     <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
   <div class="bottom-bar"><div class="gap">
     <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
     <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
   </div></div>
+</div>
+
+<!-- ══ CONTINUOUS RECORDING ══ -->
+<div id="screen-cont-rec" class="screen" style="align-items:center;text-align:center">
+  <div class="topbar" style="width:100%"><button class="back-btn" id="cont-back">←</button><span></span></div>
+  <div class="center-screen">
+    <div style="font-size:22px;font-weight:900">הקלטה רצופה</div>
+    <div class="rec-bpm-label" id="cont-bpm">♩ —</div>
+    <div class="sub">הקלט את כל השיר מהתחלה עד הסוף.<br>אחר כך תסמן sections בSession view.</div>
+    <div class="metro-wrap"><div class="metro-arm" id="cont-metro"><div class="metro-dot-inner"></div></div></div>
+    <canvas id="cont-waveform"></canvas>
+    <div id="cont-instruction" style="font-size:13px;color:var(--muted)">לחץ להתחיל</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="rec-indicator" id="cont-indicator"></div>
+      <div class="rec-timer" id="cont-timer">00:00</div>
+    </div>
+    <button class="rec-big-btn" id="cont-rec-btn">●</button>
+  </div>
+  <div class="bottom-bar"></div>
 </div>
 
 <!-- ══ OVERDUB ══ -->
@@ -206,7 +255,7 @@
     <div id="od-section-name" style="font-size:22px;font-weight:900"></div>
     <div class="rec-bpm-label" id="od-bpm">♩ —</div>
     <div class="playing-waveform" id="od-guide-wave" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="metro-wrap"><div class="metro-dot" style="position:initial;width:10px;height:10px;border-radius:50%;background:var(--teal2)"></div><div class="metro-arm" id="od-metro-arm"></div></div>
+    <div class="metro-wrap"><div class="metro-arm" id="od-metro-arm"><div class="metro-dot-inner"></div></div></div>
     <canvas id="od-waveform"></canvas>
     <div id="od-instruction" style="font-size:13px;color:var(--muted)">שמע את הגייד ולחץ הקלט</div>
     <div style="display:flex;align-items:center;gap:10px">
@@ -226,7 +275,7 @@
     <div id="od-review-section" style="font-size:20px;font-weight:900"></div>
     <div class="od-review-layers" id="od-review-layers"></div>
     <div id="od-review-offset" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)"></div>
-    <button id="od-review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">▶</button>
+    <button id="od-review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
   </div>
   <div class="bottom-bar"><div class="gap">
     <button class="btn btn-primary" id="od-btn-keep">✓ שמור</button>
@@ -252,32 +301,39 @@
   <div class="modal-sheet">
     <div class="modal-title">שם הקטע</div>
     <input class="modal-input" id="modal-input" type="text" placeholder="A-part, ברידג׳, ורס...">
-    <button class="btn btn-primary" id="modal-confirm">המשך להקלטה →</button>
+    <button class="btn btn-primary" id="modal-confirm">המשך →</button>
   </div>
 </div>
-
 <div class="modal-overlay" id="track-modal">
   <div class="modal-sheet">
     <div class="modal-title" id="track-modal-title">שם הערוץ</div>
     <input class="modal-input" id="track-input" type="text" placeholder="vocals, bass, piano...">
-    <button class="btn btn-primary" id="track-confirm">המשך להקלטה →</button>
+    <button class="btn btn-primary" id="track-confirm">המשך →</button>
   </div>
 </div>
 
 <script>
 // ════════════════════════════════════════
-// Sprint 2 — Grid + Overdub + AI Chat
-// TEMP: הסר console.logs + dev reset לפני production
+// Sprint 3 — Session View + Continuous Rec + Voice
+// TEMP: dev reset + console.logs → הסר לפני production
 // ════════════════════════════════════════
 
-// ── AI GATEWAY ──────────────────────────
 async function callAI(prompt, sessionState) {
-  console.log('[callAI mock]', prompt, sessionState);
-  return { action:'none', message:`זיהיתי: "${prompt}" — AI יחובר ב-Sprint 3` };
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ prompt, sessionState })
+    });
+    if (!res.ok) throw new Error('proxy error');
+    return res.json();
+  } catch(e) {
+    console.log('[callAI mock fallback]', prompt);
+    return { action: 'none', message: `"${prompt}" — AI proxy לא מחובר עדיין` };
+  }
 }
 
-// ── DB ──────────────────────────────────
-const DB_NAME='laylo-v2', DB_VER=4;
+const DB_NAME='laylo-v2', DB_VER=5;
 let db;
 function openDB(){
   return new Promise((res,rej)=>{
@@ -300,36 +356,27 @@ const dbDelete=(s,k)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrit
 const saveArrangement=o=>dbPut('meta',{key:'arrangement',order:o});
 const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return r?r.order:[]};
 
-// ── STATE ────────────────────────────────
 let sections=[], layers=[], arrangement=[];
 let projectBPM=null, currentBPM=120;
 let pendingName='', pendingBuffer=null, pendingMime='', pendingDuration=0;
 let pendingODBuffer=null, pendingODMime='', pendingODDuration=0, pendingODOffsetMs=0;
 let overdubSectionId='', overdubTrackName='';
+let sessionFocusedSecId='';
+let activeTab='grid';
 
+const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 const defaultSectionName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
-const getLayer=(sectionId,trackName)=>layers.find(l=>l.sectionId===sectionId&&l.trackName===trackName);
-const getUniqueTracks=()=>{
-  const names=new Set(layers.map(l=>l.trackName||'guide'));
-  return['guide',...Array.from(names).filter(n=>n!=='guide')];
-};
-const getSessionState=()=>({
-  sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration})),
-  arrangement,
-  tracks:getUniqueTracks(),
-  layers:layers.map(l=>({id:l.id,sectionId:l.sectionId,trackName:l.trackName,offsetMs:l.offsetMs})),
-  bpm:projectBPM
-});
+const getLayer=(sid,track)=>layers.find(l=>l.sectionId===sid&&l.trackName===track);
+const getUniqueTracks=()=>{const s=new Set(layers.map(l=>l.trackName||'guide'));return['guide',...Array.from(s).filter(n=>n!=='guide')]};
+const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),layers:layers.map(l=>({id:l.id,sectionId:l.sectionId,trackName:l.trackName,offsetMs:l.offsetMs,volume:l.volume,pan:l.pan,clipOffset:l.clipOffset,clipDuration:l.clipDuration})),bpm:projectBPM});
 
-// ── AUDIO ─────────────────────────────
 let masterCtx=null;
 let analyserCtx=null, analyserNode=null, waveformLoop=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
-let activePlaySrcs=[];
-let stopPlayAllFlag=false;
-let activeCellBtn=null;
+let activePlaySrcs=[], stopPlayAllFlag=false, activeCellBtn=null;
+let playheadLoop=null, sessionPlayStartCtxTime=0, sessionPlayDuration=0;
 const decodedCache=new Map();
 
 function getMasterCtx(){
@@ -337,15 +384,14 @@ function getMasterCtx(){
   masterCtx.resume().catch(()=>{});
   return masterCtx;
 }
-async function getDecodedBuffer(layerId,arrayBuffer){
+async function getDecodedBuffer(layerId,buf){
   if(decodedCache.has(layerId)) return decodedCache.get(layerId);
   const ctx=getMasterCtx();
-  const buf=await ctx.decodeAudioData(arrayBuffer.slice());
-  decodedCache.set(layerId,buf);
-  return buf;
+  const ab=await ctx.decodeAudioData(buf.slice());
+  decodedCache.set(layerId,ab);
+  return ab;
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
-
 async function startRecording(){
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
@@ -353,31 +399,29 @@ async function startRecording(){
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
-  mediaRecorder.start(100);
-  recStartTime=Date.now();
+  mediaRecorder.start(100);recStartTime=Date.now();
   analyserCtx=new (window.AudioContext||window.webkitAudioContext)();
   analyserNode=analyserCtx.createAnalyser();analyserNode.fftSize=512;
   const micSrc=analyserCtx.createMediaStreamSource(recStream);micSrc.connect(analyserNode);
-  startWaveformLoop();
   return true;
 }
 const stopRecording=(isOD=false)=>new Promise(res=>{
   mediaRecorder.onstop=async()=>{
     const blob=new Blob(recChunks,{type:mediaRecorder.mimeType});
-    const duration=(Date.now()-recStartTime)/1000;
-    const buffer=await blob.arrayBuffer();
-    if(isOD){pendingODBuffer=buffer;pendingODMime=mediaRecorder.mimeType;pendingODDuration=duration}
-    else{pendingBuffer=buffer;pendingMime=mediaRecorder.mimeType;pendingDuration=duration}
+    const dur=(Date.now()-recStartTime)/1000;
+    const buf=await blob.arrayBuffer();
+    if(isOD){pendingODBuffer=buf;pendingODMime=mediaRecorder.mimeType;pendingODDuration=dur}
+    else{pendingBuffer=buf;pendingMime=mediaRecorder.mimeType;pendingDuration=dur}
     recStream.getTracks().forEach(t=>t.stop());
     stopWaveformLoop();res();
   };
   mediaRecorder.stop();
 });
 
-// ── WAVEFORM + METRO ──────────────────
 function startWaveformLoop(canvasId='rec-waveform'){
   setTimeout(()=>{
-    const canvas=document.getElementById(canvasId);if(!canvas||!analyserNode)return;
+    const canvas=document.getElementById(canvasId);
+    if(!canvas||!analyserNode)return;
     canvas.width=canvas.offsetWidth||340;canvas.height=72;
     const ctx=canvas.getContext('2d');
     const buf=new Uint8Array(analyserNode.frequencyBinCount);
@@ -398,44 +442,132 @@ function stopWaveformLoop(){
   if(waveformLoop){clearTimeout(waveformLoop);waveformLoop=null}
   analyserNode=null;
   if(analyserCtx){try{analyserCtx.close()}catch(e){}analyserCtx=null}
-  ['rec-waveform','od-waveform'].forEach(id=>{const c=document.getElementById(id);if(c){const ctx=c.getContext('2d');ctx.fillStyle='#162438';ctx.fillRect(0,0,c.width,c.height)}});
+  ['rec-waveform','od-waveform','cont-waveform'].forEach(id=>{const c=document.getElementById(id);if(c){const ctx=c.getContext('2d');ctx.fillStyle='#162438';ctx.fillRect(0,0,c.width,c.height)}});
 }
-function startMetronomeEl(armId,bpm){const arm=document.getElementById(armId);if(!arm||!bpm)return;arm.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
-function stopMetronomeEl(armId){const arm=document.getElementById(armId);if(arm)arm.style.animation='none'}
+function startMetronomeEl(id,bpm){const a=document.getElementById(id);if(a&&bpm)a.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
+function stopMetronomeEl(id){const a=document.getElementById(id);if(a)a.style.animation='none'}
 
-// ── CLICK ─────────────────────────────
-let clickCtx=null,clickTimeout=null,clickBeat=0,clickNextTime=0;
+async function drawSessionTrackWaveform(canvasEl, layer) {
+  if(!canvasEl||!layer)return;
+  canvasEl.width=canvasEl.offsetWidth||300;canvasEl.height=canvasEl.offsetHeight||54;
+  const ctx=canvasEl.getContext('2d');
+  ctx.fillStyle='#162438';ctx.fillRect(0,0,canvasEl.width,canvasEl.height);
+  try{
+    const audioBuf=await getDecodedBuffer(layer.id,layer.buffer);
+    const pcm=audioBuf.getChannelData(0);
+    const step=Math.ceil(pcm.length/canvasEl.width);
+    ctx.strokeStyle='#0d9488';ctx.lineWidth=1.5;
+    const mid=canvasEl.height/2;
+    ctx.beginPath();
+    for(let x=0;x<canvasEl.width;x++){
+      let max=0;
+      for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
+      const h=max*canvasEl.height*0.9;
+      x===0?ctx.moveTo(x,mid-h/2):ctx.lineTo(x,mid-h/2);
+    }
+    ctx.stroke();ctx.beginPath();
+    for(let x=0;x<canvasEl.width;x++){
+      let max=0;
+      for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
+      const h=max*canvasEl.height*0.9;
+      x===0?ctx.moveTo(x,mid+h/2):ctx.lineTo(x,mid+h/2);
+    }
+    ctx.stroke();
+  }catch(e){console.warn('waveform draw error',e)}
+}
+
+function updatePlayhead(progress){
+  document.querySelectorAll('.playhead').forEach(ph=>{
+    const w=ph.parentElement;if(!w)return;
+    ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`;
+  });
+  document.getElementById('session-time-display').textContent=fmtTime(sessionPlayDuration*progress);
+}
+function startPlayheadLoop(duration){
+  sessionPlayDuration=duration;
+  sessionPlayStartCtxTime=getMasterCtx().currentTime;
+  function tick(){
+    const ctx=masterCtx;if(!ctx)return;
+    const elapsed=ctx.currentTime-sessionPlayStartCtxTime;
+    const progress=Math.min(elapsed/Math.max(duration,0.001),1);
+    updatePlayhead(progress);
+    if(progress<1)playheadLoop=setTimeout(tick,33);
+  }
+  tick();
+}
+function stopPlayheadLoop(){
+  if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}
+  updatePlayhead(0);
+}
+
+async function renderSessionView(){
+  const panel=document.getElementById('session-tracks');
+  panel.innerHTML='';
+  const secId=sessionFocusedSecId||(arrangement[0]||'');
+  const sec=sections.find(s=>s.id===secId);
+  document.getElementById('session-section-label').textContent=sec?sec.name:'בחר קטע';
+  if(!secId||!sec)return;
+  const tracks=getUniqueTracks();
+  for(const trackName of tracks){
+    const layer=getLayer(secId,trackName);
+    const row=document.createElement('div');row.className='session-track-row';
+    const label=document.createElement('div');label.className='session-track-name';label.textContent=trackName;
+    const wrap=document.createElement('div');wrap.className='session-canvas-wrap';wrap.dataset.trackName=trackName;
+    const canvas=document.createElement('canvas');canvas.className='session-waveform';
+    const ph=document.createElement('div');ph.className='playhead';
+    wrap.appendChild(canvas);wrap.appendChild(ph);
+    row.appendChild(label);row.appendChild(wrap);
+    panel.appendChild(row);
+    if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
+    wrap.addEventListener('click',e=>{
+      const rect=wrap.getBoundingClientRect();
+      const pct=(e.clientX-rect.left)/rect.width;
+      const t=(sec.duration||0)*pct;
+      showAIResponse(`סמן: ${fmtTime(t)} — אמור לAI מה לעשות כאן`);
+    });
+  }
+}
+
+let clickCtx=null, clickTimeout=null, clickBeat=0, clickNextTime=0;
 function startClick(bpm){
   stopClick();clickCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const interval=60/bpm;clickBeat=0;clickNextTime=clickCtx.currentTime+0.1;
-  function schedule(){
+  const iv=60/bpm;clickBeat=0;clickNextTime=clickCtx.currentTime+0.1;
+  function sched(){
     if(!clickCtx||clickCtx.state==='closed')return;
     while(clickNextTime<clickCtx.currentTime+0.3){
-      const accent=clickBeat%4===0;
-      const osc=clickCtx.createOscillator(),gain=clickCtx.createGain();
-      osc.frequency.value=accent?1200:900;
-      gain.gain.setValueAtTime(accent?.8:.5,clickNextTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
-      osc.connect(gain);gain.connect(clickCtx.destination);osc.start(clickNextTime);osc.stop(clickNextTime+0.05);
+      const a=clickBeat%4===0;
+      const o=clickCtx.createOscillator(),g=clickCtx.createGain();
+      o.frequency.value=a?1200:900;
+      g.gain.setValueAtTime(a?.8:.5,clickNextTime);
+      g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
+      o.connect(g);g.connect(clickCtx.destination);o.start(clickNextTime);o.stop(clickNextTime+0.05);
       const b=clickBeat%4,t=Math.max(0,(clickNextTime-clickCtx.currentTime)*1000);
       setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
-      clickNextTime+=interval;clickBeat++;
+      clickNextTime+=iv;clickBeat++;
     }
-    clickTimeout=setTimeout(schedule,100);
+    clickTimeout=setTimeout(sched,100);
   }
-  schedule();
+  sched();
 }
 function stopClick(){if(clickTimeout)clearTimeout(clickTimeout);if(clickCtx){try{clickCtx.close()}catch(e){}clickCtx=null}}
 
-// ── SCREENS ───────────────────────────
 const showScreen=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')};
 
-// ── BPM FLOW ──────────────────────────
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    activeTab=btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===activeTab));
+    document.getElementById('panel-grid').style.display=activeTab==='grid'?'block':'none';
+    document.getElementById('panel-session').style.display=activeTab==='session'?'flex':'none';
+    if(activeTab==='session')renderSessionView();
+  });
+});
+
 let bpmAdjFrom='welcome';
 const updateBPMDisplay=()=>document.getElementById('bpm-adj-num').textContent=currentBPM;
 document.getElementById('bpm-start').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='welcome';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 document.getElementById('bpm-adj-back').addEventListener('click',()=>{stopClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
-const adjBPM=delta=>{currentBPM=Math.max(40,Math.min(220,currentBPM+delta));updateBPMDisplay();startClick(currentBPM)};
+const adjBPM=d=>{currentBPM=Math.max(40,Math.min(220,currentBPM+d));updateBPMDisplay();startClick(currentBPM)};
 document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
@@ -444,7 +576,8 @@ document.getElementById('bpm-confirm').addEventListener('click',async()=>{stopCl
 async function lockBPM(bpm){projectBPM=bpm;await dbPut('meta',{key:'project',bpm});document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;showScreen('screen-home')}
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 
-// ── HOME GRID ─────────────────────────
+function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
+
 function renderHome(){
   const empty=document.getElementById('empty-state');
   const wrap=document.getElementById('grid-wrap');
@@ -464,30 +597,28 @@ function renderHome(){
   arrangement.forEach(secId=>{
     const sec=sections.find(s=>s.id===secId);if(!sec)return;
     const row=document.createElement('tr');
-    const tdLabel=document.createElement('td');tdLabel.className='grid-td-label';tdLabel.textContent=sec.name;row.appendChild(tdLabel);
+    const tdLabel=document.createElement('td');tdLabel.className='grid-td-label'+(sessionFocusedSecId===secId?' focused':'');tdLabel.textContent=sec.name;tdLabel.dataset.focusSec=secId;row.appendChild(tdLabel);
     tracks.forEach(trackName=>{
       const td=document.createElement('td');td.className='grid-td';
       const layer=getLayer(sec.id,trackName);
-      if(layer){
-        const btn=document.createElement('button');btn.className='grid-play-btn';btn.textContent='▶';
-        btn.dataset.secId=sec.id;btn.dataset.trackName=trackName;btn.dataset.layerId=layer.id;td.appendChild(btn);
-      } else {
-        const btn=document.createElement('button');btn.className='grid-add-btn';btn.textContent='+';
-        btn.dataset.addSecId=sec.id;btn.dataset.addTrack=trackName;td.appendChild(btn);
-      }
+      if(layer){const btn=document.createElement('button');btn.className='grid-play-btn';btn.textContent='▶';btn.dataset.secId=sec.id;btn.dataset.trackName=trackName;btn.dataset.layerId=layer.id;td.appendChild(btn)}
+      else{const btn=document.createElement('button');btn.className='grid-add-btn';btn.textContent='+';btn.dataset.addSecId=sec.id;btn.dataset.addTrack=trackName;td.appendChild(btn)}
       row.appendChild(td);
     });
     const tdNew=document.createElement('td');tdNew.className='grid-td';
-    const btnNew=document.createElement('button');btnNew.className='grid-add-btn';btnNew.textContent='+';
-    btnNew.dataset.addSecId=sec.id;btnNew.dataset.addTrack='new';tdNew.appendChild(btnNew);row.appendChild(tdNew);
+    const btnNew=document.createElement('button');btnNew.className='grid-add-btn';btnNew.textContent='+';btnNew.dataset.addSecId=secId;btnNew.dataset.addTrack='new';tdNew.appendChild(btnNew);row.appendChild(tdNew);
     tbody.appendChild(row);
   });
   grid.appendChild(tbody);
 }
 
 document.getElementById('session-grid').addEventListener('click',async e=>{
+  const focusBtn=e.target.closest('[data-focus-sec]');
   const playBtn=e.target.closest('[data-layer-id]');
   const addBtn=e.target.closest('[data-add-sec-id]');
+
+  if(focusBtn){sessionFocusedSecId=focusBtn.dataset.focusSec;renderHome();if(activeTab==='session')renderSessionView();return}
+
   if(playBtn){
     if(activeCellBtn===playBtn){stopAllSrcs();playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;return}
     if(activeCellBtn){stopAllSrcs();activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null}
@@ -496,20 +627,46 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
     const ctx=getMasterCtx();
     const buf=await getDecodedBuffer(layer.id,layer.buffer);
     const src=ctx.createBufferSource();src.buffer=buf;
-    const gain=ctx.createGain();gain.gain.value=layer.volume??1.0;
-    const panner=ctx.createStereoPanner();panner.pan.value=layer.pan??0.0;
-    src.connect(panner);panner.connect(gain);gain.connect(ctx.destination);
-    activePlaySrcs=[src];src.start(ctx.currentTime);
+    const gain=ctx.createGain();gain.gain.value=layer.volume??1;
+    const pan=ctx.createStereoPanner();pan.pan.value=layer.pan??0;
+    src.connect(pan);pan.connect(gain);gain.connect(ctx.destination);
+    activePlaySrcs=[src];
+    src.start(ctx.currentTime,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
     src.onended=()=>{playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;activePlaySrcs=[]};
+    return;
   }
+
   if(addBtn){
     const secId=addBtn.dataset.addSecId,trackRaw=addBtn.dataset.addTrack;
-    if(trackRaw==='new') openTrackModal(secId,'');
+    const existingTracks=getUniqueTracks();
+    if(trackRaw==='new'&&existingTracks.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);return}
+    if(trackRaw==='new')openTrackModal(secId,'');
     else enterOverdub(secId,trackRaw);
   }
 });
 
-// ── RECORD GUIDE ──────────────────────
+let sessPlaying=false;
+document.getElementById('sess-play-btn').addEventListener('click',async()=>{
+  const btn=document.getElementById('sess-play-btn');
+  if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶';return}
+  const secId=sessionFocusedSecId;if(!secId)return;
+  const secLayers=layers.filter(l=>l.sectionId===secId);if(!secLayers.length)return;
+  sessPlaying=true;btn.textContent='■';
+  const ctx=getMasterCtx();const now=ctx.currentTime;
+  const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
+  const maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000));
+  const srcs=decoded.map((b,i)=>{
+    const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;
+    const g=ctx.createGain();g.gain.value=l.volume??1;
+    const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
+    s.connect(p);p.connect(g);g.connect(ctx.destination);
+    s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);
+    return s;
+  });
+  activePlaySrcs=srcs;startPlayheadLoop(maxDur);
+  setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+200);
+});
+
 let isRecording=false;
 function enterRecord(name){
   document.getElementById('rec-section-name').textContent=name;
@@ -534,46 +691,87 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     document.getElementById('rec-indicator').classList.add('recording');
     document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    if(projectBPM)startClick(projectBPM);
-  } else {
-    clearInterval(recTimerInterval);await stopRecording();stopClick();isRecording=false;enterReview();
-  }
+    startWaveformLoop('rec-waveform');if(projectBPM)startClick(projectBPM);
+  }else{clearInterval(recTimerInterval);await stopRecording();stopClick();isRecording=false;enterReview()}
 });
 
-// ── REVIEW GUIDE ──────────────────────
 let reviewPlaying=false;
 function enterReview(){
   document.getElementById('review-name').textContent=pendingName;
   document.getElementById('review-duration').textContent=fmtTime(pendingDuration);
   reviewPlaying=false;
-  const btn=document.getElementById('review-play-btn');btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';
+  const btn=document.getElementById('review-play-btn');btn.textContent='▶';btn.style.background='var(--s2)';
   stopMetronomeEl('metro-arm');showScreen('screen-review');
 }
 document.getElementById('review-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('review-play-btn');
-  if(reviewPlaying){stopAllSrcs();reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';return}
-  reviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';btn.style.borderColor='var(--teal)';
-  const ctx=getMasterCtx();
-  const buf=await ctx.decodeAudioData(pendingBuffer.slice());
-  const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
-  activePlaySrcs=[src];src.start(ctx.currentTime);
-  src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';activePlaySrcs=[]};
+  if(reviewPlaying){stopAllSrcs();reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)'}
+  else{
+    reviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';
+    const ctx=getMasterCtx();const buf=await ctx.decodeAudioData(pendingBuffer.slice());
+    const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
+    activePlaySrcs=[src];src.start(ctx.currentTime);
+    src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
+  }
 });
 document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
-  const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0};
+  const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   sections.push(sec);layers.push(layer);arrangement.push(secId);
+  if(!sessionFocusedSecId)sessionFocusedSecId=secId;
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
   renderHome();showScreen('screen-home');
 });
 document.getElementById('btn-redo').addEventListener('click',()=>{stopAllSrcs();enterRecord(pendingName)});
 
-// ── OVERDUB ───────────────────────────
-let isODRecording=false, guideStartCtxTime=0, guideSrc=null;
+let isContRecording=false;
+document.getElementById('btn-cont-rec').addEventListener('click',()=>{
+  document.getElementById('cont-bpm').textContent=projectBPM?`♩ ${projectBPM}`:'';
+  document.getElementById('cont-timer').textContent='00:00';
+  document.getElementById('cont-instruction').textContent='לחץ להתחיל';
+  document.getElementById('cont-timer').classList.remove('recording');
+  document.getElementById('cont-indicator').classList.remove('recording');
+  document.getElementById('cont-rec-btn').textContent='●';document.getElementById('cont-rec-btn').classList.remove('recording');
+  isContRecording=false;startMetronomeEl('cont-metro',projectBPM);showScreen('screen-cont-rec');
+});
+document.getElementById('cont-back').addEventListener('click',()=>{
+  if(isContRecording){clearInterval(recTimerInterval);stopRecording();isContRecording=false}
+  stopMetronomeEl('cont-metro');stopWaveformLoop();showScreen('screen-home');
+});
+document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
+  if(!isContRecording){
+    const ok=await startRecording();if(!ok)return;
+    isContRecording=true;
+    document.getElementById('cont-instruction').textContent='מקליט... לחץ לעצור';
+    document.getElementById('cont-timer').classList.add('recording');
+    document.getElementById('cont-indicator').classList.add('recording');
+    document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
+    recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
+    startWaveformLoop('cont-waveform');if(projectBPM)startClick(projectBPM);
+  }else{
+    clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
+    const secId=uid(),layerId=uid();
+    const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
+    const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+    sections.push(sec);layers.push(layer);arrangement.push(secId);
+    sessionFocusedSecId=secId;
+    decodedCache.delete(layerId);
+    await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
+    renderHome();
+    activeTab='session';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='session'));
+    document.getElementById('panel-grid').style.display='none';
+    document.getElementById('panel-session').style.display='flex';
+    showScreen('screen-home');
+    setTimeout(()=>renderSessionView(),100);
+    showAIResponse('Full Take מוכן — אמור לAI: "סמן A-part מ-0:00 עד 0:32"');
+  }
+});
 
+let isODRecording=false, guideStartCtxTime=0, guideSrc=null;
 async function enterOverdub(sectionId,trackName){
   overdubSectionId=sectionId;overdubTrackName=trackName;
   const sec=sections.find(s=>s.id===sectionId);
@@ -589,15 +787,12 @@ async function enterOverdub(sectionId,trackName){
   isODRecording=false;
   const guideLayer=getLayer(sectionId,'guide');
   if(guideLayer){
-    const ctx=getMasterCtx();
-    const buf=await getDecodedBuffer(guideLayer.id,guideLayer.buffer);
-    guideSrc=ctx.createBufferSource();guideSrc.buffer=buf;guideSrc.loop=true;
-    guideSrc.connect(ctx.destination);guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
+    const ctx=getMasterCtx();const buf=await getDecodedBuffer(guideLayer.id,guideLayer.buffer);
+    guideSrc=ctx.createBufferSource();guideSrc.buffer=buf;guideSrc.loop=true;guideSrc.connect(ctx.destination);
+    guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
     document.getElementById('od-guide-wave').style.display='flex';
   }
-  startMetronomeEl('od-metro-arm',projectBPM);
-  if(projectBPM)startClick(projectBPM);
-  showScreen('screen-overdub');
+  startMetronomeEl('od-metro-arm',projectBPM);if(projectBPM)startClick(projectBPM);showScreen('screen-overdub');
 }
 document.getElementById('od-back').addEventListener('click',()=>{
   if(isODRecording){clearInterval(recTimerInterval);stopRecording(true);isODRecording=false}
@@ -607,90 +802,85 @@ document.getElementById('od-back').addEventListener('click',()=>{
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
     const ok=await startRecording();if(!ok)return;
-    const ctx=getMasterCtx();
-    pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
+    const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
     isODRecording=true;
     document.getElementById('od-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('od-timer').classList.add('recording');
     document.getElementById('od-indicator').classList.add('recording');
     document.getElementById('od-rec-btn').textContent='■';document.getElementById('od-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('od-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-  } else {
+    startWaveformLoop('od-waveform');
+  }else{
     clearInterval(recTimerInterval);await stopRecording(true);
     if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
     stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
   }
 });
-
 async function enterODReview(){
   const sec=sections.find(s=>s.id===overdubSectionId);
   document.getElementById('od-review-section').textContent=sec?.name||'';
   document.getElementById('od-review-offset').textContent=`offset: ${Math.round(pendingODOffsetMs)}ms`;
   const tagsEl=document.getElementById('od-review-layers');tagsEl.innerHTML='';
-  layers.filter(l=>l.sectionId===overdubSectionId).forEach(l=>{const tag=document.createElement('div');tag.className='od-layer-tag';tag.textContent=l.trackName;tagsEl.appendChild(tag)});
-  const newTag=document.createElement('div');newTag.className='od-layer-tag';newTag.style.background='rgba(13,148,136,0.2)';newTag.textContent=overdubTrackName+' ✦';tagsEl.appendChild(newTag);
+  layers.filter(l=>l.sectionId===overdubSectionId).forEach(l=>{const t=document.createElement('div');t.className='od-layer-tag';t.textContent=l.trackName;tagsEl.appendChild(t)});
+  const nt=document.createElement('div');nt.className='od-layer-tag';nt.style.background='rgba(13,148,136,.2)';nt.textContent=overdubTrackName+' ✦';tagsEl.appendChild(nt);
   document.getElementById('od-review-play-btn').textContent='▶';document.getElementById('od-review-play-btn').style.background='var(--s2)';
   showScreen('screen-od-review');
 }
-
 let odReviewPlaying=false;
 document.getElementById('od-review-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('od-review-play-btn');
-  if(odReviewPlaying){stopAllSrcs();odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';return}
-  odReviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';btn.style.borderColor='var(--teal)';
+  if(odReviewPlaying){stopAllSrcs();odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';return}
+  odReviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';
   const ctx=getMasterCtx();const now=ctx.currentTime;
-  const sectionLayers=layers.filter(l=>l.sectionId===overdubSectionId);
-  const srcs=await Promise.all(sectionLayers.map(async l=>{
+  const secLayers=layers.filter(l=>l.sectionId===overdubSectionId);
+  const srcs=await Promise.all(secLayers.map(async l=>{
     const b=await getDecodedBuffer(l.id,l.buffer);
-    const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);
-    s.start(now+(l.offsetMs||0)/1000);return s;
+    const s=ctx.createBufferSource();s.buffer=b;
+    const g=ctx.createGain();g.gain.value=l.volume??1;
+    const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
+    s.connect(p);p.connect(g);g.connect(ctx.destination);
+    s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s;
   }));
   const odBuf=await ctx.decodeAudioData(pendingODBuffer.slice());
   const odSrc=ctx.createBufferSource();odSrc.buffer=odBuf;odSrc.connect(ctx.destination);
   odSrc.start(now+pendingODOffsetMs/1000);
   activePlaySrcs=[...srcs,odSrc];
-  odSrc.onended=()=>{odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';activePlaySrcs=[]};
+  odSrc.onended=()=>{odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
 });
 document.getElementById('od-btn-keep').addEventListener('click',async()=>{
-  stopAllSrcs();
-  const layerId=uid();
-  const layer={id:layerId,sectionId:overdubSectionId,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:pendingODOffsetMs,volume:1.0,pan:0.0};
-  layers.push(layer);await dbPut('layers',layer);
-  renderHome();showScreen('screen-home');
+  stopAllSrcs();const layerId=uid();
+  const layer={id:layerId,sectionId:overdubSectionId,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:pendingODOffsetMs,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+  layers.push(layer);await dbPut('layers',layer);renderHome();showScreen('screen-home');
 });
 document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();enterOverdub(overdubSectionId,overdubTrackName)});
 
-// ── PLAY ALL ──────────────────────────
 async function playAll(){
   if(!arrangement.length)return;
   stopPlayAllFlag=false;showScreen('screen-playing');
   for(let i=0;i<arrangement.length;i++){
     if(stopPlayAllFlag)break;
     const sec=sections.find(s=>s.id===arrangement[i]);
-    const sectionLayers=layers.filter(l=>l.sectionId===arrangement[i]);
-    if(!sec||!sectionLayers.length||sec.muted)continue;
+    const secLayers=layers.filter(l=>l.sectionId===arrangement[i]);
+    if(!sec||!secLayers.length||sec.muted)continue;
     document.getElementById('playing-name').textContent=sec.name;
     document.getElementById('playing-counter').textContent=`${i+1} / ${arrangement.length}`;
     document.getElementById('playing-progress-fill').style.width='0%';
     const ctx=getMasterCtx();const now=ctx.currentTime;
-    const decoded=await Promise.all(sectionLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-    const maxDur=Math.max(...decoded.map((b,idx)=>b.duration+(sectionLayers[idx].offsetMs||0)/1000));
+    const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
+    const maxDur=Math.max(...decoded.map((b,idx)=>b.duration+(secLayers[idx].offsetMs||0)/1000));
     const srcs=decoded.map((b,idx)=>{
-      const l=sectionLayers[idx];
-      const s=ctx.createBufferSource();s.buffer=b;
-      const gain=ctx.createGain();gain.gain.value=l.volume??1.0;
-      const panner=ctx.createStereoPanner();panner.pan.value=l.pan??0.0;
-      s.connect(panner);panner.connect(gain);gain.connect(ctx.destination);
-      s.start(now+(l.offsetMs||0)/1000);return s;
+      const l=secLayers[idx];const s=ctx.createBufferSource();s.buffer=b;
+      const g=ctx.createGain();g.gain.value=l.volume??1;
+      const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
+      s.connect(p);p.connect(g);g.connect(ctx.destination);
+      s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s;
     });
     activePlaySrcs=srcs;
     await new Promise(res=>{
-      let elapsed=0;
-      const tick=setInterval(()=>{
+      let el=0;const tick=setInterval(()=>{
         if(stopPlayAllFlag){clearInterval(tick);res();return}
-        elapsed+=0.1;
-        document.getElementById('playing-progress-fill').style.width=Math.min(100,(elapsed/maxDur)*100)+'%';
-        if(elapsed>=maxDur){clearInterval(tick);res()}
+        el+=0.1;document.getElementById('playing-progress-fill').style.width=Math.min(100,(el/maxDur)*100)+'%';
+        if(el>=maxDur){clearInterval(tick);res()}
       },100);
     });
     stopAllSrcs();
@@ -700,19 +890,30 @@ async function playAll(){
 document.getElementById('btn-play-all').addEventListener('click',playAll);
 document.getElementById('btn-stop-playing').addEventListener('click',()=>{stopPlayAllFlag=true;stopAllSrcs();showScreen('screen-home')});
 
-// ── AI BAR ────────────────────────────
-async function sendAICommand(){
-  const input=document.getElementById('ai-input');
-  const cmd=input.value.trim();if(!cmd)return;
-  input.value='';
-  document.getElementById('ai-response').textContent='...';
+async function sendAICommand(cmd){
+  if(!cmd)return;
+  document.getElementById('ai-input').value='';
+  showAIResponse('...');
   const result=await callAI(cmd,getSessionState());
-  document.getElementById('ai-response').textContent=result.message||'';
+  showAIResponse(result.message||'');
 }
-document.getElementById('ai-send').addEventListener('click',sendAICommand);
-document.getElementById('ai-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendAICommand()});
+document.getElementById('ai-send').addEventListener('click',()=>sendAICommand(document.getElementById('ai-input').value.trim()));
+document.getElementById('ai-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendAICommand(document.getElementById('ai-input').value.trim())});
 
-// ── MODALS ────────────────────────────
+let recognition=null;
+if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();recognition.lang='he-IL';recognition.interimResults=false;
+  recognition.onresult=e=>{const t=e.results[0][0].transcript;document.getElementById('ai-input').value=t;sendAICommand(t)};
+  recognition.onend=()=>document.getElementById('ai-mic-btn').classList.remove('listening');
+  recognition.onerror=()=>document.getElementById('ai-mic-btn').classList.remove('listening');
+}
+document.getElementById('ai-mic-btn').addEventListener('click',()=>{
+  if(!recognition){showAIResponse('זיהוי קולי לא נתמך בדפדפן זה');return}
+  document.getElementById('ai-mic-btn').classList.add('listening');
+  recognition.start();
+});
+
 const openNameModal=()=>{const i=document.getElementById('modal-input');i.value=defaultSectionName();document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300)};
 const closeNameModal=()=>document.getElementById('name-modal').classList.remove('open');
 document.getElementById('btn-new-section').addEventListener('click',openNameModal);
@@ -721,19 +922,23 @@ document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==
 document.getElementById('name-modal').addEventListener('click',e=>{if(e.target===document.getElementById('name-modal'))closeNameModal()});
 
 let trackModalSectionId='';
-function openTrackModal(secId,defaultTrack){
+function openTrackModal(secId,def){
   trackModalSectionId=secId;
   const sec=sections.find(s=>s.id===secId);
   document.getElementById('track-modal-title').textContent=`ערוץ חדש — ${sec?.name||''}`;
-  const i=document.getElementById('track-input');i.value=defaultTrack||'';
+  const i=document.getElementById('track-input');i.value=def||'';
   document.getElementById('track-modal').classList.add('open');setTimeout(()=>i.focus(),300);
 }
 const closeTrackModal=()=>document.getElementById('track-modal').classList.remove('open');
-document.getElementById('track-confirm').addEventListener('click',()=>{const v=document.getElementById('track-input').value.trim();if(!v)return;closeTrackModal();enterOverdub(trackModalSectionId,v)});
+document.getElementById('track-confirm').addEventListener('click',()=>{
+  const v=document.getElementById('track-input').value.trim();if(!v)return;
+  const existing=getUniqueTracks();
+  if(!existing.includes(v)&&existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
+  closeTrackModal();enterOverdub(trackModalSectionId,v);
+});
 document.getElementById('track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('track-confirm').click()});
 document.getElementById('track-modal').addEventListener('click',e=>{if(e.target===document.getElementById('track-modal'))closeTrackModal()});
 
-// ── INIT ──────────────────────────────
 async function init(){
   if(!sessionStorage.getItem('laylo-session')){
     await new Promise(r=>{const req=indexedDB.deleteDatabase('laylo-v2');req.onsuccess=req.onerror=r});
@@ -747,17 +952,12 @@ async function init(){
   const ids=new Set(sections.map(s=>s.id));
   arrangement=savedArr.filter(id=>ids.has(id));
   sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
-  if(project?.bpm){
-    projectBPM=project.bpm;
-    document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;
-    renderHome();showScreen('screen-home');
-  } else {
-    showScreen('screen-bpm-welcome');
-  }
+  if(arrangement.length)sessionFocusedSecId=arrangement[0];
+  if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;renderHome();showScreen('screen-home')}
+  else showScreen('screen-bpm-welcome');
 }
 init().catch(console.error);
 
-// TEMP DEV: Easter egg reset
 ;(()=>{
   let t=null;const logo=document.getElementById('home-logo');if(!logo)return;
   logo.addEventListener('touchstart',e=>{e.preventDefault();t=setTimeout(()=>{indexedDB.deleteDatabase('laylo-v2');location.reload()},3000)},{passive:false});
