@@ -15,7 +15,7 @@
     .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);opacity:0;pointer-events:none;transition:opacity .2s}
     .screen.active{opacity:1;pointer-events:all}
     .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0}
-    .logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
+    .logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--teal2);letter-spacing:-.04em;user-select:none}
     .badge{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 7px;border-radius:20px}
     .bpm-chip{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px;cursor:pointer}
     .btn{border:none;border-radius:var(--r);font-family:'Heebo',sans-serif;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;user-select:none}
@@ -66,9 +66,9 @@
     #screen-home .bottom-bar{background:linear-gradient(to top,var(--bg) 60%,transparent)}
     .play-all-row{display:flex;gap:10px;margin-bottom:10px}
     .play-all-row .btn{flex:1}
-    .metro-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
-    .metro-arm{width:3px;height:56px;background:var(--teal);border-radius:2px;transform-origin:top center;animation:none}
-    .metro-dot{width:10px;height:10px;border-radius:50%;background:var(--teal2);margin-top:-4px}
+    .metro-wrap{display:flex;flex-direction:column;align-items:center;gap:0}
+    .metro-bob{width:10px;height:10px;border-radius:50%;background:var(--teal2)}
+    .metro-arm{width:3px;height:60px;background:var(--teal);border-radius:2px;transform-origin:bottom center;animation:none}
     @keyframes metro-swing{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
     #rec-waveform{width:100%;max-width:340px;height:72px;border-radius:10px;background:var(--s2);display:block}
     .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
@@ -124,7 +124,7 @@
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-confirm">&#10003; &#1488;&#1513;&#1512; BPM</button></div>
 </div>
 <div id="screen-home" class="screen">
-  <div class="topbar"><span class="logo">laylo</span><span class="bpm-chip" id="bpm-chip">&#9834; &#8212;</span></div>
+  <div class="topbar"><span class="logo" id="home-logo">laylo</span><span class="bpm-chip" id="bpm-chip">&#9834; &#8212;</span></div>
   <div class="scroll-area">
     <div class="empty-state" id="empty-state">
       <div class="empty-icon">&#127928;</div>
@@ -146,8 +146,8 @@
     <div id="rec-section-name" style="font-size:22px;font-weight:900"></div>
     <div class="rec-bpm-label" id="rec-bpm">&#9834; &#8212;</div>
     <div class="metro-wrap">
+      <div class="metro-bob"></div>
       <div class="metro-arm" id="metro-arm"></div>
-      <div class="metro-dot"></div>
     </div>
     <canvas id="rec-waveform"></canvas>
     <div id="rec-instruction" style="font-size:13px;color:var(--muted)">&#1500;&#1495;&#1509; &#1500;&#1492;&#1514;&#1495;&#1497;&#1500; &#1492;&#1511;&#1500;&#1496;&#1492;</div>
@@ -213,7 +213,7 @@ const stopCurrentAudio=()=>{if(currentAudio){currentAudio.pause();currentAudio=n
 const bufToBlob=(buf,mime)=>new Blob([buf],{type:mime});
 async function startRecording(){
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
-  catch(e){alert('\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d2\u05e9\u05ea \u05dc\u05de\u05d9\u05e7\u05e8\u05d5\u05e4\u05d5\u05df. \u05d0\u05e4\u05e9\u05e8 \u05d2\u05d9\u05e9\u05d4 \u05d1\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea \u05d4\u05d3\u05e4\u05d3\u05e4\u05df.');return false}
+  catch(e){alert('\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d2\u05e9\u05ea \u05dc\u05de\u05d9\u05e7\u05e8\u05d5\u05e4\u05d5\u05df.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
   recChunks=[];mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
@@ -227,7 +227,7 @@ async function startRecording(){
 }
 const stopRecording=()=>new Promise(res=>{mediaRecorder.onstop=async()=>{const blob=new Blob(recChunks,{type:mediaRecorder.mimeType});pendingDuration=(Date.now()-recStartTime)/1000;pendingBuffer=await blob.arrayBuffer();pendingMime=mediaRecorder.mimeType;recStream.getTracks().forEach(t=>t.stop());stopWaveformLoop();stopClick();res()};mediaRecorder.stop()});
 const playBlob=(blob,onProgress)=>new Promise(res=>{const url=URL.createObjectURL(blob);const audio=new Audio(url);currentAudio=audio;if(onProgress)audio.ontimeupdate=()=>{if(audio.duration)onProgress(audio.currentTime/audio.duration)};audio.onended=()=>{URL.revokeObjectURL(url);res('ended')};audio.onerror=()=>{URL.revokeObjectURL(url);res('error')};audio.play().catch(()=>res('error'))});
-function startWaveformLoop(){const canvas=document.getElementById('rec-waveform');if(!canvas||!analyserNode)return;canvas.width=canvas.offsetWidth||340;canvas.height=72;const ctx=canvas.getContext('2d');const buf=new Uint8Array(analyserNode.frequencyBinCount);function draw(){if(!analyserNode){ctx.clearRect(0,0,canvas.width,canvas.height);return}waveformLoop=setTimeout(draw,33);analyserNode.getByteTimeDomainData(buf);ctx.fillStyle='#162438';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.lineWidth=2;ctx.strokeStyle='#0d9488';ctx.beginPath();const sw=canvas.width/buf.length;let x=0;for(let i=0;i<buf.length;i++){const y=(buf[i]/128)*canvas.height/2;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);x+=sw}ctx.lineTo(canvas.width,canvas.height/2);ctx.stroke()}draw()}
+function startWaveformLoop(){setTimeout(()=>{const canvas=document.getElementById('rec-waveform');if(!canvas||!analyserNode)return;canvas.width=canvas.offsetWidth||340;canvas.height=72;const ctx=canvas.getContext('2d');const buf=new Uint8Array(analyserNode.frequencyBinCount);function draw(){if(!analyserNode){ctx.clearRect(0,0,canvas.width,canvas.height);return}waveformLoop=setTimeout(draw,33);analyserNode.getByteTimeDomainData(buf);ctx.fillStyle='#162438';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.lineWidth=2;ctx.strokeStyle='#0d9488';ctx.beginPath();const sw=canvas.width/buf.length;let x=0;for(let i=0;i<buf.length;i++){const y=(buf[i]/128)*canvas.height/2;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);x+=sw}ctx.lineTo(canvas.width,canvas.height/2);ctx.stroke()}draw()},50)}
 function stopWaveformLoop(){if(waveformLoop){clearTimeout(waveformLoop);waveformLoop=null}analyserNode=null;if(analyserCtx){try{analyserCtx.close()}catch(e){}analyserCtx=null}const canvas=document.getElementById('rec-waveform');if(canvas){const ctx=canvas.getContext('2d');ctx.fillStyle='#162438';ctx.fillRect(0,0,canvas.width,canvas.height)}}
 function startMetronome(bpm){const arm=document.getElementById('metro-arm');if(!arm||!bpm)return;const period=(60/bpm)*2;arm.style.animation=`metro-swing ${period}s ease-in-out infinite`}
 function stopMetronome(){const arm=document.getElementById('metro-arm');if(arm)arm.style.animation='none'}
@@ -274,6 +274,8 @@ document.getElementById('section-list').addEventListener('click',async e=>{
 });
 async function init(){await openDB();const project=await dbGet('meta','project');sections=await dbGetAll('sections');layers=await dbGetAll('layers');const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent='\u266a '+projectBPM;renderHome();showScreen('screen-home')}else{showScreen('screen-bpm-welcome')}}
 init().catch(console.error);
+// DEV RESET — לחיצה ארוכה 3 שניות על הלוגו
+;(()=>{let t=null;const logo=document.getElementById('home-logo');if(!logo)return;logo.addEventListener('pointerdown',()=>{t=setTimeout(()=>{indexedDB.deleteDatabase('laylo-v2');location.reload()},3000)});logo.addEventListener('pointerup',()=>clearTimeout(t));logo.addEventListener('pointercancel',()=>clearTimeout(t))})();
 </script>
 </body>
 </html>
