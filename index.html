@@ -272,7 +272,9 @@ document.getElementById('section-list').addEventListener('click',async e=>{
   if(upBtn){const i=parseInt(upBtn.dataset.up);if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
   if(downBtn){const i=parseInt(downBtn.dataset.down);if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
 });
-async function init(){await openDB();const project=await dbGet('meta','project');sections=await dbGetAll('sections');layers=await dbGetAll('layers');const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent='\u266a '+projectBPM;renderHome();showScreen('screen-home')}else{showScreen('screen-bpm-welcome')}}
+async function init(){
+  if(!sessionStorage.getItem('laylo-session')){await new Promise(r=>{const req=indexedDB.deleteDatabase('laylo-v2');req.onsuccess=req.onerror=r});sessionStorage.setItem('laylo-session','1')}
+  await openDB();const project=await dbGet('meta','project');sections=await dbGetAll('sections');layers=await dbGetAll('layers');const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent='\u266a '+projectBPM;renderHome();showScreen('screen-home')}else{showScreen('screen-bpm-welcome')}}
 init().catch(console.error);
 // DEV RESET — לחיצה ארוכה 3 שניות על הלוגו
 ;(()=>{let t=null;const logo=document.getElementById('home-logo');if(!logo)return;logo.addEventListener('pointerdown',()=>{t=setTimeout(()=>{indexedDB.deleteDatabase('laylo-v2');location.reload()},3000)});logo.addEventListener('pointerup',()=>clearTimeout(t));logo.addEventListener('pointercancel',()=>clearTimeout(t))})();
