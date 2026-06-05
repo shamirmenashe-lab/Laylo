@@ -87,6 +87,7 @@
   </style>
 </head>
 <body>
+
 <div id="screen-bpm-welcome" class="screen">
   <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 1.5</span></div>
   <div class="center-screen">
@@ -96,6 +97,7 @@
   </div>
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-start">&#9654; &#1492;&#1508;&#1506;&#1500; &#1511;&#1500;&#1497;&#1511;</button></div>
 </div>
+
 <div id="screen-bpm-adjust" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%"><button class="back-btn" id="bpm-adj-back">&#8592;</button><span></span></div>
   <div class="center-screen">
@@ -117,6 +119,7 @@
   </div>
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-confirm">&#10003; &#1488;&#1513;&#1512; BPM</button></div>
 </div>
+
 <div id="screen-home" class="screen">
   <div class="topbar"><span class="logo">laylo</span><span class="bpm-chip" id="bpm-chip">&#9834; &#8212;</span></div>
   <div class="scroll-area">
@@ -134,6 +137,7 @@
     <button class="btn btn-primary" id="btn-new-section">&#8853; &#1511;&#1496;&#1506; &#1495;&#1491;&#1513;</button>
   </div>
 </div>
+
 <div id="screen-record" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%"><button class="back-btn" id="rec-back">&#8592;</button><span></span></div>
   <div class="center-screen">
@@ -147,6 +151,7 @@
   </div>
   <div class="bottom-bar"></div>
 </div>
+
 <div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -160,6 +165,7 @@
     <button class="btn btn-ghost" id="btn-redo">&#8634; &#1492;&#1511;&#1500;&#1496; &#1513;&#1493;&#1489;</button>
   </div></div>
 </div>
+
 <div id="screen-playing" class="screen">
   <div class="topbar"><span class="logo">laylo</span></div>
   <div class="playing-center">
@@ -171,70 +177,159 @@
   </div>
   <div class="bottom-bar"><button class="btn btn-danger" id="btn-stop-playing">&#9632; &#1506;&#1510;&#1493;&#1512;</button></div>
 </div>
+
 <div class="modal-overlay" id="name-modal">
   <div class="modal-sheet">
     <div class="modal-title">&#1513;&#1501; &#1492;&#1511;&#1496;&#1506;</div>
-    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, &#1489;&#1512;&#1497;&#1491;&#1490;&#768;, &#1493;&#1493;&#1512;&#1505;...">
+    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, &#1489;&#1512;&#1497;&#1491;&#1490;&#1468;, &#1493;&#1493;&#1512;&#1505;...">
     <button class="btn btn-primary" id="modal-confirm">&#1492;&#1502;&#1513;&#1498; &#1500;&#1492;&#1511;&#1500;&#1496;&#1492; &#8592;</button>
   </div>
 </div>
+
 <script>
 async function callAI(p){console.log('[callAI mock]',p);return{text:'[mock]'}}
-const DB_NAME='laylo-v2',DB_VER=2;let db;
-function openDB(){return new Promise((res,rej)=>{const req=indexedDB.open(DB_NAME,DB_VER);req.onupgradeneeded=e=>{const d=e.target.result;for(const n of[...d.objectStoreNames])d.deleteObjectStore(n);d.createObjectStore('sections',{keyPath:'id'});d.createObjectStore('layers',{keyPath:'id'});d.createObjectStore('meta',{keyPath:'key'})};req.onsuccess=e=>{db=e.target.result;res(db)};req.onerror=()=>rej(req.error)})}
+
+const DB_NAME='laylo-v2',DB_VER=3;
+let db;
+function openDB(){return new Promise((res,rej)=>{
+  const req=indexedDB.open(DB_NAME,DB_VER);
+  req.onupgradeneeded=e=>{
+    const d=e.target.result;
+    for(const n of[...d.objectStoreNames])d.deleteObjectStore(n);
+    d.createObjectStore('sections',{keyPath:'id'});
+    d.createObjectStore('layers',{keyPath:'id'});
+    d.createObjectStore('meta',{keyPath:'key'});
+  };
+  req.onsuccess=e=>{db=e.target.result;res(db)};
+  req.onerror=()=>rej(req.error);
+})}
 const dbPut=(s,v)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).put(v).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const dbGet=(s,k)=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const dbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const dbDelete=(s,k)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).delete(k).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const saveArrangement=o=>dbPut('meta',{key:'arrangement',order:o});
 const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return r?r.order:[]};
+
 let sections=[],layers=[],arrangement=[],projectBPM=null,currentBPM=120;
 let pendingName='',pendingBuffer=null,pendingMime='',pendingDuration=0;
+let bpmAdjFrom='welcome';
+
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 const defaultName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
 const getGuideLayer=sid=>layers.find(l=>l.sectionId===sid&&l.layerName==='guide');
+
 let mediaRecorder=null,recStream=null,recChunks=[],recStartTime=0,recTimerInterval=null;
 let currentAudio=null,stopPlayAllFlag=false,activeSectionPlayBtn=null;
 const stopCurrentAudio=()=>{if(currentAudio){currentAudio.pause();currentAudio=null}};
 const bufToBlob=(buf,mime)=>new Blob([buf],{type:mime});
-async function startRecording(){try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}catch(e){alert('No mic access');return false}const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});recChunks=[];mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};mediaRecorder.start(100);recStartTime=Date.now();return true}
+
+async function startRecording(){
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
+  catch(e){alert('\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d2\u05e9\u05ea \u05dc\u05de\u05d9\u05e7\u05e8\u05d5\u05e4\u05d5\u05df. \u05d0\u05e4\u05e9\u05e8 \u05d2\u05d9\u05e9\u05d4 \u05d1\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea \u05d4\u05d3\u05e4\u05d3\u05e4\u05df.');return false}
+  const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
+  mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
+  recChunks=[];mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
+  mediaRecorder.start(100);recStartTime=Date.now();return true;
+}
 const stopRecording=()=>new Promise(res=>{mediaRecorder.onstop=async()=>{const blob=new Blob(recChunks,{type:mediaRecorder.mimeType});pendingDuration=(Date.now()-recStartTime)/1000;pendingBuffer=await blob.arrayBuffer();pendingMime=mediaRecorder.mimeType;recStream.getTracks().forEach(t=>t.stop());res()};mediaRecorder.stop()});
 const playBlob=(blob,onProgress)=>new Promise(res=>{const url=URL.createObjectURL(blob);const audio=new Audio(url);currentAudio=audio;if(onProgress)audio.ontimeupdate=()=>{if(audio.duration)onProgress(audio.currentTime/audio.duration)};audio.onended=()=>{URL.revokeObjectURL(url);res('ended')};audio.onerror=()=>{URL.revokeObjectURL(url);res('error')};audio.play().catch(()=>res('error'))});
+
 let clickCtx=null,clickTimeout=null,clickBeat=0,clickNextTime=0;
-function startClick(bpm){stopClick();clickCtx=new(window.AudioContext||window.webkitAudioContext)();const interval=60/bpm;clickBeat=0;clickNextTime=clickCtx.currentTime+0.1;function schedule(){if(!clickCtx||clickCtx.state==='closed')return;while(clickNextTime<clickCtx.currentTime+0.3){const accent=clickBeat%4===0,osc=clickCtx.createOscillator(),gain=clickCtx.createGain();osc.frequency.value=accent?1200:900;gain.gain.setValueAtTime(accent?.8:.5,clickNextTime);gain.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);osc.connect(gain);gain.connect(clickCtx.destination);osc.start(clickNextTime);osc.stop(clickNextTime+0.05);const b=clickBeat%4,t=Math.max(0,(clickNextTime-clickCtx.currentTime)*1000);setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);clickNextTime+=interval;clickBeat++}clickTimeout=setTimeout(schedule,100)}schedule()}
+function startClick(bpm){
+  stopClick();
+  clickCtx=new(window.AudioContext||window.webkitAudioContext)();
+  const interval=60/bpm;clickBeat=0;clickNextTime=clickCtx.currentTime+0.1;
+  function schedule(){
+    if(!clickCtx||clickCtx.state==='closed')return;
+    while(clickNextTime<clickCtx.currentTime+0.3){
+      const accent=clickBeat%4===0,osc=clickCtx.createOscillator(),gain=clickCtx.createGain();
+      osc.frequency.value=accent?1200:900;
+      gain.gain.setValueAtTime(accent?.8:.5,clickNextTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
+      osc.connect(gain);gain.connect(clickCtx.destination);osc.start(clickNextTime);osc.stop(clickNextTime+0.05);
+      const b=clickBeat%4,t=Math.max(0,(clickNextTime-clickCtx.currentTime)*1000);
+      setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
+      clickNextTime+=interval;clickBeat++;
+    }
+    clickTimeout=setTimeout(schedule,100);
+  }
+  schedule();
+}
 function stopClick(){if(clickTimeout)clearTimeout(clickTimeout);if(clickCtx){try{clickCtx.close()}catch(e){}clickCtx=null}}
+
 const showScreen=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')};
 const updateBPMDisplay=()=>document.getElementById('bpm-adj-num').textContent=currentBPM;
-document.getElementById('bpm-start').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();startClick(currentBPM);showScreen('screen-bpm-adjust')});
-document.getElementById('bpm-adj-back').addEventListener('click',()=>{stopClick();showScreen('screen-bpm-welcome')});
+
+document.getElementById('bpm-start').addEventListener('click',()=>{
+  currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='welcome';startClick(currentBPM);showScreen('screen-bpm-adjust');
+});
+document.getElementById('bpm-adj-back').addEventListener('click',()=>{
+  stopClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome');
+});
 const adjBPM=d=>{currentBPM=Math.max(40,Math.min(220,currentBPM+d));updateBPMDisplay();startClick(currentBPM)};
 document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
 document.getElementById('bpm-p5').addEventListener('click',()=>adjBPM(5));
 document.getElementById('bpm-confirm').addEventListener('click',async()=>{stopClick();await lockBPM(currentBPM)});
-async function lockBPM(bpm){projectBPM=bpm;await dbPut('meta',{key:'project',bpm});document.getElementById('bpm-chip').textContent='\u266a '+bpm;showScreen('screen-home')}
-document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();startClick(currentBPM);showScreen('screen-bpm-adjust')});
-function renderHome(){const empty=document.getElementById('empty-state'),list=document.getElementById('section-list'),playRow=document.getElementById('play-all-row');if(!sections.length){empty.style.display='flex';list.style.display='none';playRow.style.display='none';return}empty.style.display='none';list.style.display='block';playRow.style.display=arrangement.length>1?'flex':'none';list.innerHTML='';arrangement.forEach((id,idx)=>{const sec=sections.find(s=>s.id===id);if(!sec)return;const card=document.createElement('div');card.className='section-card';card.innerHTML=`<div class="section-main"><button class="section-play" data-id="${sec.id}">&#9654;</button><div class="section-info"><div class="section-name">${sec.name}</div><div class="section-meta">${fmtTime(sec.duration)}</div></div><div class="section-actions"><div class="order-btns"><button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>&#9650;</button><button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>&#9660;</button></div><button class="btn-icon" data-delete="${sec.id}">&#128465;</button></div></div>`;list.appendChild(card)})}
+
+async function lockBPM(bpm){
+  projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
+  document.getElementById('bpm-chip').textContent='\u266a '+bpm;
+  showScreen('screen-home');
+}
+document.getElementById('bpm-chip').addEventListener('click',()=>{
+  currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust');
+});
+
+function renderHome(){
+  const empty=document.getElementById('empty-state'),list=document.getElementById('section-list'),playRow=document.getElementById('play-all-row');
+  if(!sections.length){empty.style.display='flex';list.style.display='none';playRow.style.display='none';return}
+  empty.style.display='none';list.style.display='block';playRow.style.display=arrangement.length>1?'flex':'none';
+  list.innerHTML='';
+  arrangement.forEach((id,idx)=>{
+    const sec=sections.find(s=>s.id===id);if(!sec)return;
+    const card=document.createElement('div');card.className='section-card';
+    card.innerHTML=`<div class="section-main"><button class="section-play" data-id="${sec.id}">&#9654;</button><div class="section-info"><div class="section-name">${sec.name}</div><div class="section-meta">${fmtTime(sec.duration)}</div></div><div class="section-actions"><div class="order-btns"><button class="order-btn" data-up="${idx}" ${idx===0?'disabled':''}>&#9650;</button><button class="order-btn" data-down="${idx}" ${idx===arrangement.length-1?'disabled':''}>&#9660;</button></div><button class="btn-icon" data-delete="${sec.id}">&#128465;</button></div></div>`;
+    list.appendChild(card);
+  });
+}
+
 let isRecording=false;
-function enterRecord(name){document.getElementById('rec-section-name').textContent=name;document.getElementById('rec-instruction').textContent='\u05dc\u05d7\u05e5 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc \u05d4\u05e7\u05dc\u05d8\u05d4';document.getElementById('rec-timer').textContent='00:00';document.getElementById('rec-timer').classList.remove('recording');document.getElementById('rec-indicator').classList.remove('recording');document.getElementById('rec-btn').textContent='\u25cf';document.getElementById('rec-btn').classList.remove('recording');isRecording=false;showScreen('screen-record')}
+function enterRecord(name){
+  document.getElementById('rec-section-name').textContent=name;
+  document.getElementById('rec-instruction').textContent='\u05dc\u05d7\u05e5 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc \u05d4\u05e7\u05dc\u05d8\u05d4';
+  document.getElementById('rec-timer').textContent='00:00';
+  document.getElementById('rec-timer').classList.remove('recording');
+  document.getElementById('rec-indicator').classList.remove('recording');
+  document.getElementById('rec-btn').textContent='\u25cf';
+  document.getElementById('rec-btn').classList.remove('recording');
+  isRecording=false;showScreen('screen-record');
+}
 document.getElementById('rec-back').addEventListener('click',()=>{if(isRecording){clearInterval(recTimerInterval);stopRecording();isRecording=false}stopCurrentAudio();showScreen('screen-home')});
-document.getElementById('rec-btn').addEventListener('click',async()=>{if(!isRecording){const ok=await startRecording();if(!ok)return;isRecording=true;document.getElementById('rec-instruction').textContent='\u05de\u05e7\u05dc\u05d9\u05d8... \u05dc\u05d7\u05e5 \u05dc\u05e2\u05e6\u05d5\u05e8';document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');document.getElementById('rec-btn').textContent='\u25a0';document.getElementById('rec-btn').classList.add('recording');recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250)}else{clearInterval(recTimerInterval);await stopRecording();isRecording=false;enterReview()}});
+document.getElementById('rec-btn').addEventListener('click',async()=>{
+  if(!isRecording){const ok=await startRecording();if(!ok)return;isRecording=true;document.getElementById('rec-instruction').textContent='\u05de\u05e7\u05dc\u05d9\u05d8... \u05dc\u05d7\u05e5 \u05dc\u05e2\u05e6\u05d5\u05e8';document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');document.getElementById('rec-btn').textContent='\u25a0';document.getElementById('rec-btn').classList.add('recording');recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250)}
+  else{clearInterval(recTimerInterval);await stopRecording();isRecording=false;enterReview()}
+});
+
 let reviewPlaying=false;
 function enterReview(){document.getElementById('review-name').textContent=pendingName;document.getElementById('review-duration').textContent=fmtTime(pendingDuration);reviewPlaying=false;const btn=document.getElementById('review-play-btn');btn.textContent='\u25b6';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)';showScreen('screen-review')}
 document.getElementById('review-play-btn').addEventListener('click',async()=>{const btn=document.getElementById('review-play-btn');if(reviewPlaying){stopCurrentAudio();reviewPlaying=false;btn.textContent='\u25b6';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)'}else{reviewPlaying=true;btn.textContent='\u25a0';btn.style.background='var(--teal)';btn.style.borderColor='var(--teal)';await playBlob(bufToBlob(pendingBuffer,pendingMime));reviewPlaying=false;btn.textContent='\u25b6';btn.style.background='var(--s2)';btn.style.borderColor='var(--border)'}});
 document.getElementById('btn-keep').addEventListener('click',async()=>{stopCurrentAudio();const secId=uid(),layerId=uid();const sec={id:secId,name:pendingName,duration:pendingDuration};const layer={id:layerId,sectionId:secId,layerName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0};sections.push(sec);layers.push(layer);arrangement.push(secId);await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);renderHome();showScreen('screen-home')});
 document.getElementById('btn-redo').addEventListener('click',()=>{stopCurrentAudio();enterRecord(pendingName)});
+
 async function playAll(){if(!arrangement.length)return;stopPlayAllFlag=false;showScreen('screen-playing');for(let i=0;i<arrangement.length;i++){if(stopPlayAllFlag)break;const sec=sections.find(s=>s.id===arrangement[i]),layer=getGuideLayer(arrangement[i]);if(!sec||!layer)continue;document.getElementById('playing-name').textContent=sec.name;document.getElementById('playing-counter').textContent=`${i+1} / ${arrangement.length}`;document.getElementById('playing-progress-fill').style.width='0%';await playBlob(bufToBlob(layer.buffer,layer.mimeType),pct=>{document.getElementById('playing-progress-fill').style.width=(pct*100)+'%'})}if(!stopPlayAllFlag)showScreen('screen-home')}
 document.getElementById('btn-play-all').addEventListener('click',playAll);
 document.getElementById('btn-stop-playing').addEventListener('click',()=>{stopPlayAllFlag=true;stopCurrentAudio();showScreen('screen-home')});
+
 const openNameModal=()=>{const i=document.getElementById('modal-input');i.value=defaultName();document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300)};
 const closeNameModal=()=>document.getElementById('name-modal').classList.remove('open');
 document.getElementById('btn-new-section').addEventListener('click',openNameModal);
 document.getElementById('modal-confirm').addEventListener('click',()=>{const v=document.getElementById('modal-input').value.trim();if(!v)return;pendingName=v;closeNameModal();enterRecord(pendingName)});
 document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-confirm').click()});
 document.getElementById('name-modal').addEventListener('click',e=>{if(e.target===document.getElementById('name-modal'))closeNameModal()});
+
 document.getElementById('section-list').addEventListener('click',async e=>{
   const playBtn=e.target.closest('[data-id]'),delBtn=e.target.closest('[data-delete]'),upBtn=e.target.closest('[data-up]'),downBtn=e.target.closest('[data-down]');
   if(playBtn){if(activeSectionPlayBtn===playBtn){stopCurrentAudio();playBtn.classList.remove('playing');playBtn.textContent='\u25b6';activeSectionPlayBtn=null;return}if(activeSectionPlayBtn){stopCurrentAudio();activeSectionPlayBtn.classList.remove('playing');activeSectionPlayBtn.textContent='\u25b6';activeSectionPlayBtn=null}const id=playBtn.dataset.id,layer=getGuideLayer(id);if(!layer)return;activeSectionPlayBtn=playBtn;playBtn.classList.add('playing');playBtn.textContent='\u25a0';await playBlob(bufToBlob(layer.buffer,layer.mimeType));playBtn.classList.remove('playing');playBtn.textContent='\u25b6';activeSectionPlayBtn=null}
@@ -242,7 +337,22 @@ document.getElementById('section-list').addEventListener('click',async e=>{
   if(upBtn){const i=parseInt(upBtn.dataset.up);if(i>0){[arrangement[i],arrangement[i-1]]=[arrangement[i-1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
   if(downBtn){const i=parseInt(downBtn.dataset.down);if(i<arrangement.length-1){[arrangement[i],arrangement[i+1]]=[arrangement[i+1],arrangement[i]];await saveArrangement(arrangement);renderHome()}}
 });
-async function init(){await openDB();const project=await dbGet('meta','project');sections=await dbGetAll('sections');layers=await dbGetAll('layers');const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent='\u266a '+projectBPM;renderHome();showScreen('screen-home')}else{showScreen('screen-bpm-welcome')}}
+
+async function init(){
+  await openDB();
+  const project=await dbGet('meta','project');
+  sections=await dbGetAll('sections');layers=await dbGetAll('layers');
+  const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));
+  arrangement=savedArr.filter(id=>ids.has(id));
+  sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
+  if(project?.bpm){
+    projectBPM=project.bpm;
+    document.getElementById('bpm-chip').textContent='\u266a '+projectBPM;
+    renderHome();showScreen('screen-home');
+  }else{
+    showScreen('screen-bpm-welcome');
+  }
+}
 init().catch(console.error);
 </script>
 </body>
