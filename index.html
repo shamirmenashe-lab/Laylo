@@ -71,6 +71,13 @@
     .grid-add-btn:active{border-color:var(--teal);color:var(--teal)}
     .home-actions{padding:10px 16px;display:flex;gap:8px;flex-shrink:0}
     .home-actions .btn{flex:1;font-size:14px;padding:12px 10px}
+    /* TIMELINE */
+    .timeline-wrap{overflow-x:auto;padding:10px 16px 4px;flex-shrink:0;border-bottom:1px solid var(--border)}
+    .tl-track-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:54px;flex-shrink:0;text-align:right;padding-right:8px;display:flex;align-items:center;justify-content:flex-end}
+    .tl-segment{border-radius:6px;background:var(--s2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;padding:0 4px;transition:all .15s;min-width:28px;height:32px}
+    .tl-segment.focused{background:var(--teal);border-color:var(--teal);color:#fff}
+    .tl-segment.empty{border-style:dashed;background:none}
+    /* SESSION DETAIL */
     .session-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
     .session-section-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -174,8 +181,14 @@
       </div>
     </div>
     <div id="panel-session">
+      <!-- Timeline -->
+      <div class="timeline-wrap">
+        <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;padding-right:62px">timeline</div>
+        <div id="timeline-rows"></div>
+      </div>
+      <!-- Section detail -->
       <div class="session-header">
-        <span class="session-section-name" id="session-section-label">בחר קטע מהgrid</span>
+        <span class="session-section-name" id="session-section-label">לחץ על קטע בtimeline</span>
         <span class="session-time" id="session-time-display">0:00</span>
       </div>
       <div class="session-tracks" id="session-tracks"></div>
@@ -319,13 +332,12 @@
 </div>
 
 <script>
-// Sprint 3.5 — M/S + Reference playback + Unified recording flow
+// Sprint 3.5 — Timeline + M/S + Click on masterCtx + Reference playback
 
 async function callAI(prompt, sessionState) {
   try {
     const res = await fetch('/api/ai', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ prompt, sessionState })
     });
     if (!res.ok) throw new Error('proxy error');
@@ -367,7 +379,7 @@ let sessionFocusedSecId='';
 let activeTab='grid';
 let soloTrack=null;
 let mutedTracks=new Set();
-let refGuideSrcs=[];   // reference sources playing during recording
+let refGuideSrc=null;
 let sessPlaying=false;
 
 const FREE_TRACK_LIMIT=4;
@@ -376,14 +388,10 @@ const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floo
 const defaultSectionName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
 const getLayer=(sid,track)=>layers.find(l=>l.sectionId===sid&&l.trackName===track);
 const getUniqueTracks=()=>{const s=new Set(layers.map(l=>l.trackName||'guide'));return['guide',...Array.from(s).filter(n=>n!=='guide')]};
-const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),layers:layers.map(l=>({id:l.id,sectionId:l.sectionId,trackName:l.trackName,offsetMs:l.offsetMs,volume:l.volume,pan:l.pan,clipOffset:l.clipOffset,clipDuration:l.clipDuration})),bpm:projectBPM});
+const shouldPlay=t=>soloTrack?t===soloTrack:!mutedTracks.has(t);
+const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),bpm:projectBPM});
 
-// shouldPlay — מחשב אם track נשמע לפי M/S state
-function shouldPlay(trackName){
-  if(soloTrack) return trackName===soloTrack;
-  return !mutedTracks.has(trackName);
-}
-
+// ── AUDIO — single masterCtx ─────────────
 let masterCtx=null;
 let analyserCtx=null, analyserNode=null, waveformLoop=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
@@ -404,9 +412,8 @@ async function getDecodedBuffer(layerId,buf){
   return ab;
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
-function stopRefSrcs(){refGuideSrcs.forEach(s=>{try{s.stop()}catch(e){}});refGuideSrcs=[]}
+function stopRefSrc(){if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}}
 
-// startRecording — ללא stopClick כאן, כל caller מחליט
 async function startRecording(){
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
@@ -462,7 +469,7 @@ function stopWaveformLoop(){
 function startMetronomeEl(id,bpm){const a=document.getElementById(id);if(a&&bpm)a.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
 function stopMetronomeEl(id){const a=document.getElementById(id);if(a)a.style.animation='none'}
 
-async function drawSessionTrackWaveform(canvasEl, layer) {
+async function drawSessionTrackWaveform(canvasEl,layer){
   if(!canvasEl||!layer)return;
   canvasEl.width=canvasEl.offsetWidth||300;canvasEl.height=canvasEl.offsetHeight||54;
   const ctx=canvasEl.getContext('2d');
@@ -482,10 +489,7 @@ async function drawSessionTrackWaveform(canvasEl, layer) {
 }
 
 function updatePlayhead(progress){
-  document.querySelectorAll('.playhead').forEach(ph=>{
-    const w=ph.parentElement;if(!w)return;
-    ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`;
-  });
+  document.querySelectorAll('.playhead').forEach(ph=>{const w=ph.parentElement;if(!w)return;ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`});
   document.getElementById('session-time-display').textContent=fmtTime(sessionPlayDuration*progress);
 }
 function startPlayheadLoop(duration){
@@ -495,24 +499,89 @@ function startPlayheadLoop(duration){
 }
 function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0)}
 
+// ── CLICK — על masterCtx, אותו clock ─────
+// FIX באג 3: קליק על masterCtx בלבד = zero drift
+let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
+function startClick(bpm){
+  stopClick();
+  const ctx=getMasterCtx();
+  const iv=60/bpm;
+  clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
+  function sched(){
+    if(!clickRunning)return;
+    const c=getMasterCtx();
+    while(clickNextTime<c.currentTime+0.3){
+      const a=clickBeat%4===0;
+      const o=c.createOscillator(),g=c.createGain();
+      o.frequency.value=a?1200:900;
+      g.gain.setValueAtTime(a?.8:.5,clickNextTime);
+      g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
+      o.connect(g);g.connect(c.destination);o.start(clickNextTime);o.stop(clickNextTime+0.05);
+      const b=clickBeat%4,t=Math.max(0,(clickNextTime-c.currentTime)*1000);
+      setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
+      clickNextTime+=iv;clickBeat++;
+    }
+    clickTimeout=setTimeout(sched,100);
+  }
+  sched();
+}
+function stopClick(){clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}}
+
+// ── TIMELINE ────────────────────────────
+function renderTimeline(){
+  const container=document.getElementById('timeline-rows');
+  if(!container||!arrangement.length){if(container)container.innerHTML='';return}
+  container.innerHTML='';
+  const tracks=getUniqueTracks();
+  const totalDur=arrangement.reduce((s,id)=>{const sec=sections.find(x=>x.id===id);return s+(sec?.duration||0)},0)||1;
+
+  tracks.forEach(trackName=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px';
+    const lbl=document.createElement('div');
+    lbl.className='tl-track-label';lbl.textContent=trackName;row.appendChild(lbl);
+    const segsWrap=document.createElement('div');
+    segsWrap.style.cssText='display:flex;gap:2px;flex:1;height:32px';
+    arrangement.forEach(secId=>{
+      const sec=sections.find(s=>s.id===secId);if(!sec)return;
+      const layer=getLayer(secId,trackName);
+      const pct=Math.max(5,(sec.duration/totalDur)*100);
+      const seg=document.createElement('div');
+      seg.className='tl-segment'+(layer?'':' empty')+(sessionFocusedSecId===secId?' focused':'');
+      seg.style.cssText=`width:${pct}%;flex-shrink:0`;
+      seg.textContent=layer?sec.name:'';
+      seg.dataset.focusSecTl=secId;
+      segsWrap.appendChild(seg);
+    });
+    row.appendChild(segsWrap);
+    container.appendChild(row);
+  });
+}
+
+// Timeline click delegation
+document.addEventListener('click',e=>{
+  const seg=e.target.closest('[data-focus-sec-tl]');
+  if(seg){
+    sessionFocusedSecId=seg.dataset.focusSecTl;
+    renderTimeline();renderSessionView();
+  }
+});
+
 async function renderSessionView(){
   const panel=document.getElementById('session-tracks');
   panel.innerHTML='';
   const secId=sessionFocusedSecId||(arrangement[0]||'');
   const sec=sections.find(s=>s.id===secId);
-  document.getElementById('session-section-label').textContent=sec?sec.name:'בחר קטע';
+  document.getElementById('session-section-label').textContent=sec?sec.name:'לחץ על קטע בtimeline';
   if(!secId||!sec)return;
   const tracks=getUniqueTracks();
   for(const trackName of tracks){
     const layer=getLayer(secId,trackName);
-    const isMuted=mutedTracks.has(trackName);
-    const isSolo=soloTrack===trackName;
     const row=document.createElement('div');row.className='session-track-row';
     const label=document.createElement('div');label.className='session-track-name';label.textContent=trackName;
-    // M/S buttons
     const msWrap=document.createElement('div');msWrap.className='ms-btns';
-    const mBtn=document.createElement('button');mBtn.className='ms-btn'+(isMuted?' m-on':'');mBtn.textContent='M';
-    const sBtn=document.createElement('button');sBtn.className='ms-btn'+(isSolo?' s-on':'');sBtn.textContent='S';
+    const mBtn=document.createElement('button');mBtn.className='ms-btn'+(mutedTracks.has(trackName)?' m-on':'');mBtn.textContent='M';
+    const sBtn=document.createElement('button');sBtn.className='ms-btn'+(soloTrack===trackName?' s-on':'');sBtn.textContent='S';
     msWrap.appendChild(mBtn);msWrap.appendChild(sBtn);
     const wrap=document.createElement('div');wrap.className='session-canvas-wrap';
     const canvas=document.createElement('canvas');canvas.className='session-waveform';
@@ -521,10 +590,7 @@ async function renderSessionView(){
     row.appendChild(label);row.appendChild(msWrap);row.appendChild(wrap);
     panel.appendChild(row);
     if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
-    mBtn.addEventListener('click',()=>{
-      if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);
-      renderSessionView();
-    });
+    mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSessionView()});
     sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSessionView()});
     wrap.addEventListener('click',e=>{
       const rect=wrap.getBoundingClientRect();const pct=(e.clientX-rect.left)/rect.width;
@@ -532,51 +598,6 @@ async function renderSessionView(){
     });
   }
 }
-
-// ── REFERENCE PLAYBACK ───────────────────
-// מנגן sections ברקע לפי M/S state, על loop, לא נכנס לrecording
-let recRefStartCtxTime=0;
-async function startRefPlayback(refVal){
-  stopRefSrcs();stopClick();
-  if(refVal==='none') return;
-  if(projectBPM) startClick(projectBPM);
-  if(refVal==='click') return;
-  // refVal = sectionId
-  const refLayers=layers.filter(l=>l.sectionId===refVal&&shouldPlay(l.trackName));
-  if(!refLayers.length) return;
-  const ctx=getMasterCtx();
-  const decoded=await Promise.all(refLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-  const now=ctx.currentTime+0.1;
-  recRefStartCtxTime=now;
-  decoded.forEach((b,i)=>{
-    const l=refLayers[i];const s=ctx.createBufferSource();s.buffer=b;s.loop=true;
-    const g=ctx.createGain();g.gain.value=l.volume??1;
-    const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
-    s.connect(p);p.connect(g);g.connect(ctx.destination);
-    s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);
-    refGuideSrcs.push(s);
-  });
-}
-
-let clickCtx=null, clickTimeout=null, clickBeat=0, clickNextTime=0;
-function startClick(bpm){
-  stopClick();clickCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const iv=60/bpm;clickBeat=0;clickNextTime=clickCtx.currentTime+0.1;
-  function sched(){
-    if(!clickCtx||clickCtx.state==='closed')return;
-    while(clickNextTime<clickCtx.currentTime+0.3){
-      const a=clickBeat%4===0;const o=clickCtx.createOscillator(),g=clickCtx.createGain();
-      o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,clickNextTime);g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
-      o.connect(g);g.connect(clickCtx.destination);o.start(clickNextTime);o.stop(clickNextTime+0.05);
-      const b=clickBeat%4,t=Math.max(0,(clickNextTime-clickCtx.currentTime)*1000);
-      setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
-      clickNextTime+=iv;clickBeat++;
-    }
-    clickTimeout=setTimeout(sched,100);
-  }
-  sched();
-}
-function stopClick(){if(clickTimeout)clearTimeout(clickTimeout);if(clickCtx){try{clickCtx.close()}catch(e){}clickCtx=null}}
 
 const showScreen=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')};
 
@@ -586,7 +607,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===activeTab));
     document.getElementById('panel-grid').style.display=activeTab==='grid'?'block':'none';
     document.getElementById('panel-session').style.display=activeTab==='session'?'flex':'none';
-    if(activeTab==='session')renderSessionView();
+    if(activeTab==='session'){renderTimeline();renderSessionView()}
   });
 });
 
@@ -606,11 +627,10 @@ document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=pro
 function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
 
 function buildRefSelect(){
-  const refSel=document.getElementById('ref-select');
-  refSel.innerHTML='<option value="none">ללא</option><option value="click">♩ קליק בלבד</option>';
-  sections.forEach(sec=>{const o=document.createElement('option');o.value=sec.id;o.textContent=sec.name;refSel.appendChild(o)});
-  // ברירת מחדל: אם יש sections — הראשון, אחרת קליק
-  refSel.value=sections.length?sections[0].id:'click';
+  const sel=document.getElementById('ref-select');
+  sel.innerHTML='<option value="none">ללא</option><option value="click">♩ קליק בלבד</option>';
+  sections.forEach(sec=>{const o=document.createElement('option');o.value=sec.id;o.textContent=sec.name;sel.appendChild(o)});
+  sel.value=sections.length?sections[0].id:'click';
 }
 
 function renderHome(){
@@ -635,7 +655,7 @@ function renderHome(){
     tracks.forEach(trackName=>{
       const td=document.createElement('td');td.className='grid-td';
       const layer=getLayer(sec.id,trackName);
-      if(layer){const btn=document.createElement('button');btn.className='grid-play-btn';btn.textContent='▶';btn.dataset.secId=sec.id;btn.dataset.trackName=trackName;btn.dataset.layerId=layer.id;td.appendChild(btn)}
+      if(layer){const btn=document.createElement('button');btn.className='grid-play-btn';btn.textContent='▶';btn.dataset.layerId=layer.id;td.appendChild(btn)}
       else{const btn=document.createElement('button');btn.className='grid-add-btn';btn.textContent='+';btn.dataset.addSecId=sec.id;btn.dataset.addTrack=trackName;td.appendChild(btn)}
       row.appendChild(td);
     });
@@ -650,7 +670,7 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
   const focusBtn=e.target.closest('[data-focus-sec]');
   const playBtn=e.target.closest('[data-layer-id]');
   const addBtn=e.target.closest('[data-add-sec-id]');
-  if(focusBtn){sessionFocusedSecId=focusBtn.dataset.focusSec;renderHome();if(activeTab==='session')renderSessionView();return}
+  if(focusBtn){sessionFocusedSecId=focusBtn.dataset.focusSec;renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}return}
   if(playBtn){
     stopAllSrcs();stopPlayheadLoop();
     if(activeCellBtn&&activeCellBtn!==playBtn){activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null}
@@ -676,19 +696,18 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
   }
 });
 
-// Session play — listener יחיד, flag sessPlaying
+// Session play — flag יחיד
 document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('sess-play-btn');
   if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶';return}
   const secId=sessionFocusedSecId;if(!secId)return;
-  const secLayers=layers.filter(l=>l.sectionId===secId);if(!secLayers.length)return;
-  const filteredLayers=secLayers.filter(l=>shouldPlay(l.trackName));
-  if(!filteredLayers.length)return;
-  const decoded=await Promise.all(filteredLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-  const maxDur=Math.max(...decoded.map((b,i)=>b.duration+(filteredLayers[i].offsetMs||0)/1000),0.001);
+  const secLayers=layers.filter(l=>l.sectionId===secId&&shouldPlay(l.trackName));
+  if(!secLayers.length)return;
+  const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
+  const maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000),0.001);
   const ctx=getMasterCtx();const now=ctx.currentTime+0.1;
   const srcs=decoded.map((b,i)=>{
-    const l=filteredLayers[i];const s=ctx.createBufferSource();s.buffer=b;
+    const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;
     const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
     s.connect(p);p.connect(g);g.connect(ctx.destination);
     s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s;
@@ -697,7 +716,7 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+300);
 });
 
-// ── UNIFIED RECORD FLOW ──────────────────
+// ── RECORD ───────────────────────────────
 let isRecording=false;
 function enterRecord(name){
   document.getElementById('rec-section-name').textContent=name;
@@ -712,13 +731,25 @@ function enterRecord(name){
 }
 document.getElementById('rec-back').addEventListener('click',()=>{
   if(isRecording){clearInterval(recTimerInterval);stopRecording();isRecording=false}
-  stopRefSrcs();stopClick();stopMetronomeEl('metro-arm');stopWaveformLoop();showScreen('screen-home');
+  stopRefSrc();stopClick();stopMetronomeEl('metro-arm');stopWaveformLoop();showScreen('screen-home');
 });
 document.getElementById('rec-btn').addEventListener('click',async()=>{
   if(!isRecording){
     const refVal=document.getElementById('ref-select').value;
-    await startRefPlayback(refVal); // מנגן reference + קליק לפי בחירה
-    const ok=await startRecording();if(!ok){stopRefSrcs();stopClick();return}
+    // הפעל reference לפני startRecording
+    if(refVal==='click'&&projectBPM){startClick(projectBPM)}
+    else if(refVal!=='none'&&refVal!=='click'){
+      if(projectBPM)startClick(projectBPM);
+      const refLayer=getLayer(refVal,'guide');
+      if(refLayer){
+        const ctx=getMasterCtx();const buf=await getDecodedBuffer(refLayer.id,refLayer.buffer);
+        refGuideSrc=ctx.createBufferSource();refGuideSrc.buffer=buf;refGuideSrc.loop=true;
+        // FIX באג 2: gain=0.7 על reference — לא יתחרה עם הנגינה
+        const refGain=ctx.createGain();refGain.gain.value=0.7;
+        refGuideSrc.connect(refGain);refGain.connect(ctx.destination);refGuideSrc.start(ctx.currentTime);
+      }
+    }
+    const ok=await startRecording();if(!ok){stopRefSrc();stopClick();return}
     isRecording=true;
     document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('rec-timer').classList.add('recording');
@@ -728,7 +759,7 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     startWaveformLoop('rec-waveform');
   }else{
     clearInterval(recTimerInterval);await stopRecording();
-    stopRefSrcs();stopClick();isRecording=false;enterReview();
+    stopRefSrc();stopClick();isRecording=false;enterReview();
   }
 });
 
@@ -760,7 +791,8 @@ document.getElementById('btn-keep').addEventListener('click',async()=>{
   sessionFocusedSecId=secId;
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
-  renderHome();showScreen('screen-home');
+  renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}
+  showScreen('screen-home');
 });
 document.getElementById('btn-redo').addEventListener('click',()=>{stopAllSrcs();enterRecord(pendingName)});
 
@@ -794,17 +826,15 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
     const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-    sections.push(sec);layers.push(layer);arrangement.push(secId);
-    sessionFocusedSecId=secId;
+    sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
     decodedCache.delete(layerId);
     await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
-    renderHome();
-    activeTab='session';
+    renderHome();activeTab='session';
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='session'));
     document.getElementById('panel-grid').style.display='none';
     document.getElementById('panel-session').style.display='flex';
     showScreen('screen-home');
-    setTimeout(()=>renderSessionView(),100);
+    setTimeout(()=>{renderTimeline();renderSessionView()},100);
     showAIResponse('Full Take מוכן — אמור לAI: "סמן A-part מ-0:00 עד 0:32"');
   }
 });
@@ -824,21 +854,13 @@ async function enterOverdub(sectionId,trackName){
   document.getElementById('od-rec-btn').textContent='●';document.getElementById('od-rec-btn').classList.remove('recording');
   document.getElementById('od-guide-wave').style.display='none';
   isODRecording=false;
-  // נגן את כל ה-layers של הsection לפי M/S
-  const secLayers=layers.filter(l=>l.sectionId===sectionId&&shouldPlay(l.trackName));
-  if(secLayers.length){
-    const ctx=getMasterCtx();
-    const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-    const now=ctx.currentTime+0.1;
-    guideStartCtxTime=now;
-    const srcs=decoded.map((b,i)=>{
-      const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;s.loop=true;
-      const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
-      s.connect(p);p.connect(g);g.connect(ctx.destination);
-      s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);return s;
-    });
-    guideSrc=srcs[0]; // לref של offset
-    refGuideSrcs=srcs;
+  const guideLayer=getLayer(sectionId,'guide');
+  if(guideLayer){
+    const ctx=getMasterCtx();const buf=await getDecodedBuffer(guideLayer.id,guideLayer.buffer);
+    guideSrc=ctx.createBufferSource();guideSrc.buffer=buf;guideSrc.loop=true;
+    const g=ctx.createGain();g.gain.value=0.8;
+    guideSrc.connect(g);g.connect(ctx.destination);
+    guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
     document.getElementById('od-guide-wave').style.display='flex';
   }
   startMetronomeEl('od-metro-arm',projectBPM);if(projectBPM)startClick(projectBPM);
@@ -846,12 +868,12 @@ async function enterOverdub(sectionId,trackName){
 }
 document.getElementById('od-back').addEventListener('click',()=>{
   if(isODRecording){clearInterval(recTimerInterval);stopRecording(true);isODRecording=false}
-  stopRefSrcs();guideSrc=null;
+  if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
   stopClick();stopMetronomeEl('od-metro-arm');stopWaveformLoop();showScreen('screen-home');
 });
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
-    stopClick(); // עצור קליק לפני הקלטת overdub
+    stopClick(); // עצור קליק לפני הקלטה — אין bleed
     const ok=await startRecording();if(!ok){if(projectBPM)startClick(projectBPM);return}
     const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
     isODRecording=true;
@@ -863,7 +885,7 @@ document.getElementById('od-rec-btn').addEventListener('click',async()=>{
     startWaveformLoop('od-waveform');
   }else{
     clearInterval(recTimerInterval);await stopRecording(true);
-    stopRefSrcs();guideSrc=null;
+    if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
     stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
   }
 });
@@ -942,8 +964,7 @@ document.getElementById('btn-stop-playing').addEventListener('click',()=>{stopPl
 async function sendAICommand(cmd){
   if(!cmd)return;
   document.getElementById('ai-input').value='';showAIResponse('...');
-  const result=await callAI(cmd,getSessionState());
-  showAIResponse(result.message||'');
+  const result=await callAI(cmd,getSessionState());showAIResponse(result.message||'');
 }
 document.getElementById('ai-send').addEventListener('click',()=>sendAICommand(document.getElementById('ai-input').value.trim()));
 document.getElementById('ai-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendAICommand(document.getElementById('ai-input').value.trim())});
@@ -957,7 +978,7 @@ if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
   recognition.onerror=()=>document.getElementById('ai-mic-btn').classList.remove('listening');
 }
 document.getElementById('ai-mic-btn').addEventListener('click',()=>{
-  if(!recognition){showAIResponse('זיהוי קולי לא נתמך בדפדפן זה');return}
+  if(!recognition){showAIResponse('זיהוי קולי לא נתמך');return}
   document.getElementById('ai-mic-btn').classList.add('listening');recognition.start();
 });
 
