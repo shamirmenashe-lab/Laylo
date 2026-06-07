@@ -71,11 +71,15 @@
     .grid-add-btn:active{border-color:var(--teal);color:var(--teal)}
     .home-actions{padding:10px 16px;display:flex;gap:8px;flex-shrink:0}
     .home-actions .btn{flex:1;font-size:14px;padding:12px 10px}
+    /* TIMELINE */
     .timeline-wrap{overflow-x:auto;padding:10px 16px 4px;flex-shrink:0;border-bottom:1px solid var(--border)}
     .tl-track-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:54px;flex-shrink:0;text-align:right;padding-right:8px;display:flex;align-items:center;justify-content:flex-end}
-    .tl-segment{border-radius:6px;background:var(--s2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;padding:0 4px;transition:all .15s;min-width:28px;height:32px}
+    .tl-segment{border-radius:6px;position:relative;overflow:hidden;background:var(--s2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;padding:0 4px;transition:all .15s;min-width:28px;height:32px}
     .tl-segment.focused{background:var(--teal);border-color:var(--teal);color:#fff}
     .tl-segment.empty{border-style:dashed;background:none}
+    /* playhead בtimeline */
+    .tl-ph{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);opacity:.9;pointer-events:none}
+    /* SESSION DETAIL */
     .session-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
     .session-section-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -272,7 +276,7 @@
     <div class="playing-waveform" id="od-guide-wave" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="metro-wrap"><div class="metro-arm" id="od-metro-arm"><div class="metro-dot-inner"></div></div></div>
     <canvas id="od-waveform"></canvas>
-    <div id="od-instruction" style="font-size:13px;color:var(--muted)">שמע את הגייד ולחץ הקלט</div>
+    <div id="od-instruction" style="font-size:13px;color:var(--muted)">שמע את הtrack הראשון ולחץ הקלט</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="od-indicator"></div>
       <div class="rec-timer" id="od-timer">00:00</div>
@@ -328,7 +332,7 @@
 </div>
 
 <script>
-// Sprint 4 — Content-based alignment + Timeline + M/S + masterCtx click
+// Sprint 4 — getFirstLayer + timeline playhead + alignment
 
 async function callAI(prompt, sessionState) {
   try {
@@ -383,7 +387,16 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 const defaultSectionName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
 const getLayer=(sid,track)=>layers.find(l=>l.sectionId===sid&&l.trackName===track);
-const getUniqueTracks=()=>{const s=new Set(layers.map(l=>l.trackName||'guide'));return['guide',...Array.from(s).filter(n=>n!=='guide')]};
+
+// הlayer הישן ביותר בsection = reference לoverdub, ללא תלות בשם
+const getFirstLayer=sid=>layers.filter(l=>l.sectionId===sid).sort((a,b)=>a.id.localeCompare(b.id))[0];
+
+// tracks בסדר יצירה — לא לפי שם מיוחד
+const getUniqueTracks=()=>{
+  const seen=new Set();
+  return layers.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(l=>l.trackName).filter(n=>n&&!seen.has(n)&&seen.add(n));
+};
+
 const shouldPlay=t=>soloTrack?t===soloTrack:!mutedTracks.has(t);
 const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),bpm:projectBPM});
 
@@ -484,22 +497,37 @@ async function drawSessionTrackWaveform(canvasEl,layer){
 }
 
 function updatePlayhead(progress){
-  document.querySelectorAll('.playhead').forEach(ph=>{const w=ph.parentElement;if(!w)return;ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`});
+  // session waveform playheads
+  document.querySelectorAll('.playhead').forEach(ph=>{
+    const w=ph.parentElement;if(!w)return;
+    ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`;
+  });
   document.getElementById('session-time-display').textContent=fmtTime(sessionPlayDuration*progress);
+  // timeline playhead — זז על הsegment הממוקד
+  const seg=document.querySelector(`[data-focus-sec-tl="${sessionFocusedSecId}"]`);
+  if(seg){
+    let ph=seg.querySelector('.tl-ph');
+    if(!ph){ph=document.createElement('div');ph.className='tl-ph';seg.appendChild(ph)}
+    ph.style.left=Math.round(progress*seg.offsetWidth)+'px';
+  }
 }
 function startPlayheadLoop(duration){
   sessionPlayDuration=duration;sessionPlayStartCtxTime=getMasterCtx().currentTime;
   function tick(){const ctx=masterCtx;if(!ctx)return;const elapsed=ctx.currentTime-sessionPlayStartCtxTime;const progress=Math.min(elapsed/Math.max(duration,0.001),1);updatePlayhead(progress);if(progress<1)playheadLoop=setTimeout(tick,33)}
   tick();
 }
-function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0)}
+function stopPlayheadLoop(){
+  if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}
+  updatePlayhead(0);
+  // נקה timeline playhead
+  document.querySelectorAll('.tl-ph').forEach(el=>el.remove());
+}
 
 // ── CLICK — masterCtx בלבד, zero drift ──
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
 function startClick(bpm){
   stopClick();
-  const ctx=getMasterCtx();
-  const iv=60/bpm;
+  const ctx=getMasterCtx();const iv=60/bpm;
   clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
   function sched(){
     if(!clickRunning)return;
@@ -519,52 +547,23 @@ function startClick(bpm){
 function stopClick(){clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}}
 
 // ── CONTENT-BASED ALIGNMENT ─────────────
-// envelope cross-correlation — מוצא את ה-offset האמיתי בין guide ל-overdub
 async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
-  const ctx = getMasterCtx();
-  const [guideBuf, newBuf] = await Promise.all([
-    ctx.decodeAudioData(guideArrayBuf.slice()),
-    ctx.decodeAudioData(newArrayBuf.slice())
-  ]);
-  const sr = guideBuf.sampleRate;
-  const FRAME = Math.round(0.01 * sr); // 10ms frames
-
-  function envelope(audioBuf) {
-    const s = audioBuf.getChannelData(0);
-    const out = [];
-    for (let i = 0; i < s.length; i += FRAME) {
-      let sum = 0;
-      for (let j = 0; j < FRAME && i+j < s.length; j++) sum += s[i+j] ** 2;
-      out.push(Math.sqrt(sum / FRAME));
-    }
-    return out;
+  const ctx=getMasterCtx();
+  const [guideBuf,newBuf]=await Promise.all([ctx.decodeAudioData(guideArrayBuf.slice()),ctx.decodeAudioData(newArrayBuf.slice())]);
+  const sr=guideBuf.sampleRate;const FRAME=Math.round(0.01*sr);
+  function envelope(audioBuf){const s=audioBuf.getChannelData(0);const out=[];for(let i=0;i<s.length;i+=FRAME){let sum=0;for(let j=0;j<FRAME&&i+j<s.length;j++)sum+=s[i+j]**2;out.push(Math.sqrt(sum/FRAME))}return out}
+  function normalize(env){const mean=env.reduce((a,b)=>a+b,0)/(env.length||1);const std=Math.sqrt(env.reduce((a,b)=>a+(b-mean)**2,0)/(env.length||1))||1;return env.map(v=>(v-mean)/std)}
+  const gEnv=normalize(envelope(guideBuf));const nEnv=normalize(envelope(newBuf));
+  const minLag=Math.round(-2000/10);const maxLag=Math.round(500/10);
+  const compLen=Math.min(gEnv.length,nEnv.length,Math.round(10*sr/FRAME));
+  let bestLag=0,bestScore=-Infinity;
+  for(let lag=minLag;lag<=maxLag;lag++){
+    let score=0,n=0;
+    for(let i=0;i<compLen;i++){const j=i+lag;if(j>=0&&j<nEnv.length){score+=gEnv[i]*nEnv[j];n++}}
+    const norm=n>0?score/n:0;if(norm>bestScore){bestScore=norm;bestLag=lag}
   }
-  function normalize(env) {
-    const mean = env.reduce((a,b) => a+b, 0) / (env.length||1);
-    const std  = Math.sqrt(env.reduce((a,b) => a+(b-mean)**2, 0) / (env.length||1)) || 1;
-    return env.map(v => (v - mean) / std);
-  }
-
-  const gEnv = normalize(envelope(guideBuf));
-  const nEnv = normalize(envelope(newBuf));
-
-  const minLag = Math.round(-2000 / 10);  // -200 frames = -2000ms
-  const maxLag = Math.round(500  / 10);   //  +50 frames = +500ms
-  const compLen = Math.min(gEnv.length, nEnv.length, Math.round(10 * sr / FRAME));
-
-  let bestLag = 0, bestScore = -Infinity;
-  for (let lag = minLag; lag <= maxLag; lag++) {
-    let score = 0, n = 0;
-    for (let i = 0; i < compLen; i++) {
-      const j = i + lag;
-      if (j >= 0 && j < nEnv.length) { score += gEnv[i] * nEnv[j]; n++; }
-    }
-    const norm = n > 0 ? score / n : 0;
-    if (norm > bestScore) { bestScore = norm; bestLag = lag; }
-  }
-
-  const shiftMs = bestLag * 10;
-  return { correctedOffsetMs: currentOffsetMs + shiftMs, shiftMs, correlation: bestScore };
+  const shiftMs=bestLag*10;
+  return{correctedOffsetMs:currentOffsetMs+shiftMs,shiftMs,correlation:bestScore};
 }
 
 // ── TIMELINE ────────────────────────────
@@ -575,8 +574,7 @@ function renderTimeline(){
   const tracks=getUniqueTracks();
   const totalDur=arrangement.reduce((s,id)=>{const sec=sections.find(x=>x.id===id);return s+(sec?.duration||0)},0)||1;
   tracks.forEach(trackName=>{
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px';
+    const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px';
     const lbl=document.createElement('div');lbl.className='tl-track-label';lbl.textContent=trackName;row.appendChild(lbl);
     const segsWrap=document.createElement('div');segsWrap.style.cssText='display:flex;gap:2px;flex:1;height:32px';
     arrangement.forEach(secId=>{
@@ -600,8 +598,7 @@ document.addEventListener('click',e=>{
 });
 
 async function renderSessionView(){
-  const panel=document.getElementById('session-tracks');
-  panel.innerHTML='';
+  const panel=document.getElementById('session-tracks');panel.innerHTML='';
   const secId=sessionFocusedSecId||(arrangement[0]||'');
   const sec=sections.find(s=>s.id===secId);
   document.getElementById('session-section-label').textContent=sec?sec.name:'לחץ על קטע בtimeline';
@@ -665,8 +662,7 @@ function buildRefSelect(){
 function renderHome(){
   const empty=document.getElementById('empty-state');const wrap=document.getElementById('grid-wrap');const playAllBtn=document.getElementById('btn-play-all');
   if(!sections.length){empty.style.display='flex';wrap.style.display='none';playAllBtn.style.display='none';return}
-  empty.style.display='none';wrap.style.display='block';
-  playAllBtn.style.display=arrangement.length>1?'block':'none';
+  empty.style.display='none';wrap.style.display='block';playAllBtn.style.display=arrangement.length>1?'block':'none';
   const tracks=getUniqueTracks();const grid=document.getElementById('session-grid');grid.innerHTML='';
   const thead=document.createElement('thead');const hrow=document.createElement('tr');
   const thSec=document.createElement('th');thSec.className='grid-th section-col';thSec.textContent='';hrow.appendChild(thSec);
@@ -736,8 +732,7 @@ function enterRecord(name){
   buildRefSelect();
   document.getElementById('rec-instruction').textContent='בחר reference ולחץ להקלטה';
   document.getElementById('rec-timer').textContent='00:00';
-  document.getElementById('rec-timer').classList.remove('recording');
-  document.getElementById('rec-indicator').classList.remove('recording');
+  document.getElementById('rec-timer').classList.remove('recording');document.getElementById('rec-indicator').classList.remove('recording');
   document.getElementById('rec-btn').textContent='●';document.getElementById('rec-btn').classList.remove('recording');
   isRecording=false;startMetronomeEl('metro-arm',projectBPM);showScreen('screen-record');
 }
@@ -751,7 +746,8 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     if(refVal==='click'&&projectBPM){startClick(projectBPM)}
     else if(refVal!=='none'&&refVal!=='click'){
       if(projectBPM)startClick(projectBPM);
-      const refLayer=getLayer(refVal,'guide');
+      // getFirstLayer — ללא תלות בשם 'guide'
+      const refLayer=getFirstLayer(refVal);
       if(refLayer){
         const ctx=getMasterCtx();const buf=await getDecodedBuffer(refLayer.id,refLayer.buffer);
         refGuideSrc=ctx.createBufferSource();refGuideSrc.buffer=buf;refGuideSrc.loop=true;
@@ -762,8 +758,7 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     const ok=await startRecording();if(!ok){stopRefSrc();stopClick();return}
     isRecording=true;
     document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
-    document.getElementById('rec-timer').classList.add('recording');
-    document.getElementById('rec-indicator').classList.add('recording');
+    document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');
     document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
     startWaveformLoop('rec-waveform');
@@ -794,7 +789,8 @@ document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
-  const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+  // trackName = pendingName (שם הsection = שם הtrack הראשון)
+  const layer={id:layerId,sectionId:secId,trackName:pendingName,buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
@@ -828,7 +824,7 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
-    const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+    const layer={id:layerId,sectionId:secId,trackName:'Full Take',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
     sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
     decodedCache.delete(layerId);
     await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);renderHome();
@@ -846,13 +842,14 @@ async function enterOverdub(sectionId,trackName){
   const sec=sections.find(s=>s.id===sectionId);
   document.getElementById('od-section-name').textContent=sec?.name||'';document.getElementById('od-track-label').textContent=trackName;
   document.getElementById('od-bpm').textContent=projectBPM?`♩ ${projectBPM}`:'';document.getElementById('od-timer').textContent='00:00';
-  document.getElementById('od-instruction').textContent='שמע את הגייד ולחץ הקלט';
+  document.getElementById('od-instruction').textContent='שמע את הtrack הראשון ולחץ הקלט';
   document.getElementById('od-timer').classList.remove('recording');document.getElementById('od-indicator').classList.remove('recording');
   document.getElementById('od-rec-btn').textContent='●';document.getElementById('od-rec-btn').classList.remove('recording');
   document.getElementById('od-guide-wave').style.display='none';isODRecording=false;
-  const guideLayer=getLayer(sectionId,'guide');
-  if(guideLayer){
-    const ctx=getMasterCtx();const buf=await getDecodedBuffer(guideLayer.id,guideLayer.buffer);
+  // getFirstLayer — הtrack הישן ביותר, ללא תלות בשם
+  const firstLayer=getFirstLayer(sectionId);
+  if(firstLayer){
+    const ctx=getMasterCtx();const buf=await getDecodedBuffer(firstLayer.id,firstLayer.buffer);
     guideSrc=ctx.createBufferSource();guideSrc.buffer=buf;guideSrc.loop=true;
     const g=ctx.createGain();g.gain.value=0.8;guideSrc.connect(g);g.connect(ctx.destination);
     guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
@@ -867,7 +864,7 @@ document.getElementById('od-back').addEventListener('click',()=>{
 });
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
-    stopClick(); // אין bleed של קליק להקלטה
+    stopClick(); // אין bleed
     const ok=await startRecording();if(!ok){if(projectBPM)startClick(projectBPM);return}
     const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
     isODRecording=true;
@@ -907,22 +904,19 @@ document.getElementById('od-review-play-btn').addEventListener('click',async()=>
   odSrc.onended=()=>{odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
 });
 
-// ── שמור ויישר — alignment אוטומטי ──────
 document.getElementById('od-btn-keep').addEventListener('click',async()=>{
-  stopAllSrcs();
-  showAIResponse('מיישר...');
+  stopAllSrcs();showAIResponse('מיישר...');
   let finalOffsetMs=pendingODOffsetMs;
-  const guideLayer=getLayer(overdubSectionId,'guide');
-  if(guideLayer){
+  // getFirstLayer — reference ללא תלות בשם
+  const firstLayer=getFirstLayer(overdubSectionId);
+  if(firstLayer){
     try{
-      const {correctedOffsetMs,shiftMs,correlation}=await alignLayer(guideLayer.buffer,pendingODBuffer,pendingODOffsetMs);
+      const {correctedOffsetMs,shiftMs,correlation}=await alignLayer(firstLayer.buffer,pendingODBuffer,pendingODOffsetMs);
       if(correlation>=0.3){
         finalOffsetMs=correctedOffsetMs;
         const dir=shiftMs>=0?'מאוחר':'מוקדם';
-        showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${dir} (correlation: ${correlation.toFixed(2)})`);
-      }else{
-        showAIResponse(`correlation נמוך (${correlation.toFixed(2)}) — שמור ללא יישור`);
-      }
+        showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${dir} (${correlation.toFixed(2)})`);
+      }else{showAIResponse(`correlation נמוך (${correlation.toFixed(2)}) — שמור ללא יישור`)}
     }catch(e){console.warn('alignment error',e);showAIResponse('שמור ללא יישור (שגיאה)')}
   }else{showAIResponse('')}
   const layerId=uid();
