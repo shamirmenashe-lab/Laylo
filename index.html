@@ -24,8 +24,6 @@
     .btn-primary{background:var(--teal);color:#fff;font-size:16px;padding:16px 24px;width:100%}
     .btn-ghost{background:var(--s2);color:var(--text);font-size:15px;padding:14px 24px;width:100%;border:1px solid var(--border)}
     .btn-danger{background:rgba(239,68,68,.12);color:var(--red);font-size:15px;padding:14px 24px;width:100%;border:1px solid rgba(239,68,68,.2)}
-    .btn-icon{background:none;border:none;color:var(--muted);font-size:18px;padding:8px;cursor:pointer;border-radius:8px}
-    .btn-icon:active{color:var(--text)}
     .gap{gap:10px;display:flex;flex-direction:column}
     .back-btn{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px}
     .center-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px}
@@ -314,8 +312,11 @@
 
 <script>
 // ════════════════════════════════════════
-// Sprint 3 — Session View + Continuous Rec + Voice
-// TEMP: dev reset + console.logs → הסר לפני production
+// Sprint 3 bugfix — 4 תיקונים:
+// 1. sessionFocusedSecId מתעדכן בכל שמירה
+// 2. stopClick() לפני כל הקלטה — אין bleed
+// 3. now = ctx.currentTime+0.1 אחרי כל decodes — אין drift
+// 4. sess-play-btn listener אחד בלבד — אין קונפליקט
 // ════════════════════════════════════════
 
 async function callAI(prompt, sessionState) {
@@ -352,7 +353,6 @@ function openDB(){
 const dbPut=(s,v)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).put(v).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const dbGet=(s,k)=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const dbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
-const dbDelete=(s,k)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).delete(k).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const saveArrangement=o=>dbPut('meta',{key:'arrangement',order:o});
 const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return r?r.order:[]};
 
@@ -377,6 +377,7 @@ let analyserCtx=null, analyserNode=null, waveformLoop=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
 let activePlaySrcs=[], stopPlayAllFlag=false, activeCellBtn=null;
 let playheadLoop=null, sessionPlayStartCtxTime=0, sessionPlayDuration=0;
+let sessPlaying=false; // FIX 4: flag יחיד לstate של sess-play
 const decodedCache=new Map();
 
 function getMasterCtx(){
@@ -391,8 +392,14 @@ async function getDecodedBuffer(layerId,buf){
   decodedCache.set(layerId,ab);
   return ab;
 }
-function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
+function stopAllSrcs(){
+  activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});
+  activePlaySrcs=[];
+}
+
+// FIX 2: stopClick() לפני כל הקלטה — מונע bleed של קליק למיקרופון
 async function startRecording(){
+  stopClick();
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
@@ -460,15 +467,13 @@ async function drawSessionTrackWaveform(canvasEl, layer) {
     const mid=canvasEl.height/2;
     ctx.beginPath();
     for(let x=0;x<canvasEl.width;x++){
-      let max=0;
-      for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
+      let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
       const h=max*canvasEl.height*0.9;
       x===0?ctx.moveTo(x,mid-h/2):ctx.lineTo(x,mid-h/2);
     }
     ctx.stroke();ctx.beginPath();
     for(let x=0;x<canvasEl.width;x++){
-      let max=0;
-      for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
+      let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}
       const h=max*canvasEl.height*0.9;
       x===0?ctx.moveTo(x,mid+h/2):ctx.lineTo(x,mid+h/2);
     }
@@ -512,7 +517,7 @@ async function renderSessionView(){
     const layer=getLayer(secId,trackName);
     const row=document.createElement('div');row.className='session-track-row';
     const label=document.createElement('div');label.className='session-track-name';label.textContent=trackName;
-    const wrap=document.createElement('div');wrap.className='session-canvas-wrap';wrap.dataset.trackName=trackName;
+    const wrap=document.createElement('div');wrap.className='session-canvas-wrap';
     const canvas=document.createElement('canvas');canvas.className='session-waveform';
     const ph=document.createElement('div');ph.className='playhead';
     wrap.appendChild(canvas);wrap.appendChild(ph);
@@ -597,7 +602,10 @@ function renderHome(){
   arrangement.forEach(secId=>{
     const sec=sections.find(s=>s.id===secId);if(!sec)return;
     const row=document.createElement('tr');
-    const tdLabel=document.createElement('td');tdLabel.className='grid-td-label'+(sessionFocusedSecId===secId?' focused':'');tdLabel.textContent=sec.name;tdLabel.dataset.focusSec=secId;row.appendChild(tdLabel);
+    const tdLabel=document.createElement('td');
+    tdLabel.className='grid-td-label'+(sessionFocusedSecId===secId?' focused':'');
+    tdLabel.textContent=sec.name;tdLabel.dataset.focusSec=secId;
+    row.appendChild(tdLabel);
     tracks.forEach(trackName=>{
       const td=document.createElement('td');td.className='grid-td';
       const layer=getLayer(sec.id,trackName);
@@ -617,21 +625,32 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
   const playBtn=e.target.closest('[data-layer-id]');
   const addBtn=e.target.closest('[data-add-sec-id]');
 
-  if(focusBtn){sessionFocusedSecId=focusBtn.dataset.focusSec;renderHome();if(activeTab==='session')renderSessionView();return}
+  if(focusBtn){
+    sessionFocusedSecId=focusBtn.dataset.focusSec;
+    renderHome();
+    if(activeTab==='session')renderSessionView();
+    return;
+  }
 
   if(playBtn){
-    if(activeCellBtn===playBtn){stopAllSrcs();playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;return}
-    if(activeCellBtn){stopAllSrcs();activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null}
+    // FIX 4 + עצירת play קודם: תמיד עוצרים הכל לפני play חדש
+    stopAllSrcs();stopPlayheadLoop();
+    if(activeCellBtn&&activeCellBtn!==playBtn){
+      activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null;
+    }
+    if(activeCellBtn===playBtn){activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null;return}
     const layer=layers.find(l=>l.id===playBtn.dataset.layerId);if(!layer)return;
     activeCellBtn=playBtn;playBtn.classList.add('playing');playBtn.textContent='■';
     const ctx=getMasterCtx();
     const buf=await getDecodedBuffer(layer.id,layer.buffer);
+    // FIX 3: now אחרי decode
+    const now=ctx.currentTime+0.05;
     const src=ctx.createBufferSource();src.buffer=buf;
     const gain=ctx.createGain();gain.gain.value=layer.volume??1;
     const pan=ctx.createStereoPanner();pan.pan.value=layer.pan??0;
     src.connect(pan);pan.connect(gain);gain.connect(ctx.destination);
     activePlaySrcs=[src];
-    src.start(ctx.currentTime,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
+    src.start(now,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
     src.onended=()=>{playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;activePlaySrcs=[]};
     return;
   }
@@ -645,16 +664,21 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
   }
 });
 
-let sessPlaying=false;
+// FIX 4: listener יחיד — flag sessPlaying שולט על הכל
 document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('sess-play-btn');
-  if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶';return}
+  if(sessPlaying){
+    stopAllSrcs();stopPlayheadLoop();
+    sessPlaying=false;btn.textContent='▶';
+    return;
+  }
   const secId=sessionFocusedSecId;if(!secId)return;
   const secLayers=layers.filter(l=>l.sectionId===secId);if(!secLayers.length)return;
-  sessPlaying=true;btn.textContent='■';
-  const ctx=getMasterCtx();const now=ctx.currentTime;
+  // FIX 3: decode הכל קודם, אז now
   const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
   const maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000));
+  const ctx=getMasterCtx();
+  const now=ctx.currentTime+0.1; // אחרי כל ה-decodes — כל הsources מתחילים על אותו clock
   const srcs=decoded.map((b,i)=>{
     const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;
     const g=ctx.createGain();g.gain.value=l.volume??1;
@@ -663,8 +687,9 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
     s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);
     return s;
   });
-  activePlaySrcs=srcs;startPlayheadLoop(maxDur);
-  setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+200);
+  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';
+  startPlayheadLoop(maxDur);
+  setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+300);
 });
 
 let isRecording=false;
@@ -684,15 +709,18 @@ document.getElementById('rec-back').addEventListener('click',()=>{
 });
 document.getElementById('rec-btn').addEventListener('click',async()=>{
   if(!isRecording){
-    const ok=await startRecording();if(!ok)return;
+    const ok=await startRecording();if(!ok)return; // FIX 2: stopClick כבר ב-startRecording
     isRecording=true;
     document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('rec-timer').classList.add('recording');
     document.getElementById('rec-indicator').classList.add('recording');
     document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    startWaveformLoop('rec-waveform');if(projectBPM)startClick(projectBPM);
-  }else{clearInterval(recTimerInterval);await stopRecording();stopClick();isRecording=false;enterReview()}
+    startWaveformLoop('rec-waveform');
+    // קליק לא מופעל בזמן הקלטה — מניעת echo
+  }else{
+    clearInterval(recTimerInterval);await stopRecording();isRecording=false;enterReview();
+  }
 });
 
 let reviewPlaying=false;
@@ -714,13 +742,15 @@ document.getElementById('review-play-btn').addEventListener('click',async()=>{
     src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
   }
 });
+
+// FIX 1: sessionFocusedSecId=secId בכל שמירה — session תמיד מראה את הsection החדש
 document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
   const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   sections.push(sec);layers.push(layer);arrangement.push(secId);
-  if(!sessionFocusedSecId)sessionFocusedSecId=secId;
+  sessionFocusedSecId=secId; // FIX 1
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
   renderHome();showScreen('screen-home');
@@ -750,14 +780,15 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     document.getElementById('cont-indicator').classList.add('recording');
     document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    startWaveformLoop('cont-waveform');if(projectBPM)startClick(projectBPM);
+    startWaveformLoop('cont-waveform');
+    if(projectBPM)startClick(projectBPM); // קליק בהקלטה רצופה — תוך כדי שומעים דרך אוזניות
   }else{
     clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
     const layer={id:layerId,sectionId:secId,trackName:'guide',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
     sections.push(sec);layers.push(layer);arrangement.push(secId);
-    sessionFocusedSecId=secId;
+    sessionFocusedSecId=secId; // FIX 1
     decodedCache.delete(layerId);
     await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
     renderHome();
@@ -801,7 +832,7 @@ document.getElementById('od-back').addEventListener('click',()=>{
 });
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
-    const ok=await startRecording();if(!ok)return;
+    const ok=await startRecording();if(!ok)return; // FIX 2: stopClick כבר ב-startRecording
     const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
     isODRecording=true;
     document.getElementById('od-instruction').textContent='מקליט... לחץ לעצור';
@@ -816,6 +847,7 @@ document.getElementById('od-rec-btn').addEventListener('click',async()=>{
     stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
   }
 });
+
 async function enterODReview(){
   const sec=sections.find(s=>s.id===overdubSectionId);
   document.getElementById('od-review-section').textContent=sec?.name||'';
@@ -826,27 +858,31 @@ async function enterODReview(){
   document.getElementById('od-review-play-btn').textContent='▶';document.getElementById('od-review-play-btn').style.background='var(--s2)';
   showScreen('screen-od-review');
 }
+
 let odReviewPlaying=false;
 document.getElementById('od-review-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('od-review-play-btn');
   if(odReviewPlaying){stopAllSrcs();odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';return}
-  odReviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';
-  const ctx=getMasterCtx();const now=ctx.currentTime;
   const secLayers=layers.filter(l=>l.sectionId===overdubSectionId);
-  const srcs=await Promise.all(secLayers.map(async l=>{
-    const b=await getDecodedBuffer(l.id,l.buffer);
-    const s=ctx.createBufferSource();s.buffer=b;
+  // FIX 3: decode הכל קודם, אז now
+  const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
+  const odBuf=await getMasterCtx().decodeAudioData(pendingODBuffer.slice());
+  const ctx=getMasterCtx();
+  const now=ctx.currentTime+0.1; // אחרי כל ה-decodes
+  odReviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';
+  const srcs=decoded.map((b,idx)=>{
+    const l=secLayers[idx];const s=ctx.createBufferSource();s.buffer=b;
     const g=ctx.createGain();g.gain.value=l.volume??1;
     const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
     s.connect(p);p.connect(g);g.connect(ctx.destination);
     s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s;
-  }));
-  const odBuf=await ctx.decodeAudioData(pendingODBuffer.slice());
+  });
   const odSrc=ctx.createBufferSource();odSrc.buffer=odBuf;odSrc.connect(ctx.destination);
   odSrc.start(now+pendingODOffsetMs/1000);
   activePlaySrcs=[...srcs,odSrc];
   odSrc.onended=()=>{odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
 });
+
 document.getElementById('od-btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();const layerId=uid();
   const layer={id:layerId,sectionId:overdubSectionId,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:pendingODOffsetMs,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
@@ -865,9 +901,11 @@ async function playAll(){
     document.getElementById('playing-name').textContent=sec.name;
     document.getElementById('playing-counter').textContent=`${i+1} / ${arrangement.length}`;
     document.getElementById('playing-progress-fill').style.width='0%';
-    const ctx=getMasterCtx();const now=ctx.currentTime;
+    // FIX 3: decode קודם, אז now
     const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
     const maxDur=Math.max(...decoded.map((b,idx)=>b.duration+(secLayers[idx].offsetMs||0)/1000));
+    const ctx=getMasterCtx();
+    const now=ctx.currentTime+0.1;
     const srcs=decoded.map((b,idx)=>{
       const l=secLayers[idx];const s=ctx.createBufferSource();s.buffer=b;
       const g=ctx.createGain();g.gain.value=l.volume??1;
@@ -910,8 +948,7 @@ if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
 }
 document.getElementById('ai-mic-btn').addEventListener('click',()=>{
   if(!recognition){showAIResponse('זיהוי קולי לא נתמך בדפדפן זה');return}
-  document.getElementById('ai-mic-btn').classList.add('listening');
-  recognition.start();
+  document.getElementById('ai-mic-btn').classList.add('listening');recognition.start();
 });
 
 const openNameModal=()=>{const i=document.getElementById('modal-input');i.value=defaultSectionName();document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300)};
