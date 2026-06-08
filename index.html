@@ -401,7 +401,7 @@ const shouldPlay=t=>soloTrack?t===soloTrack:!mutedTracks.has(t);
 const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),bpm:projectBPM});
 
 let masterCtx=null;
-let analyserCtx=null, analyserNode=null, waveformLoop=null;
+let analyserNode=null, waveformLoop=null, micSourceNode=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
 let activePlaySrcs=[], stopPlayAllFlag=false, activeCellBtn=null;
 let playheadLoop=null, sessionPlayStartCtxTime=0, sessionPlayDuration=0;
@@ -423,16 +423,18 @@ function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});acti
 function stopRefSrc(){if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}}
 
 async function startRecording(){
-  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);recStartTime=Date.now();
-  analyserCtx=new (window.AudioContext||window.webkitAudioContext)();
-  analyserNode=analyserCtx.createAnalyser();analyserNode.fftSize=512;
-  const micSrc=analyserCtx.createMediaStreamSource(recStream);micSrc.connect(analyserNode);
+  // analyser על masterCtx — אין context שני, אין dropouts
+  const mctx=getMasterCtx();
+  analyserNode=mctx.createAnalyser();analyserNode.fftSize=512;
+  micSourceNode=mctx.createMediaStreamSource(recStream);
+  micSourceNode.connect(analyserNode);
   return true;
 }
 const stopRecording=(isOD=false)=>new Promise(res=>{
@@ -470,8 +472,9 @@ function startWaveformLoop(canvasId='rec-waveform'){
 }
 function stopWaveformLoop(){
   if(waveformLoop){clearTimeout(waveformLoop);waveformLoop=null}
-  analyserNode=null;
-  if(analyserCtx){try{analyserCtx.close()}catch(e){}analyserCtx=null}
+  if(micSourceNode){try{micSourceNode.disconnect()}catch(e){}micSourceNode=null}
+  if(analyserNode){try{analyserNode.disconnect()}catch(e){}analyserNode=null}
+  // לא סוגרים masterCtx
   ['rec-waveform','od-waveform','cont-waveform'].forEach(id=>{const c=document.getElementById(id);if(c){const ctx=c.getContext('2d');ctx.fillStyle='#162438';ctx.fillRect(0,0,c.width,c.height)}});
 }
 function startMetronomeEl(id,bpm){const a=document.getElementById(id);if(a&&bpm)a.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
@@ -525,9 +528,17 @@ function stopPlayheadLoop(){
 
 // ── CLICK — masterCtx בלבד, zero drift ──
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
+let clickGainNode=null;
 function startClick(bpm){
-  stopClick();
-  const ctx=getMasterCtx();const iv=60/bpm;
+  // עצור scheduler קיים
+  clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
+  const ctx=getMasterCtx();
+  // צור/שחזר gain node
+  if(!clickGainNode||clickGainNode.context.state==='closed'){
+    clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
+  }
+  clickGainNode.gain.setValueAtTime(1.0,ctx.currentTime);
+  const iv=60/bpm;
   clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
   function sched(){
     if(!clickRunning)return;
@@ -535,7 +546,7 @@ function startClick(bpm){
     while(clickNextTime<c.currentTime+0.3){
       const a=clickBeat%4===0;const o=c.createOscillator(),g=c.createGain();
       o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,clickNextTime);g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
-      o.connect(g);g.connect(c.destination);o.start(clickNextTime);o.stop(clickNextTime+0.05);
+      o.connect(g);g.connect(clickGainNode);o.start(clickNextTime);o.stop(clickNextTime+0.05);
       const b=clickBeat%4,t=Math.max(0,(clickNextTime-c.currentTime)*1000);
       setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
       clickNextTime+=iv;clickBeat++;
@@ -544,7 +555,15 @@ function startClick(bpm){
   }
   sched();
 }
-function stopClick(){clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}}
+function stopClick(){
+  // מיוט בלבד — phase נשמר
+  if(clickGainNode) clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime);
+}
+function killClick(){
+  // עצירה מוחלטת — רק לפני BPM wizard
+  clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
+  if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}clickGainNode=null}
+}
 
 // ── CONTENT-BASED ALIGNMENT ─────────────
 async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
@@ -640,14 +659,16 @@ document.querySelectorAll('.tab').forEach(btn=>{
 let bpmAdjFrom='welcome';
 const updateBPMDisplay=()=>document.getElementById('bpm-adj-num').textContent=currentBPM;
 document.getElementById('bpm-start').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='welcome';startClick(currentBPM);showScreen('screen-bpm-adjust')});
-document.getElementById('bpm-adj-back').addEventListener('click',()=>{stopClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
+document.getElementById('bpm-adj-back').addEventListener('click',()=>{killClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
 const adjBPM=d=>{currentBPM=Math.max(40,Math.min(220,currentBPM+d));updateBPMDisplay();startClick(currentBPM)};
 document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
 document.getElementById('bpm-p5').addEventListener('click',()=>adjBPM(5));
 document.getElementById('bpm-confirm').addEventListener('click',async()=>{stopClick();await lockBPM(currentBPM)});
-async function lockBPM(bpm){projectBPM=bpm;await dbPut('meta',{key:'project',bpm});document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;showScreen('screen-home')}
+async function lockBPM(bpm){projectBPM=bpm;await dbPut('meta',{key:'project',bpm});document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
+  startClick(bpm); // קליק גלובלי — רץ מכאן לנצח
+  showScreen('screen-home')}
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 
 function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
