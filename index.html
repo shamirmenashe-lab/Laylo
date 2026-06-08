@@ -130,7 +130,7 @@
 
 <!-- ══ BPM: ברוך הבא ══ -->
 <div id="screen-bpm-welcome" class="screen">
-  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 4</span></div>
+  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 4f</span></div>
   <div class="center-screen">
     <div style="font-size:48px">🎸</div>
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
@@ -327,7 +327,11 @@
 </div>
 
 <script>
-// Sprint 4e — Android audio routing fix: close masterCtx before getUserMedia
+// Sprint 4f — 4 fixes:
+// 1. אין startClick בתוך startRecording
+// 2. lockBPM לא מפעיל קליק אוטומטי
+// 3. btn-keep לא משנה sessionFocusedSecId
+// 4. decodedCache.clear() לפני masterCtx.close()
 
 async function callAI(prompt, sessionState) {
   try {
@@ -405,10 +409,11 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// Android audio routing fix:
-// סגור masterCtx לפני getUserMedia — context חדש יאותחל ב-communication mode
+// Fix 4: decodedCache.clear() לפני close
+// Fix 1: אין startClick כאן — קליק מופעל רק מUI מפורש
 async function startRecording(){
   if(masterCtx && masterCtx.state!=='closed'){
+    decodedCache.clear();
     await masterCtx.close();
     masterCtx=null;
     clickGainNode=null;
@@ -420,7 +425,6 @@ async function startRecording(){
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);recStartTime=Date.now();
-  if(projectBPM) startClick(projectBPM);
   return true;
 }
 const stopRecording=(isOD=false)=>new Promise(res=>{
@@ -594,10 +598,11 @@ document.getElementById('click-vol').addEventListener('input',e=>{
   if(clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
 });
 document.getElementById('bpm-confirm').addEventListener('click',async()=>{await lockBPM(currentBPM)});
+// Fix 2: lockBPM לא מפעיל קליק — קליק כבר רץ מה-BPM screen, killClick בחזרה
 async function lockBPM(bpm){
   projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
   document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
-  startClick(bpm);
+  killClick(); // קליק נעצר אחרי אישור BPM
   showScreen('screen-home');
 }
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
@@ -702,7 +707,10 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
     const refVal=document.getElementById('ref-select').value;
-    if(refVal!=='none'&&refVal!=='click'){
+    if(refVal==='click'&&projectBPM){
+      startClick(projectBPM); // קליק רק כשuser בחר אותו מפורשות
+    } else if(refVal!=='none'&&refVal!=='click'){
+      if(projectBPM) startClick(projectBPM);
       const refLayer=getFirstLayer(refVal);
       if(refLayer){
         const ctx=getMasterCtx();const buf=await getDecodedBuffer(refLayer.id,refLayer.buffer);
@@ -713,6 +721,7 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     }
   }else{
     clearInterval(recTimerInterval);await stopRecording();
+    stopClick();
     if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
     isRecording=false;enterReview();
   }
@@ -736,12 +745,14 @@ document.getElementById('review-play-btn').addEventListener('click',async()=>{
     src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
   }
 });
+// Fix 3: לא משנים sessionFocusedSecId בשמירה — focus נשאר כפי שהיה
 document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
   const layer={id:layerId,sectionId:secId,trackName:pendingName,buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-  sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
+  sections.push(sec);layers.push(layer);arrangement.push(secId);
+  // sessionFocusedSecId לא משתנה — focus נשאר על מה שהיה
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
   renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}showScreen('screen-home');
@@ -768,12 +779,14 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     document.getElementById('cont-timer').classList.add('recording');document.getElementById('cont-indicator').classList.add('recording');
     document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
+    if(projectBPM) startClick(projectBPM); // קליק מפורש להקלטה רצופה
   }else{
-    clearInterval(recTimerInterval);await stopRecording();stopMetronomeEl('cont-metro');isContRecording=false;
+    clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
     const layer={id:layerId,sectionId:secId,trackName:'Full Take',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-    sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
+    sections.push(sec);layers.push(layer);arrangement.push(secId);
+    sessionFocusedSecId=secId; // Full Take — focus מוגדר לsection החדש (הגיוני)
     decodedCache.delete(layerId);
     await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);renderHome();
     activeTab='session';
@@ -802,12 +815,14 @@ async function enterOverdub(sectionId,trackName){
     guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
     document.getElementById('od-guide-wave').style.display='flex';
   }
-  startMetronomeEl('od-metro-arm',projectBPM);showScreen('screen-overdub');
+  startMetronomeEl('od-metro-arm',projectBPM);
+  if(projectBPM) startClick(projectBPM); // קליק מפורש לoverdub
+  showScreen('screen-overdub');
 }
 document.getElementById('od-back').addEventListener('click',()=>{
   if(isODRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isODRecording=false}
   if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-  stopMetronomeEl('od-metro-arm');showScreen('screen-home');
+  stopClick();stopMetronomeEl('od-metro-arm');showScreen('screen-home');
 });
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
@@ -821,7 +836,7 @@ document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   }else{
     clearInterval(recTimerInterval);await stopRecording(true);
     if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-    stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
+    stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
   }
 });
 async function enterODReview(){
