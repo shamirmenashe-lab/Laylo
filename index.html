@@ -417,7 +417,7 @@ async function getDecodedBuffer(layerId,buf){
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
 async function startRecording(){
-  if(masterCtx && masterCtx.state!=='closed'){
+  if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
     decodedCache.clear();
     await masterCtx.close();
     masterCtx=null;
