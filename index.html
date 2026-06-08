@@ -46,7 +46,6 @@
     .metro-arm{width:3px;height:60px;background:var(--teal);border-radius:2px;transform-origin:bottom center;animation:none;position:relative}
     .metro-dot-inner{width:10px;height:10px;border-radius:50%;background:var(--teal2);position:absolute;top:-5px;left:-3.5px}
     @keyframes metro-swing{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
-    #rec-waveform,#od-waveform,#cont-waveform{width:100%;max-width:340px;height:72px;border-radius:10px;background:var(--s2);display:block}
     .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
     .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;padding:0 16px}
     .tab{flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid transparent;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
@@ -219,9 +218,7 @@
     <div id="rec-section-name" style="font-size:22px;font-weight:900"></div>
     <div class="rec-bpm-label" id="rec-bpm">♩ —</div>
     <div class="metro-wrap"><div class="metro-arm" id="metro-arm"><div class="metro-dot-inner"></div></div></div>
-    <select id="ref-select" class="ref-select">
-      <option value="click">♩ קליק בלבד</option>
-    </select>
+    <select id="ref-select" class="ref-select"><option value="click">♩ קליק בלבד</option></select>
     <div id="rec-instruction" style="font-size:13px;color:var(--muted)">בחר reference ולחץ להקלטה</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="rec-indicator"></div>
@@ -330,7 +327,7 @@
 </div>
 
 <script>
-// Sprint 4 — clean recording (no analyser) + global click + click volume
+// Sprint 4e — Android audio routing fix: close masterCtx before getUserMedia
 
 async function callAI(prompt, sessionState) {
   try {
@@ -408,9 +405,14 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// ── RECORDING — MediaRecorder בלבד, ללא analyser ──
-// הסרת createMediaStreamSource מונעת audio routing conflict על Android
+// Android audio routing fix:
+// סגור masterCtx לפני getUserMedia — context חדש יאותחל ב-communication mode
 async function startRecording(){
+  if(masterCtx && masterCtx.state!=='closed'){
+    await masterCtx.close();
+    masterCtx=null;
+    clickGainNode=null;
+  }
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
@@ -418,6 +420,7 @@ async function startRecording(){
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);recStartTime=Date.now();
+  if(projectBPM) startClick(projectBPM);
   return true;
 }
 const stopRecording=(isOD=false)=>new Promise(res=>{
@@ -462,14 +465,11 @@ function startPlayheadLoop(duration){
 }
 function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0);document.querySelectorAll('.tl-ph').forEach(el=>el.remove())}
 
-// ── CLICK — global, phase נשמר ──
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
 let clickGainNode=null, clickVolume=0.7;
-
 function startClick(bpm){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   const ctx=getMasterCtx();
-  // check מדויק: context חדש = gain node חדש
   if(!clickGainNode||clickGainNode.context!==ctx){
     if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}}
     clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
@@ -490,17 +490,12 @@ function startClick(bpm){
   }
   sched();
 }
-function stopClick(){
-  // מיוט בלבד — phase נשמר
-  if(clickGainNode) clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime);
-}
+function stopClick(){if(clickGainNode) clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
 function killClick(){
-  // עצירה מוחלטת — רק לפני BPM wizard
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}clickGainNode=null}
 }
 
-// ── CONTENT-BASED ALIGNMENT ─────────────
 async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   const ctx=getMasterCtx();
   const [guideBuf,newBuf]=await Promise.all([ctx.decodeAudioData(guideArrayBuf.slice()),ctx.decodeAudioData(newArrayBuf.slice())]);
@@ -512,14 +507,12 @@ async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   const compLen=Math.min(gEnv.length,nEnv.length,Math.round(10*sr/FRAME));
   let bestLag=0,bestScore=-Infinity;
   for(let lag=minLag;lag<=maxLag;lag++){
-    let score=0,n=0;
-    for(let i=0;i<compLen;i++){const j=i+lag;if(j>=0&&j<nEnv.length){score+=gEnv[i]*nEnv[j];n++}}
+    let score=0,n=0;for(let i=0;i<compLen;i++){const j=i+lag;if(j>=0&&j<nEnv.length){score+=gEnv[i]*nEnv[j];n++}}
     const norm=n>0?score/n:0;if(norm>bestScore){bestScore=norm;bestLag=lag}
   }
   return{correctedOffsetMs:currentOffsetMs+bestLag*10,shiftMs:bestLag*10,correlation:bestScore};
 }
 
-// ── TIMELINE ────────────────────────────
 function renderTimeline(){
   const container=document.getElementById('timeline-rows');
   if(!container||!arrangement.length){if(container)container.innerHTML='';return}
@@ -604,7 +597,7 @@ document.getElementById('bpm-confirm').addEventListener('click',async()=>{await 
 async function lockBPM(bpm){
   projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
   document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
-  startClick(bpm); // קליק גלובלי — רץ מכאן לנצח
+  startClick(bpm);
   showScreen('screen-home');
 }
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
@@ -657,10 +650,10 @@ document.getElementById('session-grid').addEventListener('click',async e=>{
     if(activeCellBtn===playBtn){activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null;return}
     const layer=layers.find(l=>l.id===playBtn.dataset.layerId);if(!layer)return;
     activeCellBtn=playBtn;playBtn.classList.add('playing');playBtn.textContent='■';
-    const ctx=getMasterCtx();const buf=await getDecodedBuffer(layer.id,layer.buffer);const now=ctx.currentTime+0.05;
+    const ctx=getMasterCtx();const buf=await getDecodedBuffer(layer.id,layer.buffer);
     const src=ctx.createBufferSource();src.buffer=buf;const gain=ctx.createGain();gain.gain.value=layer.volume??1;const pan=ctx.createStereoPanner();pan.pan.value=layer.pan??0;
     src.connect(pan);pan.connect(gain);gain.connect(ctx.destination);activePlaySrcs=[src];
-    src.start(now,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
+    src.start(ctx.currentTime+0.05,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
     src.onended=()=>{playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;activePlaySrcs=[]};return;
   }
   if(addBtn){
@@ -684,7 +677,6 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+300);
 });
 
-// ── RECORD ───────────────────────────────
 let isRecording=false;
 function enterRecord(name){
   document.getElementById('rec-section-name').textContent=name;
@@ -709,7 +701,6 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');
     document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    // הפעל reference — קליק כבר רץ גלובלי
     const refVal=document.getElementById('ref-select').value;
     if(refVal!=='none'&&refVal!=='click'){
       const refLayer=getFirstLayer(refVal);
@@ -777,7 +768,6 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     document.getElementById('cont-timer').classList.add('recording');document.getElementById('cont-indicator').classList.add('recording');
     document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    // קליק כבר רץ גלובלי
   }else{
     clearInterval(recTimerInterval);await stopRecording();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
@@ -813,7 +803,6 @@ async function enterOverdub(sectionId,trackName){
     document.getElementById('od-guide-wave').style.display='flex';
   }
   startMetronomeEl('od-metro-arm',projectBPM);showScreen('screen-overdub');
-  // קליק כבר רץ גלובלי
 }
 document.getElementById('od-back').addEventListener('click',()=>{
   if(isODRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isODRecording=false}
