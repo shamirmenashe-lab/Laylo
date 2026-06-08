@@ -71,15 +71,12 @@
     .grid-add-btn:active{border-color:var(--teal);color:var(--teal)}
     .home-actions{padding:10px 16px;display:flex;gap:8px;flex-shrink:0}
     .home-actions .btn{flex:1;font-size:14px;padding:12px 10px}
-    /* TIMELINE */
     .timeline-wrap{overflow-x:auto;padding:10px 16px 4px;flex-shrink:0;border-bottom:1px solid var(--border)}
     .tl-track-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:54px;flex-shrink:0;text-align:right;padding-right:8px;display:flex;align-items:center;justify-content:flex-end}
     .tl-segment{border-radius:6px;position:relative;overflow:hidden;background:var(--s2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;padding:0 4px;transition:all .15s;min-width:28px;height:32px}
     .tl-segment.focused{background:var(--teal);border-color:var(--teal);color:#fff}
     .tl-segment.empty{border-style:dashed;background:none}
-    /* playhead בtimeline */
     .tl-ph{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);opacity:.9;pointer-events:none}
-    /* SESSION DETAIL */
     .session-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
     .session-section-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -157,6 +154,10 @@
       <button class="adj-btn" id="bpm-p5">+5</button>
     </div>
     <div class="sub">כוון עד שהקליק מרגיש נכון</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <span style="font-size:16px">🔔</span>
+      <input type="range" id="click-vol" min="0" max="100" value="70" style="flex:1;max-width:200px;accent-color:var(--teal)">
+    </div>
   </div>
   <div class="bottom-bar"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
 </div>
@@ -218,7 +219,6 @@
     <div id="rec-section-name" style="font-size:22px;font-weight:900"></div>
     <div class="rec-bpm-label" id="rec-bpm">♩ —</div>
     <div class="metro-wrap"><div class="metro-arm" id="metro-arm"><div class="metro-dot-inner"></div></div></div>
-    <canvas id="rec-waveform"></canvas>
     <select id="ref-select" class="ref-select">
       <option value="click">♩ קליק בלבד</option>
     </select>
@@ -255,7 +255,6 @@
     <div class="rec-bpm-label" id="cont-bpm">♩ —</div>
     <div class="sub">הקלט את כל השיר מהתחלה עד הסוף.<br>אחר כך תסמן sections בSession view.</div>
     <div class="metro-wrap"><div class="metro-arm" id="cont-metro"><div class="metro-dot-inner"></div></div></div>
-    <canvas id="cont-waveform"></canvas>
     <div id="cont-instruction" style="font-size:13px;color:var(--muted)">לחץ להתחיל</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="cont-indicator"></div>
@@ -275,7 +274,6 @@
     <div class="rec-bpm-label" id="od-bpm">♩ —</div>
     <div class="playing-waveform" id="od-guide-wave" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="metro-wrap"><div class="metro-arm" id="od-metro-arm"><div class="metro-dot-inner"></div></div></div>
-    <canvas id="od-waveform"></canvas>
     <div id="od-instruction" style="font-size:13px;color:var(--muted)">שמע את הtrack הראשון ולחץ הקלט</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="rec-indicator" id="od-indicator"></div>
@@ -332,7 +330,7 @@
 </div>
 
 <script>
-// Sprint 4 — getFirstLayer + timeline playhead + alignment
+// Sprint 4 — clean recording (no analyser) + global click + click volume
 
 async function callAI(prompt, sessionState) {
   try {
@@ -387,21 +385,12 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 const defaultSectionName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
 const getLayer=(sid,track)=>layers.find(l=>l.sectionId===sid&&l.trackName===track);
-
-// הlayer הישן ביותר בsection = reference לoverdub, ללא תלות בשם
 const getFirstLayer=sid=>layers.filter(l=>l.sectionId===sid).sort((a,b)=>a.id.localeCompare(b.id))[0];
-
-// tracks בסדר יצירה — לא לפי שם מיוחד
-const getUniqueTracks=()=>{
-  const seen=new Set();
-  return layers.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(l=>l.trackName).filter(n=>n&&!seen.has(n)&&seen.add(n));
-};
-
+const getUniqueTracks=()=>{const seen=new Set();return layers.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(l=>l.trackName).filter(n=>n&&!seen.has(n)&&seen.add(n))};
 const shouldPlay=t=>soloTrack?t===soloTrack:!mutedTracks.has(t);
 const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),bpm:projectBPM});
 
 let masterCtx=null;
-let analyserNode=null, waveformLoop=null, micSourceNode=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
 let activePlaySrcs=[], stopPlayAllFlag=false, activeCellBtn=null;
 let playheadLoop=null, sessionPlayStartCtxTime=0, sessionPlayDuration=0;
@@ -414,14 +403,13 @@ function getMasterCtx(){
 }
 async function getDecodedBuffer(layerId,buf){
   if(decodedCache.has(layerId)) return decodedCache.get(layerId);
-  const ctx=getMasterCtx();
-  const ab=await ctx.decodeAudioData(buf.slice());
-  decodedCache.set(layerId,ab);
-  return ab;
+  const ctx=getMasterCtx();const ab=await ctx.decodeAudioData(buf.slice());
+  decodedCache.set(layerId,ab);return ab;
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
-function stopRefSrc(){if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}}
 
+// ── RECORDING — MediaRecorder בלבד, ללא analyser ──
+// הסרת createMediaStreamSource מונעת audio routing conflict על Android
 async function startRecording(){
   try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
@@ -430,11 +418,6 @@ async function startRecording(){
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);recStartTime=Date.now();
-  // analyser על masterCtx — אין context שני, אין dropouts
-  const mctx=getMasterCtx();
-  analyserNode=mctx.createAnalyser();analyserNode.fftSize=512;
-  micSourceNode=mctx.createMediaStreamSource(recStream);
-  micSourceNode.connect(analyserNode);
   return true;
 }
 const stopRecording=(isOD=false)=>new Promise(res=>{
@@ -444,39 +427,11 @@ const stopRecording=(isOD=false)=>new Promise(res=>{
     const buf=await blob.arrayBuffer();
     if(isOD){pendingODBuffer=buf;pendingODMime=mediaRecorder.mimeType;pendingODDuration=dur}
     else{pendingBuffer=buf;pendingMime=mediaRecorder.mimeType;pendingDuration=dur}
-    recStream.getTracks().forEach(t=>t.stop());
-    stopWaveformLoop();res();
+    recStream.getTracks().forEach(t=>t.stop());res();
   };
   mediaRecorder.stop();
 });
 
-function startWaveformLoop(canvasId='rec-waveform'){
-  setTimeout(()=>{
-    const canvas=document.getElementById(canvasId);
-    if(!canvas||!analyserNode)return;
-    canvas.width=canvas.offsetWidth||340;canvas.height=72;
-    const ctx=canvas.getContext('2d');
-    const buf=new Uint8Array(analyserNode.frequencyBinCount);
-    function draw(){
-      if(!analyserNode){ctx.clearRect(0,0,canvas.width,canvas.height);return}
-      waveformLoop=setTimeout(draw,33);
-      analyserNode.getByteTimeDomainData(buf);
-      ctx.fillStyle='#162438';ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.lineWidth=2;ctx.strokeStyle='#0d9488';ctx.beginPath();
-      const sw=canvas.width/buf.length;let x=0;
-      for(let i=0;i<buf.length;i++){const y=(buf[i]/128)*canvas.height/2;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);x+=sw}
-      ctx.lineTo(canvas.width,canvas.height/2);ctx.stroke();
-    }
-    draw();
-  },50);
-}
-function stopWaveformLoop(){
-  if(waveformLoop){clearTimeout(waveformLoop);waveformLoop=null}
-  if(micSourceNode){try{micSourceNode.disconnect()}catch(e){}micSourceNode=null}
-  if(analyserNode){try{analyserNode.disconnect()}catch(e){}analyserNode=null}
-  // לא סוגרים masterCtx
-  ['rec-waveform','od-waveform','cont-waveform'].forEach(id=>{const c=document.getElementById(id);if(c){const ctx=c.getContext('2d');ctx.fillStyle='#162438';ctx.fillRect(0,0,c.width,c.height)}});
-}
 function startMetronomeEl(id,bpm){const a=document.getElementById(id);if(a&&bpm)a.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
 function stopMetronomeEl(id){const a=document.getElementById(id);if(a)a.style.animation='none'}
 
@@ -487,62 +442,42 @@ async function drawSessionTrackWaveform(canvasEl,layer){
   ctx.fillStyle='#162438';ctx.fillRect(0,0,canvasEl.width,canvasEl.height);
   try{
     const audioBuf=await getDecodedBuffer(layer.id,layer.buffer);
-    const pcm=audioBuf.getChannelData(0);
-    const step=Math.ceil(pcm.length/canvasEl.width);
-    ctx.strokeStyle='#0d9488';ctx.lineWidth=1.5;
-    const mid=canvasEl.height/2;
-    ctx.beginPath();
-    for(let x=0;x<canvasEl.width;x++){let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}const h=max*canvasEl.height*0.9;x===0?ctx.moveTo(x,mid-h/2):ctx.lineTo(x,mid-h/2)}
-    ctx.stroke();ctx.beginPath();
-    for(let x=0;x<canvasEl.width;x++){let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}const h=max*canvasEl.height*0.9;x===0?ctx.moveTo(x,mid+h/2):ctx.lineTo(x,mid+h/2)}
-    ctx.stroke();
+    const pcm=audioBuf.getChannelData(0);const step=Math.ceil(pcm.length/canvasEl.width);
+    ctx.strokeStyle='#0d9488';ctx.lineWidth=1.5;const mid=canvasEl.height/2;
+    ctx.beginPath();for(let x=0;x<canvasEl.width;x++){let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}const h=max*canvasEl.height*0.9;x===0?ctx.moveTo(x,mid-h/2):ctx.lineTo(x,mid-h/2)}ctx.stroke();
+    ctx.beginPath();for(let x=0;x<canvasEl.width;x++){let max=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[x*step+j]||0);if(v>max)max=v}const h=max*canvasEl.height*0.9;x===0?ctx.moveTo(x,mid+h/2):ctx.lineTo(x,mid+h/2)}ctx.stroke();
   }catch(e){console.warn('waveform draw error',e)}
 }
 
 function updatePlayhead(progress){
-  // session waveform playheads
-  document.querySelectorAll('.playhead').forEach(ph=>{
-    const w=ph.parentElement;if(!w)return;
-    ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`;
-  });
+  document.querySelectorAll('.playhead').forEach(ph=>{const w=ph.parentElement;if(!w)return;ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`});
   document.getElementById('session-time-display').textContent=fmtTime(sessionPlayDuration*progress);
-  // timeline playhead — זז על הsegment הממוקד
   const seg=document.querySelector(`[data-focus-sec-tl="${sessionFocusedSecId}"]`);
-  if(seg){
-    let ph=seg.querySelector('.tl-ph');
-    if(!ph){ph=document.createElement('div');ph.className='tl-ph';seg.appendChild(ph)}
-    ph.style.left=Math.round(progress*seg.offsetWidth)+'px';
-  }
+  if(seg){let ph=seg.querySelector('.tl-ph');if(!ph){ph=document.createElement('div');ph.className='tl-ph';seg.appendChild(ph)}ph.style.left=Math.round(progress*seg.offsetWidth)+'px'}
 }
 function startPlayheadLoop(duration){
   sessionPlayDuration=duration;sessionPlayStartCtxTime=getMasterCtx().currentTime;
   function tick(){const ctx=masterCtx;if(!ctx)return;const elapsed=ctx.currentTime-sessionPlayStartCtxTime;const progress=Math.min(elapsed/Math.max(duration,0.001),1);updatePlayhead(progress);if(progress<1)playheadLoop=setTimeout(tick,33)}
   tick();
 }
-function stopPlayheadLoop(){
-  if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}
-  updatePlayhead(0);
-  // נקה timeline playhead
-  document.querySelectorAll('.tl-ph').forEach(el=>el.remove());
-}
+function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0);document.querySelectorAll('.tl-ph').forEach(el=>el.remove())}
 
-// ── CLICK — masterCtx בלבד, zero drift ──
+// ── CLICK — global, phase נשמר ──
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
-let clickGainNode=null;
+let clickGainNode=null, clickVolume=0.7;
+
 function startClick(bpm){
-  // עצור scheduler קיים
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   const ctx=getMasterCtx();
-  // צור/שחזר gain node
-  if(!clickGainNode||clickGainNode.context.state==='closed'){
+  // check מדויק: context חדש = gain node חדש
+  if(!clickGainNode||clickGainNode.context!==ctx){
+    if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}}
     clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
   }
-  clickGainNode.gain.setValueAtTime(1.0,ctx.currentTime);
-  const iv=60/bpm;
-  clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
+  clickGainNode.gain.setValueAtTime(clickVolume,ctx.currentTime);
+  const iv=60/bpm;clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
   function sched(){
-    if(!clickRunning)return;
-    const c=getMasterCtx();
+    if(!clickRunning)return;const c=getMasterCtx();
     while(clickNextTime<c.currentTime+0.3){
       const a=clickBeat%4===0;const o=c.createOscillator(),g=c.createGain();
       o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,clickNextTime);g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
@@ -570,7 +505,7 @@ async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   const ctx=getMasterCtx();
   const [guideBuf,newBuf]=await Promise.all([ctx.decodeAudioData(guideArrayBuf.slice()),ctx.decodeAudioData(newArrayBuf.slice())]);
   const sr=guideBuf.sampleRate;const FRAME=Math.round(0.01*sr);
-  function envelope(audioBuf){const s=audioBuf.getChannelData(0);const out=[];for(let i=0;i<s.length;i+=FRAME){let sum=0;for(let j=0;j<FRAME&&i+j<s.length;j++)sum+=s[i+j]**2;out.push(Math.sqrt(sum/FRAME))}return out}
+  function envelope(ab){const s=ab.getChannelData(0);const out=[];for(let i=0;i<s.length;i+=FRAME){let sum=0;for(let j=0;j<FRAME&&i+j<s.length;j++)sum+=s[i+j]**2;out.push(Math.sqrt(sum/FRAME))}return out}
   function normalize(env){const mean=env.reduce((a,b)=>a+b,0)/(env.length||1);const std=Math.sqrt(env.reduce((a,b)=>a+(b-mean)**2,0)/(env.length||1))||1;return env.map(v=>(v-mean)/std)}
   const gEnv=normalize(envelope(guideBuf));const nEnv=normalize(envelope(newBuf));
   const minLag=Math.round(-2000/10);const maxLag=Math.round(500/10);
@@ -581,8 +516,7 @@ async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
     for(let i=0;i<compLen;i++){const j=i+lag;if(j>=0&&j<nEnv.length){score+=gEnv[i]*nEnv[j];n++}}
     const norm=n>0?score/n:0;if(norm>bestScore){bestScore=norm;bestLag=lag}
   }
-  const shiftMs=bestLag*10;
-  return{correctedOffsetMs:currentOffsetMs+shiftMs,shiftMs,correlation:bestScore};
+  return{correctedOffsetMs:currentOffsetMs+bestLag*10,shiftMs:bestLag*10,correlation:bestScore};
 }
 
 // ── TIMELINE ────────────────────────────
@@ -598,14 +532,11 @@ function renderTimeline(){
     const segsWrap=document.createElement('div');segsWrap.style.cssText='display:flex;gap:2px;flex:1;height:32px';
     arrangement.forEach(secId=>{
       const sec=sections.find(s=>s.id===secId);if(!sec)return;
-      const layer=getLayer(secId,trackName);
-      const pct=Math.max(5,(sec.duration/totalDur)*100);
+      const layer=getLayer(secId,trackName);const pct=Math.max(5,(sec.duration/totalDur)*100);
       const seg=document.createElement('div');
       seg.className='tl-segment'+(layer?'':' empty')+(sessionFocusedSecId===secId?' focused':'');
-      seg.style.cssText=`width:${pct}%;flex-shrink:0`;
-      seg.textContent=layer?sec.name:'';
-      seg.dataset.focusSecTl=secId;
-      segsWrap.appendChild(seg);
+      seg.style.cssText=`width:${pct}%;flex-shrink:0`;seg.textContent=layer?sec.name:'';
+      seg.dataset.focusSecTl=secId;segsWrap.appendChild(seg);
     });
     row.appendChild(segsWrap);container.appendChild(row);
   });
@@ -640,7 +571,7 @@ async function renderSessionView(){
     if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
     mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSessionView()});
     sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSessionView()});
-    wrap.addEventListener('click',e=>{const rect=wrap.getBoundingClientRect();showAIResponse(`סמן: ${fmtTime((sec.duration||0)*(e.clientX-rect.left)/rect.width)} — אמור לAI מה לעשות כאן`)});
+    wrap.addEventListener('click',e=>{const rect=wrap.getBoundingClientRect();showAIResponse(`סמן: ${fmtTime((sec.duration||0)*(e.clientX-rect.left)/rect.width)} — אמור לAI מה לעשות`)});
   }
 }
 
@@ -665,10 +596,17 @@ document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
 document.getElementById('bpm-p5').addEventListener('click',()=>adjBPM(5));
-document.getElementById('bpm-confirm').addEventListener('click',async()=>{stopClick();await lockBPM(currentBPM)});
-async function lockBPM(bpm){projectBPM=bpm;await dbPut('meta',{key:'project',bpm});document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
+document.getElementById('click-vol').addEventListener('input',e=>{
+  clickVolume=e.target.value/100;
+  if(clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
+});
+document.getElementById('bpm-confirm').addEventListener('click',async()=>{await lockBPM(currentBPM)});
+async function lockBPM(bpm){
+  projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
+  document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
   startClick(bpm); // קליק גלובלי — רץ מכאן לנצח
-  showScreen('screen-home')}
+  showScreen('screen-home');
+}
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 
 function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
@@ -746,6 +684,7 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+300);
 });
 
+// ── RECORD ───────────────────────────────
 let isRecording=false;
 function enterRecord(name){
   document.getElementById('rec-section-name').textContent=name;
@@ -758,16 +697,21 @@ function enterRecord(name){
   isRecording=false;startMetronomeEl('metro-arm',projectBPM);showScreen('screen-record');
 }
 document.getElementById('rec-back').addEventListener('click',()=>{
-  if(isRecording){clearInterval(recTimerInterval);stopRecording();isRecording=false}
-  stopRefSrc();stopClick();stopMetronomeEl('metro-arm');stopWaveformLoop();showScreen('screen-home');
+  if(isRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isRecording=false}
+  if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
+  stopMetronomeEl('metro-arm');showScreen('screen-home');
 });
 document.getElementById('rec-btn').addEventListener('click',async()=>{
   if(!isRecording){
+    const ok=await startRecording();if(!ok)return;
+    isRecording=true;
+    document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
+    document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');
+    document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
+    recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
+    // הפעל reference — קליק כבר רץ גלובלי
     const refVal=document.getElementById('ref-select').value;
-    if(refVal==='click'&&projectBPM){startClick(projectBPM)}
-    else if(refVal!=='none'&&refVal!=='click'){
-      if(projectBPM)startClick(projectBPM);
-      // getFirstLayer — ללא תלות בשם 'guide'
+    if(refVal!=='none'&&refVal!=='click'){
       const refLayer=getFirstLayer(refVal);
       if(refLayer){
         const ctx=getMasterCtx();const buf=await getDecodedBuffer(refLayer.id,refLayer.buffer);
@@ -776,15 +720,10 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
         refGuideSrc.connect(refGain);refGain.connect(ctx.destination);refGuideSrc.start(ctx.currentTime);
       }
     }
-    const ok=await startRecording();if(!ok){stopRefSrc();stopClick();return}
-    isRecording=true;
-    document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
-    document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');
-    document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
-    recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    startWaveformLoop('rec-waveform');
   }else{
-    clearInterval(recTimerInterval);await stopRecording();stopRefSrc();stopClick();isRecording=false;enterReview();
+    clearInterval(recTimerInterval);await stopRecording();
+    if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
+    isRecording=false;enterReview();
   }
 });
 
@@ -810,7 +749,6 @@ document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
-  // trackName = pendingName (שם הsection = שם הtrack הראשון)
   const layer={id:layerId,sectionId:secId,trackName:pendingName,buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   sections.push(sec);layers.push(layer);arrangement.push(secId);sessionFocusedSecId=secId;
   decodedCache.delete(layerId);
@@ -828,21 +766,20 @@ document.getElementById('btn-cont-rec').addEventListener('click',()=>{
   isContRecording=false;startMetronomeEl('cont-metro',projectBPM);showScreen('screen-cont-rec');
 });
 document.getElementById('cont-back').addEventListener('click',()=>{
-  if(isContRecording){clearInterval(recTimerInterval);stopRecording();isContRecording=false}
-  stopClick();stopMetronomeEl('cont-metro');stopWaveformLoop();showScreen('screen-home');
+  if(isContRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isContRecording=false}
+  stopMetronomeEl('cont-metro');showScreen('screen-home');
 });
 document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
   if(!isContRecording){
-    if(projectBPM)startClick(projectBPM);
-    const ok=await startRecording();if(!ok){stopClick();return}
+    const ok=await startRecording();if(!ok)return;
     isContRecording=true;
     document.getElementById('cont-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('cont-timer').classList.add('recording');document.getElementById('cont-indicator').classList.add('recording');
     document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    startWaveformLoop('cont-waveform');
+    // קליק כבר רץ גלובלי
   }else{
-    clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
+    clearInterval(recTimerInterval);await stopRecording();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
     const layer={id:layerId,sectionId:secId,trackName:'Full Take',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
@@ -867,7 +804,6 @@ async function enterOverdub(sectionId,trackName){
   document.getElementById('od-timer').classList.remove('recording');document.getElementById('od-indicator').classList.remove('recording');
   document.getElementById('od-rec-btn').textContent='●';document.getElementById('od-rec-btn').classList.remove('recording');
   document.getElementById('od-guide-wave').style.display='none';isODRecording=false;
-  // getFirstLayer — הtrack הישן ביותר, ללא תלות בשם
   const firstLayer=getFirstLayer(sectionId);
   if(firstLayer){
     const ctx=getMasterCtx();const buf=await getDecodedBuffer(firstLayer.id,firstLayer.buffer);
@@ -876,28 +812,27 @@ async function enterOverdub(sectionId,trackName){
     guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
     document.getElementById('od-guide-wave').style.display='flex';
   }
-  startMetronomeEl('od-metro-arm',projectBPM);if(projectBPM)startClick(projectBPM);showScreen('screen-overdub');
+  startMetronomeEl('od-metro-arm',projectBPM);showScreen('screen-overdub');
+  // קליק כבר רץ גלובלי
 }
 document.getElementById('od-back').addEventListener('click',()=>{
-  if(isODRecording){clearInterval(recTimerInterval);stopRecording(true);isODRecording=false}
+  if(isODRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isODRecording=false}
   if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-  stopClick();stopMetronomeEl('od-metro-arm');stopWaveformLoop();showScreen('screen-home');
+  stopMetronomeEl('od-metro-arm');showScreen('screen-home');
 });
 document.getElementById('od-rec-btn').addEventListener('click',async()=>{
   if(!isODRecording){
-    stopClick(); // אין bleed
-    const ok=await startRecording();if(!ok){if(projectBPM)startClick(projectBPM);return}
+    const ok=await startRecording();if(!ok)return;
     const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
     isODRecording=true;
     document.getElementById('od-instruction').textContent='מקליט... לחץ לעצור';
     document.getElementById('od-timer').classList.add('recording');document.getElementById('od-indicator').classList.add('recording');
     document.getElementById('od-rec-btn').textContent='■';document.getElementById('od-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('od-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    startWaveformLoop('od-waveform');
   }else{
     clearInterval(recTimerInterval);await stopRecording(true);
     if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-    stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
+    stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
   }
 });
 async function enterODReview(){
@@ -928,15 +863,13 @@ document.getElementById('od-review-play-btn').addEventListener('click',async()=>
 document.getElementById('od-btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();showAIResponse('מיישר...');
   let finalOffsetMs=pendingODOffsetMs;
-  // getFirstLayer — reference ללא תלות בשם
   const firstLayer=getFirstLayer(overdubSectionId);
   if(firstLayer){
     try{
       const {correctedOffsetMs,shiftMs,correlation}=await alignLayer(firstLayer.buffer,pendingODBuffer,pendingODOffsetMs);
       if(correlation>=0.3){
         finalOffsetMs=correctedOffsetMs;
-        const dir=shiftMs>=0?'מאוחר':'מוקדם';
-        showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${dir} (${correlation.toFixed(2)})`);
+        showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${shiftMs>=0?'מאוחר':'מוקדם'} (${correlation.toFixed(2)})`);
       }else{showAIResponse(`correlation נמוך (${correlation.toFixed(2)}) — שמור ללא יישור`)}
     }catch(e){console.warn('alignment error',e);showAIResponse('שמור ללא יישור (שגיאה)')}
   }else{showAIResponse('')}
