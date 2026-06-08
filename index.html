@@ -17,7 +17,7 @@
     .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;flex-shrink:0}
     .logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
     .badge{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 7px;border-radius:20px}
-    .bpm-chip{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px}
+    .bpm-chip{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px;cursor:pointer}
     .btn{border:none;border-radius:var(--r);font-family:'Heebo',sans-serif;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;user-select:none}
     .btn:active{opacity:.75;transform:scale(.97)}
     .btn-primary{background:var(--teal);color:#fff;font-size:16px;padding:16px 24px;width:100%}
@@ -47,6 +47,9 @@
     .metro-dot-inner{width:10px;height:10px;border-radius:50%;background:var(--teal2);position:absolute;top:-5px;left:-3.5px}
     @keyframes metro-swing{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
     .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
+    /* click-toggle btn in topbar */
+    .click-toggle-btn{background:none;border:1px solid var(--border);border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);padding:3px 8px;cursor:pointer;transition:all .15s}
+    .click-toggle-btn.on{border-color:var(--teal);color:var(--teal2);background:rgba(13,148,136,.1)}
     .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;padding:0 16px}
     .tab{flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid transparent;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
     .tab.active{color:var(--teal2);border-bottom-color:var(--teal)}
@@ -119,7 +122,8 @@
     .modal-sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:24px 20px;width:100%;transform:translateY(100%);transition:transform .25s ease-out;padding-bottom:max(24px,env(safe-area-inset-bottom))}
     .modal-overlay.open .modal-sheet{transform:translateY(0)}
     .modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
-    .modal-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:16px;outline:none}
+    .modal-label{font-size:12px;color:var(--muted);margin-bottom:4px;font-family:'IBM Plex Mono',monospace}
+    .modal-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:12px;outline:none}
     .modal-input:focus{border-color:var(--teal)}
     .ref-select{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Heebo',sans-serif;font-size:13px;direction:rtl;width:100%;max-width:260px;outline:none}
     .ref-select:focus{border-color:var(--teal)}
@@ -130,7 +134,7 @@
 
 <!-- ══ BPM: ברוך הבא ══ -->
 <div id="screen-bpm-welcome" class="screen">
-  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 4f</span></div>
+  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 4g</span></div>
   <div class="center-screen">
     <div style="font-size:48px">🎸</div>
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
@@ -165,7 +169,10 @@
 <div id="screen-home" class="screen">
   <div class="topbar">
     <span class="logo" id="home-logo">laylo</span>
-    <span class="bpm-chip" id="bpm-chip">♩ —</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="click-toggle-btn" id="click-toggle-btn">♩ off</button>
+      <span class="bpm-chip" id="bpm-chip">— BPM</span>
+    </div>
   </div>
   <div class="tab-bar">
     <button class="tab active" data-tab="grid">Grid</button>
@@ -313,8 +320,11 @@
 <!-- ══ MODALS ══ -->
 <div class="modal-overlay" id="name-modal">
   <div class="modal-sheet">
-    <div class="modal-title">שם הקטע</div>
+    <div class="modal-title">קטע חדש</div>
+    <div class="modal-label">שם הקטע</div>
     <input class="modal-input" id="modal-input" type="text" placeholder="A-part, ברידג׳, ורס...">
+    <div class="modal-label">שם הtrack הראשון</div>
+    <input class="modal-input" id="modal-track-input" type="text" placeholder="guitar, vocals, bass...">
     <button class="btn btn-primary" id="modal-confirm">המשך →</button>
   </div>
 </div>
@@ -327,11 +337,7 @@
 </div>
 
 <script>
-// Sprint 4f — 4 fixes:
-// 1. אין startClick בתוך startRecording
-// 2. lockBPM לא מפעיל קליק אוטומטי
-// 3. btn-keep לא משנה sessionFocusedSecId
-// 4. decodedCache.clear() לפני masterCtx.close()
+// Sprint 4g — track naming fix + click toggle button in topbar
 
 async function callAI(prompt, sessionState) {
   try {
@@ -371,7 +377,7 @@ const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return
 
 let sections=[], layers=[], arrangement=[];
 let projectBPM=null, currentBPM=120;
-let pendingName='', pendingBuffer=null, pendingMime='', pendingDuration=0;
+let pendingName='', pendingTrackName='', pendingBuffer=null, pendingMime='', pendingDuration=0;
 let pendingODBuffer=null, pendingODMime='', pendingODDuration=0, pendingODOffsetMs=0;
 let overdubSectionId='', overdubTrackName='';
 let sessionFocusedSecId='';
@@ -380,6 +386,7 @@ let soloTrack=null;
 let mutedTracks=new Set();
 let refGuideSrc=null;
 let sessPlaying=false;
+let clickOn=false; // click toggle state
 
 const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -409,8 +416,6 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// Fix 4: decodedCache.clear() לפני close
-// Fix 1: אין startClick כאן — קליק מופעל רק מUI מפורש
 async function startRecording(){
   if(masterCtx && masterCtx.state!=='closed'){
     decodedCache.clear();
@@ -469,8 +474,17 @@ function startPlayheadLoop(duration){
 }
 function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0);document.querySelectorAll('.tl-ph').forEach(el=>el.remove())}
 
+// ── CLICK ────────────────────────────────
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
 let clickGainNode=null, clickVolume=0.7;
+
+function updateClickToggleBtn(){
+  const btn=document.getElementById('click-toggle-btn');
+  if(!btn)return;
+  btn.textContent=clickOn?'♩ on':'♩ off';
+  btn.classList.toggle('on',clickOn);
+}
+
 function startClick(bpm){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   const ctx=getMasterCtx();
@@ -478,7 +492,7 @@ function startClick(bpm){
     if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}}
     clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
   }
-  clickGainNode.gain.setValueAtTime(clickVolume,ctx.currentTime);
+  clickGainNode.gain.setValueAtTime(clickOn?clickVolume:0,ctx.currentTime);
   const iv=60/bpm;clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
   function sched(){
     if(!clickRunning)return;const c=getMasterCtx();
@@ -494,11 +508,29 @@ function startClick(bpm){
   }
   sched();
 }
-function stopClick(){if(clickGainNode) clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
+function setClickGain(vol){if(clickGainNode) clickGainNode.gain.setValueAtTime(vol,getMasterCtx().currentTime)}
+function stopClick(){setClickGain(0)}
 function killClick(){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}clickGainNode=null}
 }
+
+// click toggle button
+document.getElementById('click-toggle-btn').addEventListener('click',()=>{
+  if(!projectBPM){showAIResponse('קבע BPM קודם ← לחץ על ה-BPM chip');return}
+  clickOn=!clickOn;
+  updateClickToggleBtn();
+  if(clickOn){
+    startClick(projectBPM);
+  } else {
+    stopClick();
+  }
+});
+
+document.getElementById('click-vol').addEventListener('input',e=>{
+  clickVolume=e.target.value/100;
+  if(clickOn&&clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
+});
 
 async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   const ctx=getMasterCtx();
@@ -587,22 +619,17 @@ document.querySelectorAll('.tab').forEach(btn=>{
 let bpmAdjFrom='welcome';
 const updateBPMDisplay=()=>document.getElementById('bpm-adj-num').textContent=currentBPM;
 document.getElementById('bpm-start').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='welcome';startClick(currentBPM);showScreen('screen-bpm-adjust')});
-document.getElementById('bpm-adj-back').addEventListener('click',()=>{killClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
+document.getElementById('bpm-adj-back').addEventListener('click',()=>{killClick();clickOn=false;updateClickToggleBtn();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
 const adjBPM=d=>{currentBPM=Math.max(40,Math.min(220,currentBPM+d));updateBPMDisplay();startClick(currentBPM)};
 document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
 document.getElementById('bpm-p5').addEventListener('click',()=>adjBPM(5));
-document.getElementById('click-vol').addEventListener('input',e=>{
-  clickVolume=e.target.value/100;
-  if(clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
-});
 document.getElementById('bpm-confirm').addEventListener('click',async()=>{await lockBPM(currentBPM)});
-// Fix 2: lockBPM לא מפעיל קליק — קליק כבר רץ מה-BPM screen, killClick בחזרה
 async function lockBPM(bpm){
   projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
-  document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
-  killClick(); // קליק נעצר אחרי אישור BPM
+  document.getElementById('bpm-chip').textContent=`${bpm} BPM`;
+  killClick();clickOn=false;updateClickToggleBtn();
   showScreen('screen-home');
 }
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
@@ -696,7 +723,7 @@ function enterRecord(name){
 document.getElementById('rec-back').addEventListener('click',()=>{
   if(isRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isRecording=false}
   if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
-  stopMetronomeEl('metro-arm');showScreen('screen-home');
+  stopClick();stopMetronomeEl('metro-arm');showScreen('screen-home');
 });
 document.getElementById('rec-btn').addEventListener('click',async()=>{
   if(!isRecording){
@@ -708,7 +735,7 @@ document.getElementById('rec-btn').addEventListener('click',async()=>{
     recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
     const refVal=document.getElementById('ref-select').value;
     if(refVal==='click'&&projectBPM){
-      startClick(projectBPM); // קליק רק כשuser בחר אותו מפורשות
+      startClick(projectBPM);
     } else if(refVal!=='none'&&refVal!=='click'){
       if(projectBPM) startClick(projectBPM);
       const refLayer=getFirstLayer(refVal);
@@ -745,14 +772,12 @@ document.getElementById('review-play-btn').addEventListener('click',async()=>{
     src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
   }
 });
-// Fix 3: לא משנים sessionFocusedSecId בשמירה — focus נשאר כפי שהיה
 document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
   const secId=uid(),layerId=uid();
   const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
-  const layer={id:layerId,sectionId:secId,trackName:pendingName,buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+  const layer={id:layerId,sectionId:secId,trackName:pendingTrackName||'track 1',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   sections.push(sec);layers.push(layer);arrangement.push(secId);
-  // sessionFocusedSecId לא משתנה — focus נשאר על מה שהיה
   decodedCache.delete(layerId);
   await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
   renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}showScreen('screen-home');
@@ -769,7 +794,7 @@ document.getElementById('btn-cont-rec').addEventListener('click',()=>{
 });
 document.getElementById('cont-back').addEventListener('click',()=>{
   if(isContRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isContRecording=false}
-  stopMetronomeEl('cont-metro');showScreen('screen-home');
+  stopClick();stopMetronomeEl('cont-metro');showScreen('screen-home');
 });
 document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
   if(!isContRecording){
@@ -779,15 +804,14 @@ document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
     document.getElementById('cont-timer').classList.add('recording');document.getElementById('cont-indicator').classList.add('recording');
     document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
     recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    if(projectBPM) startClick(projectBPM); // קליק מפורש להקלטה רצופה
+    if(projectBPM) startClick(projectBPM);
   }else{
     clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
     const secId=uid(),layerId=uid();
     const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
-    const layer={id:layerId,sectionId:secId,trackName:'Full Take',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+    const layer={id:layerId,sectionId:secId,trackName:pendingTrackName||'track 1',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
     sections.push(sec);layers.push(layer);arrangement.push(secId);
-    sessionFocusedSecId=secId; // Full Take — focus מוגדר לsection החדש (הגיוני)
-    decodedCache.delete(layerId);
+    sessionFocusedSecId=secId;decodedCache.delete(layerId);
     await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);renderHome();
     activeTab='session';
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='session'));
@@ -816,7 +840,7 @@ async function enterOverdub(sectionId,trackName){
     document.getElementById('od-guide-wave').style.display='flex';
   }
   startMetronomeEl('od-metro-arm',projectBPM);
-  if(projectBPM) startClick(projectBPM); // קליק מפורש לoverdub
+  if(projectBPM) startClick(projectBPM);
   showScreen('screen-overdub');
 }
 document.getElementById('od-back').addEventListener('click',()=>{
@@ -923,11 +947,21 @@ document.getElementById('ai-mic-btn').addEventListener('click',()=>{
   document.getElementById('ai-mic-btn').classList.add('listening');recognition.start();
 });
 
-const openNameModal=()=>{const i=document.getElementById('modal-input');i.value=defaultSectionName();document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300)};
+const openNameModal=()=>{
+  const i=document.getElementById('modal-input');i.value=defaultSectionName();
+  document.getElementById('modal-track-input').value='';
+  document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300);
+};
 const closeNameModal=()=>document.getElementById('name-modal').classList.remove('open');
 document.getElementById('btn-new-section').addEventListener('click',openNameModal);
-document.getElementById('modal-confirm').addEventListener('click',()=>{const v=document.getElementById('modal-input').value.trim();if(!v)return;pendingName=v;closeNameModal();enterRecord(v)});
-document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-confirm').click()});
+document.getElementById('modal-confirm').addEventListener('click',()=>{
+  const v=document.getElementById('modal-input').value.trim();if(!v)return;
+  pendingName=v;
+  pendingTrackName=document.getElementById('modal-track-input').value.trim()||'track 1';
+  closeNameModal();enterRecord(v);
+});
+document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-track-input').focus()});
+document.getElementById('modal-track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-confirm').click()});
 document.getElementById('name-modal').addEventListener('click',e=>{if(e.target===document.getElementById('name-modal'))closeNameModal()});
 
 let trackModalSectionId='';
@@ -958,7 +992,8 @@ async function init(){
   const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));
   arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
   if(arrangement.length)sessionFocusedSecId=arrangement[0];
-  if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;renderHome();showScreen('screen-home')}
+  updateClickToggleBtn();
+  if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`${projectBPM} BPM`;renderHome();showScreen('screen-home')}
   else showScreen('screen-bpm-welcome');
 }
 init().catch(console.error);
