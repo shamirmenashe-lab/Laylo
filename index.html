@@ -27,8 +27,6 @@
     .back-btn{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px}
     .center-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px}
     .sub{font-size:14px;color:var(--muted);line-height:1.6}
-    .rec-timer{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;letter-spacing:-.03em}
-    .rec-timer.recording{color:var(--red)}
     .rec-indicator{width:12px;height:12px;border-radius:50%;background:var(--muted)}
     .rec-indicator.recording{background:var(--red);animation:blink 1s infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
@@ -39,9 +37,6 @@
     .adj-btn:active{background:var(--teal);border-color:var(--teal)}
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .08s}
-    .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
-
-    /* ── SESSION (home) ── */
     .session-top-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;flex-shrink:0}
     .session-proj-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -75,7 +70,6 @@
     .session-controls{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0}
     .sess-play-btn{width:44px;height:44px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
     .sess-hint{flex:1;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
-
     .ai-bar{display:flex;gap:8px;align-items:center;padding:8px 16px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--s1);border-top:1px solid var(--border);flex-shrink:0}
     .ai-input{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:15px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;outline:none}
     .ai-input:focus{border-color:var(--teal)}
@@ -84,7 +78,6 @@
     .ai-mic-btn{background:var(--s2);color:var(--muted);border:1px solid var(--border)}
     .ai-mic-btn.listening{background:var(--red);color:#fff;animation:blink .5s infinite}
     .ai-response{font-size:12px;color:var(--teal2);padding:4px 16px;font-family:'IBM Plex Mono',monospace;min-height:20px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
     .od-review-layers{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0}
     .od-layer-tag{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
@@ -109,7 +102,7 @@
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
     <div class="sub">תרגיש את הקצב.<br>לחץ "הפעל קליק" וכוון.</div>
   </div>
-  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
+  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
 </div>
 
 <!-- ══ BPM: כוונון ══ -->
@@ -131,7 +124,7 @@
       <input type="range" id="click-vol" min="0" max="100" value="70" style="flex:1;max-width:200px;accent-color:var(--teal)">
     </div>
   </div>
-  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
+  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
 </div>
 
 <!-- ══ HOME = SESSION ONLY ══ -->
@@ -141,7 +134,7 @@
     <span class="bpm-chip" id="bpm-chip">♩ —</span>
   </div>
   <div class="session-top-meta">
-    <span class="session-proj-name" id="session-proj-name">main</span>
+    <span class="session-proj-name">main</span>
     <span class="session-time" id="session-time-display">0:00</span>
   </div>
   <div class="session-tracks" id="session-tracks"></div>
@@ -150,7 +143,7 @@
   </div>
   <div class="session-controls">
     <button class="sess-play-btn" id="sess-play-btn">▶</button>
-    <span class="sess-hint" id="sess-hint">נגן הכל · M/S לסולו</span>
+    <span class="sess-hint">נגן הכל · M/S לסולו</span>
   </div>
   <div class="ai-response" id="ai-response"></div>
   <div class="ai-bar">
@@ -160,7 +153,7 @@
   </div>
 </div>
 
-<!-- ══ REVIEW (טראק ראשון) ══ -->
+<!-- ══ REVIEW (first track) ══ -->
 <div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -169,13 +162,13 @@
     <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
     <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
-  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
+  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><div class="gap">
     <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
     <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
   </div></div>
 </div>
 
-<!-- ══ REVIEW OVERDUB (טראק 2+) ══ -->
+<!-- ══ REVIEW OVERDUB ══ -->
 <div id="screen-od-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -185,7 +178,7 @@
     <div id="od-review-offset" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)"></div>
     <button id="od-review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
   </div>
-  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
+  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><div class="gap">
     <button class="btn btn-primary" id="od-btn-keep">✓ שמור ויישר</button>
     <button class="btn btn-ghost" id="od-btn-redo">↺ הקלט שוב</button>
   </div></div>
@@ -211,7 +204,7 @@
 </div>
 
 <script>
-// Sprint 5 — Session-only UI · single section "main" · per-track inline record · click as virtual track
+// Sprint 5.1 — pending tracks + visual metro + audition fix
 
 async function callAI(prompt, sessionState) {
   try {
@@ -259,6 +252,9 @@ let overdubTrackName='';
 let soloTrack=null;
 let mutedTracks=new Set();
 let sessPlaying=false;
+let pendingTracks=[];
+let auditionSrc=null, auditionTrackName=null;
+let recMetroInterval=null;
 
 const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -287,10 +283,7 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// ── RECORDING ──────────────────────────
-// guideSrc set => masterCtx stays open (overdub: guide must keep playing).
-// Otherwise masterCtx closes before getUserMedia (Android communication-mode routing fix).
-// DO NOT change this conditional.
+// guideSrc set => masterCtx stays open (overdub). Otherwise close before getUserMedia (Android fix).
 let guideSrc=null;
 async function startRecording(){
   if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
@@ -392,7 +385,6 @@ function scheduleClickRange(startAt,duration){
   }
   return oscs;
 }
-
 document.getElementById('click-vol').addEventListener('input',e=>{
   clickVolume=e.target.value/100;
   if(clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
@@ -440,24 +432,17 @@ async function ensureMainSection(){
 async function lockBPM(bpm){
   projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
   document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
-  killClick();
-  await ensureMainSection();
-  renderSession();
-  showScreen('screen-home');
+  killClick();await ensureMainSection();renderSession();showScreen('screen-home');
 }
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 
 // ── SESSION VIEW ───────────────────────
-let recordingTrack=null;
-let recIsFirst=false;
-let recRefStartTime=0;
-let backingSrcs=[];
+let recordingTrack=null, recIsFirst=false, recRefStartTime=0, backingSrcs=[];
 
 function renderSession(){
   const panel=document.getElementById('session-tracks');panel.innerHTML='';
   const tracks=getUniqueTracks();
 
-  // click row (virtual)
   if(projectBPM){
     const crow=document.createElement('div');crow.className='session-track-row click-row';
     const cname=document.createElement('div');cname.className='track-name';cname.textContent='click';
@@ -475,6 +460,7 @@ function renderSession(){
   }
 
   const displayTracks=tracks.slice();
+  pendingTracks.forEach(t=>{if(!displayTracks.includes(t))displayTracks.push(t)});
   if(recordingTrack && !displayTracks.includes(recordingTrack)) displayTracks.push(recordingTrack);
 
   if(!displayTracks.length){
@@ -488,26 +474,21 @@ function renderSession(){
     const locked=!!layer;
     const row=document.createElement('div');row.className='session-track-row';row.dataset.track=trackName;
     const name=document.createElement('div');name.className='track-name';name.textContent=trackName;
-
     const ctrl=document.createElement('div');ctrl.className='track-ctrl';
     const recBtn=document.createElement('button');recBtn.className='tbtn rec'+(locked?' locked':'')+(recordingTrack===trackName?' armed':'');
     recBtn.textContent=recordingTrack===trackName?'■':'●';
-    const playBtn=document.createElement('button');playBtn.className='tbtn play';playBtn.textContent='▶';playBtn.dataset.track=trackName;
-    if(!layer){playBtn.classList.add('locked')}
+    const playBtn=document.createElement('button');playBtn.className='tbtn play';playBtn.textContent='▶';
+    if(!layer) playBtn.classList.add('locked');
     ctrl.appendChild(recBtn);ctrl.appendChild(playBtn);
-
     const msWrap=document.createElement('div');msWrap.className='ms-btns';
     const mBtn=document.createElement('button');mBtn.className='ms-btn'+(mutedTracks.has(trackName)?' m-on':'');mBtn.textContent='M';
     const sBtn=document.createElement('button');sBtn.className='ms-btn'+(soloTrack===trackName?' s-on':'');sBtn.textContent='S';
     msWrap.appendChild(mBtn);msWrap.appendChild(sBtn);
-
     const wrap=document.createElement('div');wrap.className='session-canvas-wrap';
     const canvas=document.createElement('canvas');canvas.className='session-waveform';
     const ph=document.createElement('div');ph.className='playhead';
     wrap.appendChild(canvas);wrap.appendChild(ph);
-
     row.appendChild(name);row.appendChild(ctrl);row.appendChild(msWrap);row.appendChild(wrap);
-
     if(recordingTrack===trackName){
       const meta=document.createElement('div');meta.className='row-rec-meta';meta.id='rec-row-meta';
       meta.innerHTML='<span class="rec-indicator recording"></span><span id="rec-row-timer">00:00</span>';
@@ -515,8 +496,7 @@ function renderSession(){
     }
     panel.appendChild(row);
     if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
-
-    recBtn.addEventListener('click',()=>{ if(locked)return; toggleInlineRecord(trackName); });
+    recBtn.addEventListener('click',()=>{if(locked)return;toggleInlineRecord(trackName)});
     playBtn.addEventListener('click',()=>auditionTrack(trackName,playBtn));
     mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSession()});
     sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSession()});
@@ -525,27 +505,31 @@ function renderSession(){
 }
 
 function attachLongPressDelete(row,trackName){
-  let t=null;
-  const start=()=>{t=setTimeout(()=>askDeleteTrack(trackName),650)};
-  const cancel=()=>{if(t){clearTimeout(t);t=null}};
-  row.addEventListener('touchstart',start,{passive:true});
-  row.addEventListener('touchend',cancel);row.addEventListener('touchcancel',cancel);row.addEventListener('touchmove',cancel);
-  row.addEventListener('mousedown',start);row.addEventListener('mouseup',cancel);row.addEventListener('mouseleave',cancel);
+  let t=null,sx=0,sy=0;
+  const fire=()=>{row.style.background='';askDeleteTrack(trackName)};
+  const start=(x,y)=>{sx=x;sy=y;row.style.transition='background .5s';row.style.background='rgba(239,68,68,.18)';t=setTimeout(fire,500)};
+  const cancel=()=>{if(t){clearTimeout(t);t=null}row.style.background='';row.style.transition=''};
+  row.addEventListener('touchstart',e=>start(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+  row.addEventListener('touchmove',e=>{if(Math.abs(e.touches[0].clientX-sx)>14||Math.abs(e.touches[0].clientY-sy)>14)cancel()},{passive:true});
+  row.addEventListener('touchend',cancel);row.addEventListener('touchcancel',cancel);
+  row.addEventListener('mousedown',e=>start(e.clientX,e.clientY));row.addEventListener('mouseup',cancel);row.addEventListener('mouseleave',cancel);
 }
 
 async function toggleInlineRecord(trackName){
   if(recordingTrack && recordingTrack!==trackName) return;
-  if(sessPlaying){stopSession()}
-  if(recordingTrack===trackName){ await stopInlineRecord(); return; }
+  if(sessPlaying) stopSession();
+  if(recordingTrack===trackName){await stopInlineRecord();return}
   await startInlineRecord(trackName);
 }
 
 async function startInlineRecord(trackName){
+  stopAudition();if(sessPlaying)stopSession();
   recIsFirst=!getFirstLayer();
-  overdubTrackName=trackName;
+  overdubTrackName=trackName;pendingName=trackName;
   guideSrc=null;backingSrcs=[];
   if(!recIsFirst){
     const ctx=getMasterCtx();
+    const first=getFirstLayer();
     const startAt=ctx.currentTime+0.15;recRefStartTime=startAt;
     const monitorLayers=layers.filter(l=>l.sectionId===MAIN_ID);
     for(const l of monitorLayers){
@@ -555,48 +539,58 @@ async function startInlineRecord(trackName){
       s.connect(p);p.connect(g);g.connect(ctx.destination);
       s.start(startAt+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);
       backingSrcs.push(s);
-      if(l.id===getFirstLayer()?.id) guideSrc=s;
+      if(l.id===first.id) guideSrc=s;
     }
-    if(projectBPM) startClick(projectBPM);
+    if(projectBPM&&shouldPlay('click')) startClick(projectBPM);
   }
   const ok=await startRecording();
-  if(!ok){ stopBacking(); return; }
+  if(!ok){stopBacking();return}
   pendingODOffsetMs=recIsFirst?0:(getMasterCtx().currentTime-recRefStartTime)*1000;
   recordingTrack=trackName;
   renderSession();
+  if(projectBPM) startRecMetronomeVisual(projectBPM);
   recTimerInterval=setInterval(()=>{const el=document.getElementById('rec-row-timer');if(el)el.textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
 }
+
+function startRecMetronomeVisual(bpm){
+  stopRecMetronomeVisual();let beat=0;const iv=60/bpm*1000;
+  const pulse=()=>{
+    document.querySelectorAll('#session-tracks .clk-bar').forEach(x=>{x.style.height='14px';x.style.opacity='.5'});
+    const el=document.getElementById('clkbar'+(beat%4));if(el){el.style.height='30px';el.style.opacity='1'}
+    beat++;
+  };
+  pulse();recMetroInterval=setInterval(pulse,iv);
+}
+function stopRecMetronomeVisual(){if(recMetroInterval){clearInterval(recMetroInterval);recMetroInterval=null}}
+
 function stopBacking(){
   backingSrcs.forEach(s=>{try{s.stop()}catch(e){}});backingSrcs=[];
   if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
   stopClick();
 }
 async function stopInlineRecord(){
-  clearInterval(recTimerInterval);
-  await stopRecording();
-  stopBacking();
-  const wasFirst=recIsFirst;
-  recordingTrack=null;
-  if(wasFirst){
-    pendingName=overdubTrackName;
-    pendingODOffsetMs=0;
-    enterReview();
-  }else{
-    enterODReview();
-  }
+  clearInterval(recTimerInterval);stopRecMetronomeVisual();
+  await stopRecording();stopBacking();
+  const wasFirst=recIsFirst;recordingTrack=null;
+  if(wasFirst){pendingName=overdubTrackName;pendingODOffsetMs=0;enterReview()}
+  else{enterODReview()}
 }
 
-let auditionBtn=null;
+function stopAudition(){
+  if(auditionSrc){try{auditionSrc.onended=null;auditionSrc.stop()}catch(e){}auditionSrc=null}
+  auditionTrackName=null;
+  document.querySelectorAll('#session-tracks .tbtn.play').forEach(b=>{b.classList.remove('playing');b.textContent='▶'});
+}
 async function auditionTrack(trackName,btn){
   const layer=getLayer(trackName);if(!layer)return;
-  if(auditionBtn===btn){stopAllSrcs();btn.classList.remove('playing');btn.textContent='▶';auditionBtn=null;return}
-  stopAllSrcs();if(auditionBtn){auditionBtn.classList.remove('playing');auditionBtn.textContent='▶'}
-  auditionBtn=btn;btn.classList.add('playing');btn.textContent='■';
+  if(auditionTrackName===trackName){stopAudition();return}
+  stopAudition();if(sessPlaying)stopSession();
+  auditionTrackName=trackName;btn.classList.add('playing');btn.textContent='■';
   const ctx=getMasterCtx();const buf=await getDecodedBuffer(layer.id,layer.buffer);
   const src=ctx.createBufferSource();src.buffer=buf;const g=ctx.createGain();g.gain.value=layer.volume??1;const p=ctx.createStereoPanner();p.pan.value=layer.pan??0;
-  src.connect(p);p.connect(g);g.connect(ctx.destination);activePlaySrcs=[src];
+  src.connect(p);p.connect(g);g.connect(ctx.destination);auditionSrc=src;
   src.start(ctx.currentTime+0.03,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
-  src.onended=()=>{btn.classList.remove('playing');btn.textContent='▶';auditionBtn=null;activePlaySrcs=[]};
+  src.onended=()=>{if(auditionSrc===src)stopAudition()};
 }
 
 // ── REVIEW (first track) ──
@@ -624,8 +618,8 @@ document.getElementById('btn-keep').addEventListener('click',async()=>{
   const layer={id:layerId,sectionId:MAIN_ID,trackName:pendingName||'track 1',buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   layers.push(layer);
   const sec=sections.find(s=>s.id===MAIN_ID);if(sec){sec.duration=Math.max(sec.duration||0,pendingODDuration);await dbPut('sections',sec)}
-  decodedCache.delete(layerId);
-  await dbPut('layers',layer);
+  decodedCache.delete(layerId);await dbPut('layers',layer);
+  pendingTracks=pendingTracks.filter(t=>t!==(pendingName||'track 1'));
   renderSession();showScreen('screen-home');
 });
 document.getElementById('btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(pendingName);showScreen('screen-home')});
@@ -661,18 +655,17 @@ document.getElementById('od-btn-keep').addEventListener('click',async()=>{
   if(firstLayer){
     try{
       const {correctedOffsetMs,shiftMs,correlation}=await alignLayer(firstLayer.buffer,pendingODBuffer,pendingODOffsetMs);
-      if(correlation>=0.3){
-        finalOffsetMs=correctedOffsetMs;
-        showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${shiftMs>=0?'מאוחר':'מוקדם'} (${correlation.toFixed(2)})`);
-      }else{showAIResponse(`correlation נמוך (${correlation.toFixed(2)}) — שמור ללא יישור`)}
+      if(correlation>=0.3){finalOffsetMs=correctedOffsetMs;showAIResponse(`יושר ${Math.abs(Math.round(shiftMs))}ms ${shiftMs>=0?'מאוחר':'מוקדם'} (${correlation.toFixed(2)})`)}
+      else{showAIResponse(`correlation נמוך (${correlation.toFixed(2)}) — שמור ללא יישור`)}
     }catch(e){showAIResponse('שמור ללא יישור (שגיאה)')}
   }else{showAIResponse('')}
   const layerId=uid();
   const layer={id:layerId,sectionId:MAIN_ID,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:finalOffsetMs,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
   layers.push(layer);
   const sec=sections.find(s=>s.id===MAIN_ID);if(sec){sec.duration=Math.max(sec.duration||0,pendingODDuration+finalOffsetMs/1000);await dbPut('sections',sec)}
-  decodedCache.delete(layerId);
-  await dbPut('layers',layer);renderSession();showScreen('screen-home');
+  decodedCache.delete(layerId);await dbPut('layers',layer);
+  pendingTracks=pendingTracks.filter(t=>t!==overdubTrackName);
+  renderSession();showScreen('screen-home');
 });
 document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(overdubTrackName);showScreen('screen-home')});
 
@@ -682,6 +675,7 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   if(recordingTrack)return;
   const btn=document.getElementById('sess-play-btn');
   if(sessPlaying){stopSession();return}
+  stopAudition();
   const secLayers=layers.filter(l=>l.sectionId===MAIN_ID&&shouldPlay(l.trackName));
   const ctx=getMasterCtx();const now=ctx.currentTime+0.12;
   let maxDur=0.001;const srcs=[];
@@ -701,24 +695,22 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
 });
 
 // ── ADD TRACK ──
-function openTrackModal(){
-  const i=document.getElementById('track-input');i.value='';
-  document.getElementById('track-modal').classList.add('open');setTimeout(()=>i.focus(),300);
-}
 const closeTrackModal=()=>document.getElementById('track-modal').classList.remove('open');
 document.getElementById('btn-add-track').addEventListener('click',()=>{
-  const existing=getUniqueTracks();
-  if(existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);return}
-  openTrackModal();
+  const count=getUniqueTracks().length+pendingTracks.length;
+  if(count>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);return}
+  const i=document.getElementById('track-input');i.value='';
+  document.getElementById('track-modal').classList.add('open');setTimeout(()=>i.focus(),300);
 });
 document.getElementById('track-confirm').addEventListener('click',()=>{
   const v=document.getElementById('track-input').value.trim();if(!v)return;
   const existing=getUniqueTracks();
-  if(existing.includes(v)){showAIResponse('כבר יש ערוץ בשם הזה');return}
-  if(existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
+  if(existing.includes(v)||pendingTracks.includes(v)){showAIResponse('כבר יש ערוץ בשם הזה');return}
+  if(existing.length+pendingTracks.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
   closeTrackModal();
-  pendingName=v;overdubTrackName=v;
-  startInlineRecord(v);
+  pendingTracks.push(v);
+  renderSession();
+  showAIResponse(`"${v}" נוסף — לחץ ● בשורה כדי להקליט`);
 });
 document.getElementById('track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('track-confirm').click()});
 document.getElementById('track-modal').addEventListener('click',e=>{if(e.target===document.getElementById('track-modal'))closeTrackModal()});
@@ -737,8 +729,10 @@ document.getElementById('confirm-cancel').addEventListener('click',closeConfirm)
 document.getElementById('confirm-modal').addEventListener('click',e=>{if(e.target===document.getElementById('confirm-modal'))closeConfirm()});
 document.getElementById('confirm-ok').addEventListener('click',async()=>{
   const trackName=pendingDeleteTrack;if(!trackName){closeConfirm();return}
+  if(auditionTrackName===trackName)stopAudition();
   const layer=getLayer(trackName);
   if(layer){decodedCache.delete(layer.id);await dbDelete('layers',layer.id);layers=layers.filter(l=>l.id!==layer.id)}
+  pendingTracks=pendingTracks.filter(t=>t!==trackName);
   if(soloTrack===trackName)soloTrack=null;mutedTracks.delete(trackName);
   closeConfirm();renderSession();showAIResponse(`"${trackName}" נמחק`);
 });
@@ -750,7 +744,6 @@ async function sendAICommand(cmd){
 }
 document.getElementById('ai-send').addEventListener('click',()=>sendAICommand(document.getElementById('ai-input').value.trim()));
 document.getElementById('ai-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendAICommand(document.getElementById('ai-input').value.trim())});
-
 let recognition=null;
 if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -777,14 +770,11 @@ async function init(){
   arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
   if(project?.bpm){
     projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;
-    await ensureMainSection();
-    renderSession();showScreen('screen-home');
-  }
-  else showScreen('screen-bpm-welcome');
+    await ensureMainSection();renderSession();showScreen('screen-home');
+  } else showScreen('screen-bpm-welcome');
 }
 init().catch(console.error);
 
-// TEMP — 3s long-press on logo = hard reset
 ;(()=>{
   let t=null;const logo=document.getElementById('home-logo');if(!logo)return;
   logo.addEventListener('touchstart',e=>{e.preventDefault();t=setTimeout(()=>{indexedDB.deleteDatabase('laylo-v2');location.reload()},3000)},{passive:false});
