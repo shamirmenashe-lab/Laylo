@@ -27,6 +27,8 @@
     .back-btn{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px}
     .center-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px}
     .sub{font-size:14px;color:var(--muted);line-height:1.6}
+    .rec-timer{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;letter-spacing:-.03em}
+    .rec-timer.recording{color:var(--red)}
     .rec-indicator{width:12px;height:12px;border-radius:50%;background:var(--muted)}
     .rec-indicator.recording{background:var(--red);animation:blink 1s infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
@@ -37,6 +39,7 @@
     .adj-btn:active{background:var(--teal);border-color:var(--teal)}
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .08s}
+    .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
     .session-top-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;flex-shrink:0}
     .session-proj-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -102,7 +105,7 @@
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
     <div class="sub">תרגיש את הקצב.<br>לחץ "הפעל קליק" וכוון.</div>
   </div>
-  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
 </div>
 
 <!-- ══ BPM: כוונון ══ -->
@@ -124,7 +127,7 @@
       <input type="range" id="click-vol" min="0" max="100" value="70" style="flex:1;max-width:200px;accent-color:var(--teal)">
     </div>
   </div>
-  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
 </div>
 
 <!-- ══ HOME = SESSION ONLY ══ -->
@@ -134,7 +137,7 @@
     <span class="bpm-chip" id="bpm-chip">♩ —</span>
   </div>
   <div class="session-top-meta">
-    <span class="session-proj-name">main</span>
+    <span class="session-proj-name" id="session-proj-name">main</span>
     <span class="session-time" id="session-time-display">0:00</span>
   </div>
   <div class="session-tracks" id="session-tracks"></div>
@@ -143,7 +146,7 @@
   </div>
   <div class="session-controls">
     <button class="sess-play-btn" id="sess-play-btn">▶</button>
-    <span class="sess-hint">נגן הכל · M/S לסולו</span>
+    <span class="sess-hint" id="sess-hint">נגן הכל · M/S לסולו</span>
   </div>
   <div class="ai-response" id="ai-response"></div>
   <div class="ai-bar">
@@ -153,7 +156,7 @@
   </div>
 </div>
 
-<!-- ══ REVIEW (first track) ══ -->
+<!-- ══ REVIEW (טראק ראשון) ══ -->
 <div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -162,13 +165,13 @@
     <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
     <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
-  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><div class="gap">
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
     <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
     <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
   </div></div>
 </div>
 
-<!-- ══ REVIEW OVERDUB ══ -->
+<!-- ══ REVIEW OVERDUB (טראק 2+) ══ -->
 <div id="screen-od-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -178,7 +181,7 @@
     <div id="od-review-offset" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)"></div>
     <button id="od-review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
   </div>
-  <div style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0"><div class="gap">
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
     <button class="btn btn-primary" id="od-btn-keep">✓ שמור ויישר</button>
     <button class="btn btn-ghost" id="od-btn-redo">↺ הקלט שוב</button>
   </div></div>
@@ -204,7 +207,7 @@
 </div>
 
 <script>
-// Sprint 5.1 — pending tracks + visual metro + audition fix
+// Sprint 5.2 — M/S fully wired: backing + click respect shouldPlay during overdub
 
 async function callAI(prompt, sessionState) {
   try {
@@ -527,11 +530,13 @@ async function startInlineRecord(trackName){
   recIsFirst=!getFirstLayer();
   overdubTrackName=trackName;pendingName=trackName;
   guideSrc=null;backingSrcs=[];
+
   if(!recIsFirst){
+    // ── overdub: play only tracks the user wants to hear (M/S respected) ──
     const ctx=getMasterCtx();
-    const first=getFirstLayer();
     const startAt=ctx.currentTime+0.15;recRefStartTime=startAt;
-    const monitorLayers=layers.filter(l=>l.sectionId===MAIN_ID);
+    // filter by shouldPlay — user controls monitor mix with M/S before pressing ●
+    const monitorLayers=layers.filter(l=>l.sectionId===MAIN_ID && shouldPlay(l.trackName));
     for(const l of monitorLayers){
       const buf=await getDecodedBuffer(l.id,l.buffer);
       const s=ctx.createBufferSource();s.buffer=buf;s.loop=true;
@@ -539,16 +544,36 @@ async function startInlineRecord(trackName){
       s.connect(p);p.connect(g);g.connect(ctx.destination);
       s.start(startAt+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);
       backingSrcs.push(s);
-      if(l.id===first.id) guideSrc=s;
     }
-    if(projectBPM&&shouldPlay('click')) startClick(projectBPM);
+    // click: start always (so scheduler runs), but mute gain if M is on
+    // this keeps masterCtx alive and visual bars pulsing regardless
+    if(projectBPM){
+      startClick(projectBPM);
+      if(!shouldPlay('click')) stopClick(); // gain→0 immediately if click muted
+    }
+    // guideSrc keeps masterCtx open — use first backing src, or a sentinel if all tracks muted
+    // alignment always uses getFirstLayer().buffer post-hoc, independent of what played
+    if(backingSrcs.length){
+      guideSrc=backingSrcs[0];
+    } else if(projectBPM){
+      guideSrc={stop(){}}; // click scheduler keeps ctx open; use dummy sentinel
+    }
   }
+
   const ok=await startRecording();
   if(!ok){stopBacking();return}
+
+  // first track: masterCtx was closed before getUserMedia — now reopen and start click
+  if(recIsFirst && projectBPM){
+    startClick(projectBPM);
+    if(!shouldPlay('click')) stopClick();
+    startRecMetronomeVisual(projectBPM);
+  }
+
   pendingODOffsetMs=recIsFirst?0:(getMasterCtx().currentTime-recRefStartTime)*1000;
   recordingTrack=trackName;
   renderSession();
-  if(projectBPM) startRecMetronomeVisual(projectBPM);
+  if(!recIsFirst && projectBPM) startRecMetronomeVisual(projectBPM);
   recTimerInterval=setInterval(()=>{const el=document.getElementById('rec-row-timer');if(el)el.textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
 }
 
@@ -565,7 +590,8 @@ function stopRecMetronomeVisual(){if(recMetroInterval){clearInterval(recMetroInt
 
 function stopBacking(){
   backingSrcs.forEach(s=>{try{s.stop()}catch(e){}});backingSrcs=[];
-  if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
+  if(guideSrc && typeof guideSrc.stop==='function'){try{guideSrc.stop()}catch(e){}}
+  guideSrc=null;
   stopClick();
 }
 async function stopInlineRecord(){
@@ -708,8 +734,7 @@ document.getElementById('track-confirm').addEventListener('click',()=>{
   if(existing.includes(v)||pendingTracks.includes(v)){showAIResponse('כבר יש ערוץ בשם הזה');return}
   if(existing.length+pendingTracks.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
   closeTrackModal();
-  pendingTracks.push(v);
-  renderSession();
+  pendingTracks.push(v);renderSession();
   showAIResponse(`"${v}" נוסף — לחץ ● בשורה כדי להקליט`);
 });
 document.getElementById('track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('track-confirm').click()});
