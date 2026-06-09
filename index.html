@@ -32,9 +32,6 @@
     .rec-indicator{width:12px;height:12px;border-radius:50%;background:var(--muted)}
     .rec-indicator.recording{background:var(--red);animation:blink 1s infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-    .rec-big-btn{width:88px;height:88px;border-radius:50%;border:3px solid var(--teal);background:none;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;transition:background .15s,transform .1s;flex-shrink:0}
-    .rec-big-btn:active{transform:scale(.92);background:rgba(13,148,136,.15)}
-    .rec-big-btn.recording{border-color:var(--red)}
     .bpm-number{font-family:'IBM Plex Mono',monospace;font-size:72px;font-weight:600;color:var(--teal2);letter-spacing:-.04em}
     .bpm-label{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
     .adjust-row{display:flex;align-items:center;gap:8px}
@@ -42,60 +39,43 @@
     .adj-btn:active{background:var(--teal);border-color:var(--teal)}
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .08s}
-    .metro-wrap{display:flex;justify-content:center;align-items:flex-end;height:72px}
-    .metro-arm{width:3px;height:60px;background:var(--teal);border-radius:2px;transform-origin:bottom center;animation:none;position:relative}
-    .metro-dot-inner{width:10px;height:10px;border-radius:50%;background:var(--teal2);position:absolute;top:-5px;left:-3.5px}
-    @keyframes metro-swing{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
     .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
-    .click-toggle{background:none;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--muted);cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .15s}
-    .click-toggle.on{color:var(--teal2);border-color:var(--teal);background:rgba(13,148,136,.1)}
-    .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;padding:0 16px}
-    .tab{flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid transparent;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
-    .tab.active{color:var(--teal2);border-bottom-color:var(--teal)}
-    .content-area{flex:1;overflow-y:auto;overflow-x:hidden}
-    #panel-grid{height:100%}
-    #panel-session{height:100%;display:none;flex-direction:column}
-    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;padding:24px}
-    .empty-icon{font-size:52px;opacity:.3}
-    .empty-title{font-size:18px;font-weight:700;color:var(--muted)}
-    .empty-sub{font-size:13px;color:var(--muted);opacity:.7;line-height:1.5}
-    .grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:12px 16px}
-    .session-grid{border-collapse:collapse;width:max-content;min-width:calc(100vw - 32px)}
-    .grid-th{background:var(--s1);padding:8px 14px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);border:1px solid var(--border);white-space:nowrap;text-align:center}
-    .grid-th.section-col{text-align:right;min-width:90px;position:sticky;left:0;z-index:2;background:var(--s1)}
-    .grid-td-label{background:var(--s1);padding:10px 14px;font-weight:700;font-size:14px;border:1px solid var(--border);white-space:nowrap;position:sticky;left:0;z-index:1;cursor:pointer}
-    .grid-td-label.focused{background:var(--teal);color:#fff}
-    .grid-td{padding:8px;border:1px solid var(--border);text-align:center;min-width:72px;background:var(--bg)}
-    .grid-play-btn{width:40px;height:40px;border-radius:50%;background:var(--s2);border:1px solid var(--border);font-size:15px;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;justify-content:center}
-    .grid-play-btn:active,.grid-play-btn.playing{background:var(--teal)}
-    .grid-add-btn{width:40px;height:40px;border-radius:50%;background:none;border:1px dashed var(--border);font-size:20px;color:var(--muted);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center}
-    .grid-add-btn:active{border-color:var(--teal);color:var(--teal)}
-    .home-actions{padding:10px 16px;display:flex;gap:8px;flex-shrink:0}
-    .home-actions .btn{flex:1;font-size:14px;padding:12px 10px}
-    /* timeline — direction:ltr so segments flow left→right */
-    .timeline-wrap{overflow-x:auto;padding:10px 16px 4px;flex-shrink:0;border-bottom:1px solid var(--border);direction:ltr}
-    .tl-track-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:54px;flex-shrink:0;text-align:right;padding-right:8px;display:flex;align-items:center;justify-content:flex-end;direction:rtl}
-    .tl-segment{border-radius:6px;position:relative;overflow:hidden;background:var(--s2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;padding:0 4px;transition:all .15s;min-width:28px;height:32px}
-    .tl-segment.focused{background:var(--teal);border-color:var(--teal);color:#fff}
-    .tl-segment.empty{border-style:dashed;background:none}
-    .tl-ph{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);opacity:.9;pointer-events:none}
-    .session-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
-    .session-section-name{font-size:13px;font-weight:700;color:var(--teal2)}
+
+    /* ── SESSION (home) ── */
+    .session-top-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;flex-shrink:0}
+    .session-proj-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
     .session-tracks{flex:1;overflow-y:auto;padding:8px 0}
-    .session-track-row{display:flex;align-items:center;padding:6px 16px;gap:8px;border-bottom:1px solid var(--border)}
-    .session-track-name{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--muted);width:48px;flex-shrink:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .session-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:40px 24px;color:var(--muted)}
+    .session-empty .ic{font-size:46px;opacity:.3}
+    .session-track-row{display:flex;align-items:center;padding:8px 16px;gap:8px;border-bottom:1px solid var(--border);position:relative}
+    .session-track-row.recording-row{background:rgba(239,68,68,.06)}
+    .session-track-row.click-row{background:rgba(13,148,136,.04)}
+    .track-name{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text);width:46px;flex-shrink:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .track-ctrl{display:flex;gap:4px;flex-shrink:0}
+    .tbtn{width:30px;height:30px;border-radius:50%;background:var(--s2);border:1px solid var(--border);font-size:13px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:background .15s,opacity .15s}
+    .tbtn:active{transform:scale(.92)}
+    .tbtn.rec{color:var(--red);border-color:rgba(239,68,68,.4)}
+    .tbtn.rec.armed{background:var(--red);color:#fff;border-color:var(--red);animation:blink 1s infinite}
+    .tbtn.locked{opacity:.28;pointer-events:none}
+    .tbtn.play.playing{background:var(--teal);border-color:var(--teal);color:#fff}
     .ms-btns{display:flex;flex-direction:column;gap:3px;flex-shrink:0}
     .ms-btn{width:22px;height:22px;border-radius:4px;background:var(--s2);border:1px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;justify-content:center;padding:0}
     .ms-btn.m-on{background:rgba(239,68,68,.2);color:var(--red);border-color:var(--red)}
     .ms-btn.s-on{background:rgba(13,148,136,.2);color:var(--teal2);border-color:var(--teal)}
-    .session-canvas-wrap{flex:1;position:relative;height:54px;background:var(--s2);border-radius:8px;overflow:hidden;cursor:crosshair}
+    .session-canvas-wrap{flex:1;position:relative;height:46px;background:var(--s2);border-radius:8px;overflow:hidden}
     .session-waveform{width:100%;height:100%;display:block}
     .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);pointer-events:none}
+    .clk-bars{flex:1;display:flex;gap:4px;align-items:center;height:46px;padding:0 10px;background:var(--s2);border-radius:8px}
+    .clk-bar{width:5px;height:14px;border-radius:3px;background:var(--teal);opacity:.5;transition:height .08s,opacity .08s}
+    .row-rec-meta{position:absolute;left:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--red);background:var(--bg);padding:2px 8px;border-radius:10px}
+    .add-track-wrap{padding:10px 16px;flex-shrink:0}
+    .add-track-btn{width:100%;background:none;border:1px dashed var(--border);border-radius:12px;padding:12px;color:var(--muted);font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+    .add-track-btn:active{border-color:var(--teal);color:var(--teal)}
     .session-controls{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0}
-    .sess-play-btn{width:40px;height:40px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-    .mark-btn{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
-    .mark-btn:active{background:var(--teal)}
+    .sess-play-btn{width:44px;height:44px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .sess-hint{flex:1;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
     .ai-bar{display:flex;gap:8px;align-items:center;padding:8px 16px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--s1);border-top:1px solid var(--border);flex-shrink:0}
     .ai-input{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:15px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;outline:none}
     .ai-input:focus{border-color:var(--teal)}
@@ -104,17 +84,7 @@
     .ai-mic-btn{background:var(--s2);color:var(--muted);border:1px solid var(--border)}
     .ai-mic-btn.listening{background:var(--red);color:#fff;animation:blink .5s infinite}
     .ai-response{font-size:12px;color:var(--teal2);padding:4px 16px;font-family:'IBM Plex Mono',monospace;min-height:20px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    #screen-playing{align-items:center;text-align:center}
-    .playing-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-    .playing-label{font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.12em;margin-bottom:4px}
-    .playing-name{font-size:26px;font-weight:900;margin-bottom:4px}
-    .playing-counter{font-size:13px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
-    .playing-waveform{display:flex;gap:4px;align-items:center;height:40px}
-    .playing-waveform span{width:4px;background:var(--teal);border-radius:2px;animation:wave 1.2s infinite ease-in-out}
-    .playing-waveform span:nth-child(1){height:16px;animation-delay:0s}.playing-waveform span:nth-child(2){height:28px;animation-delay:.15s}.playing-waveform span:nth-child(3){height:36px;animation-delay:.3s}.playing-waveform span:nth-child(4){height:24px;animation-delay:.45s}.playing-waveform span:nth-child(5){height:16px;animation-delay:.6s}
-    @keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.35)}}
-    .playing-progress{width:80%;height:3px;background:var(--s2);border-radius:2px;overflow:hidden}
-    .playing-progress-fill{height:100%;background:var(--teal);border-radius:2px;width:0%;transition:width .5s linear}
+
     .od-review-layers{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0}
     .od-layer-tag{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--teal2);border:1px solid var(--teal);padding:3px 10px;border-radius:20px}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
@@ -122,25 +92,24 @@
     .modal-sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:24px 20px;width:100%;transform:translateY(100%);transition:transform .25s ease-out;padding-bottom:max(24px,env(safe-area-inset-bottom))}
     .modal-overlay.open .modal-sheet{transform:translateY(0)}
     .modal-title{font-size:17px;font-weight:700;margin-bottom:6px}
-    .modal-label{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;margin-top:10px}
-    .modal-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:4px;outline:none}
+    .modal-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;margin-bottom:4px;outline:none;margin-top:8px}
     .modal-input:focus{border-color:var(--teal)}
-    .ref-select{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Heebo',sans-serif;font-size:13px;direction:rtl;width:100%;max-width:260px;outline:none}
-    .ref-select:focus{border-color:var(--teal)}
-    .bottom-bar{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0}
+    .modal-sub{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px}
+    .modal-row{display:flex;gap:10px;margin-top:12px}
+    .modal-row .btn{flex:1}
   </style>
 </head>
 <body>
 
 <!-- ══ BPM: ברוך הבא ══ -->
 <div id="screen-bpm-welcome" class="screen">
-  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 4h</span></div>
+  <div class="topbar"><span class="logo">laylo</span><span class="badge">sprint 5</span></div>
   <div class="center-screen">
     <div style="font-size:48px">🎸</div>
     <div style="font-size:26px;font-weight:900;line-height:1.2">נגן את השיר שלך<br>כמה פעמים</div>
     <div class="sub">תרגיש את הקצב.<br>לחץ "הפעל קליק" וכוון.</div>
   </div>
-  <div class="bottom-bar"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-start">▶ הפעל קליק</button></div>
 </div>
 
 <!-- ══ BPM: כוונון ══ -->
@@ -162,53 +131,26 @@
       <input type="range" id="click-vol" min="0" max="100" value="70" style="flex:1;max-width:200px;accent-color:var(--teal)">
     </div>
   </div>
-  <div class="bottom-bar"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><button class="btn btn-primary" id="bpm-confirm">✓ אשר BPM</button></div>
 </div>
 
-<!-- ══ HOME ══ -->
+<!-- ══ HOME = SESSION ONLY ══ -->
 <div id="screen-home" class="screen">
   <div class="topbar">
     <span class="logo" id="home-logo">laylo</span>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button class="click-toggle" id="click-toggle">♩ off</button>
-      <span class="bpm-chip" id="bpm-chip">♩ —</span>
-    </div>
+    <span class="bpm-chip" id="bpm-chip">♩ —</span>
   </div>
-  <div class="tab-bar">
-    <button class="tab active" data-tab="grid">Grid</button>
-    <button class="tab" data-tab="session">Session</button>
+  <div class="session-top-meta">
+    <span class="session-proj-name" id="session-proj-name">main</span>
+    <span class="session-time" id="session-time-display">0:00</span>
   </div>
-  <div class="content-area">
-    <div id="panel-grid">
-      <div class="empty-state" id="empty-state">
-        <div class="empty-icon">🎸</div>
-        <div class="empty-title">אין קטעים עדיין</div>
-        <div class="empty-sub">לחץ "קטע חדש" כדי להתחיל</div>
-      </div>
-      <div class="grid-wrap" id="grid-wrap" style="display:none">
-        <table class="session-grid" id="session-grid"></table>
-      </div>
-    </div>
-    <div id="panel-session">
-      <div class="timeline-wrap">
-        <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;padding-right:58px;direction:rtl">timeline</div>
-        <div id="timeline-rows"></div>
-      </div>
-      <div class="session-header">
-        <span class="session-section-name" id="session-section-label">לחץ על קטע בtimeline</span>
-        <span class="session-time" id="session-time-display">0:00</span>
-      </div>
-      <div class="session-tracks" id="session-tracks"></div>
-      <div class="session-controls">
-        <button class="sess-play-btn" id="sess-play-btn">▶</button>
-        <button class="mark-btn" id="sess-mark-btn">⟦ סמן אזור ⟧</button>
-      </div>
-    </div>
+  <div class="session-tracks" id="session-tracks"></div>
+  <div class="add-track-wrap">
+    <button class="add-track-btn" id="btn-add-track">+ ערוץ חדש</button>
   </div>
-  <div class="home-actions">
-    <button class="btn btn-ghost" id="btn-cont-rec" style="font-size:13px">⏺ הקלטה רצופה</button>
-    <button class="btn btn-ghost" id="btn-play-all" style="display:none">▶ הפעל</button>
-    <button class="btn btn-primary" id="btn-new-section">⊕ קטע</button>
+  <div class="session-controls">
+    <button class="sess-play-btn" id="sess-play-btn">▶</button>
+    <span class="sess-hint" id="sess-hint">נגן הכל · M/S לסולו</span>
   </div>
   <div class="ai-response" id="ai-response"></div>
   <div class="ai-bar">
@@ -218,25 +160,7 @@
   </div>
 </div>
 
-<!-- ══ RECORD ══ -->
-<div id="screen-record" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="rec-back">←</button><span></span></div>
-  <div class="center-screen">
-    <div id="rec-section-name" style="font-size:22px;font-weight:900"></div>
-    <div class="rec-bpm-label" id="rec-bpm">♩ —</div>
-    <div class="metro-wrap"><div class="metro-arm" id="metro-arm"><div class="metro-dot-inner"></div></div></div>
-    <select id="ref-select" class="ref-select"><option value="click">♩ קליק בלבד</option></select>
-    <div id="rec-instruction" style="font-size:13px;color:var(--muted)">בחר reference ולחץ להקלטה</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="rec-indicator" id="rec-indicator"></div>
-      <div class="rec-timer" id="rec-timer">00:00</div>
-    </div>
-    <button class="rec-big-btn" id="rec-btn">●</button>
-  </div>
-  <div class="bottom-bar"></div>
-</div>
-
-<!-- ══ REVIEW GUIDE ══ -->
+<!-- ══ REVIEW (טראק ראשון) ══ -->
 <div id="screen-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -245,50 +169,13 @@
     <button id="review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
     <div id="review-duration" style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted)">0:00</div>
   </div>
-  <div class="bottom-bar"><div class="gap">
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
     <button class="btn btn-primary" id="btn-keep">✓ שמור</button>
     <button class="btn btn-ghost" id="btn-redo">↺ הקלט שוב</button>
   </div></div>
 </div>
 
-<!-- ══ CONTINUOUS RECORDING ══ -->
-<div id="screen-cont-rec" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="cont-back">←</button><span></span></div>
-  <div class="center-screen">
-    <div style="font-size:22px;font-weight:900">הקלטה רצופה</div>
-    <div class="rec-bpm-label" id="cont-bpm">♩ —</div>
-    <div class="sub">הקלט את כל השיר מהתחלה עד הסוף.<br>אחר כך תסמן sections בSession view.</div>
-    <div class="metro-wrap"><div class="metro-arm" id="cont-metro"><div class="metro-dot-inner"></div></div></div>
-    <div id="cont-instruction" style="font-size:13px;color:var(--muted)">לחץ להתחיל</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="rec-indicator" id="cont-indicator"></div>
-      <div class="rec-timer" id="cont-timer">00:00</div>
-    </div>
-    <button class="rec-big-btn" id="cont-rec-btn">●</button>
-  </div>
-  <div class="bottom-bar"></div>
-</div>
-
-<!-- ══ OVERDUB ══ -->
-<div id="screen-overdub" class="screen" style="align-items:center;text-align:center">
-  <div class="topbar" style="width:100%"><button class="back-btn" id="od-back">←</button><span></span></div>
-  <div class="center-screen">
-    <div class="rec-bpm-label" id="od-track-label">vocals</div>
-    <div id="od-section-name" style="font-size:22px;font-weight:900"></div>
-    <div class="rec-bpm-label" id="od-bpm">♩ —</div>
-    <div class="playing-waveform" id="od-guide-wave" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="metro-wrap"><div class="metro-arm" id="od-metro-arm"><div class="metro-dot-inner"></div></div></div>
-    <div id="od-instruction" style="font-size:13px;color:var(--muted)">שמע את הtrack הראשון ולחץ הקלט</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="rec-indicator" id="od-indicator"></div>
-      <div class="rec-timer" id="od-timer">00:00</div>
-    </div>
-    <button class="rec-big-btn" id="od-rec-btn">●</button>
-  </div>
-  <div class="bottom-bar"></div>
-</div>
-
-<!-- ══ REVIEW OVERDUB ══ -->
+<!-- ══ REVIEW OVERDUB (טראק 2+) ══ -->
 <div id="screen-od-review" class="screen" style="align-items:center;text-align:center">
   <div class="topbar" style="width:100%;justify-content:center"><span></span></div>
   <div class="center-screen">
@@ -298,46 +185,33 @@
     <div id="od-review-offset" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)"></div>
     <button id="od-review-play-btn" style="width:72px;height:72px;border-radius:50%;background:var(--s2);border:2px solid var(--border);font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button>
   </div>
-  <div class="bottom-bar"><div class="gap">
+  <div class="bottom-bar" style="padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))"><div class="gap">
     <button class="btn btn-primary" id="od-btn-keep">✓ שמור ויישר</button>
     <button class="btn btn-ghost" id="od-btn-redo">↺ הקלט שוב</button>
   </div></div>
 </div>
 
-<!-- ══ PLAYING ALL ══ -->
-<div id="screen-playing" class="screen">
-  <div class="topbar"><span class="logo">laylo</span></div>
-  <div class="playing-center">
-    <div class="playing-label">מנגן עכשיו</div>
-    <div class="playing-name" id="playing-name">—</div>
-    <div class="playing-counter" id="playing-counter">1 / 1</div>
-    <div class="playing-waveform"><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="playing-progress"><div class="playing-progress-fill" id="playing-progress-fill"></div></div>
-  </div>
-  <div class="bottom-bar"><button class="btn btn-danger" id="btn-stop-playing">■ עצור</button></div>
-</div>
-
 <!-- ══ MODALS ══ -->
-<div class="modal-overlay" id="name-modal">
-  <div class="modal-sheet">
-    <div class="modal-title">קטע חדש</div>
-    <div class="modal-label">שם הקטע</div>
-    <input class="modal-input" id="modal-input" type="text" placeholder="A-part, ברידג׳, ורס...">
-    <div class="modal-label">שם הtrack הראשון</div>
-    <input class="modal-input" id="modal-track-input" type="text" placeholder="guitar, vocals, bass...">
-    <div style="margin-top:12px"><button class="btn btn-primary" id="modal-confirm">המשך →</button></div>
-  </div>
-</div>
 <div class="modal-overlay" id="track-modal">
   <div class="modal-sheet">
-    <div class="modal-title" id="track-modal-title">שם הערוץ</div>
-    <input class="modal-input" id="track-input" type="text" placeholder="vocals, bass, piano...">
-    <button class="btn btn-primary" id="track-confirm">המשך →</button>
+    <div class="modal-title">ערוץ חדש</div>
+    <input class="modal-input" id="track-input" type="text" placeholder="guitar, vocals, bass...">
+    <button class="btn btn-primary" id="track-confirm" style="margin-top:12px">המשך →</button>
+  </div>
+</div>
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-sheet">
+    <div class="modal-title" id="confirm-title">למחוק?</div>
+    <div class="modal-sub" id="confirm-sub"></div>
+    <div class="modal-row">
+      <button class="btn btn-ghost" id="confirm-cancel">ביטול</button>
+      <button class="btn btn-danger" id="confirm-ok">מחק</button>
+    </div>
   </div>
 </div>
 
 <script>
-// Sprint 4h — RTL timeline fix + click toggle + track naming
+// Sprint 5 — Session-only UI · single section "main" · per-track inline record · click as virtual track
 
 async function callAI(prompt, sessionState) {
   try {
@@ -354,6 +228,7 @@ async function callAI(prompt, sessionState) {
 }
 
 const DB_NAME='laylo-v2', DB_VER=5;
+const MAIN_ID='main';
 let db;
 function openDB(){
   return new Promise((res,rej)=>{
@@ -372,35 +247,31 @@ function openDB(){
 const dbPut=(s,v)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).put(v).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const dbGet=(s,k)=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const dbGetAll=s=>new Promise((res,rej)=>{const r=db.transaction(s,'readonly').objectStore(s).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const dbDelete=(s,k)=>new Promise((res,rej)=>{const t=db.transaction(s,'readwrite');t.objectStore(s).delete(k).onsuccess=()=>res();t.onerror=()=>rej(t.error)});
 const saveArrangement=o=>dbPut('meta',{key:'arrangement',order:o});
 const loadArrangement=async()=>{const r=await dbGet('meta','arrangement');return r?r.order:[]};
 
 let sections=[], layers=[], arrangement=[];
 let projectBPM=null, currentBPM=120;
-let pendingName='', pendingTrackName='', pendingBuffer=null, pendingMime='', pendingDuration=0;
+let pendingName='';
 let pendingODBuffer=null, pendingODMime='', pendingODDuration=0, pendingODOffsetMs=0;
-let overdubSectionId='', overdubTrackName='';
-let sessionFocusedSecId='';
-let activeTab='grid';
+let overdubTrackName='';
 let soloTrack=null;
 let mutedTracks=new Set();
-let refGuideSrc=null;
 let sessPlaying=false;
-let clickOn=false;
 
 const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fmtTime=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-const defaultSectionName=()=>(['A','B','C','D','E','F'][sections.length]||String(sections.length+1))+'-part';
-const getLayer=(sid,track)=>layers.find(l=>l.sectionId===sid&&l.trackName===track);
-const getFirstLayer=sid=>layers.filter(l=>l.sectionId===sid).sort((a,b)=>a.id.localeCompare(b.id))[0];
-const getUniqueTracks=()=>{const seen=new Set();return layers.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(l=>l.trackName).filter(n=>n&&!seen.has(n)&&seen.add(n))};
+const getLayer=track=>layers.find(l=>l.sectionId===MAIN_ID&&l.trackName===track);
+const getFirstLayer=()=>layers.filter(l=>l.sectionId===MAIN_ID).sort((a,b)=>a.id.localeCompare(b.id))[0];
+const getUniqueTracks=()=>{const seen=new Set();return layers.filter(l=>l.sectionId===MAIN_ID).sort((a,b)=>a.id.localeCompare(b.id)).map(l=>l.trackName).filter(n=>n&&!seen.has(n)&&seen.add(n))};
 const shouldPlay=t=>soloTrack?t===soloTrack:!mutedTracks.has(t);
-const getSessionState=()=>({sections:sections.map(s=>({id:s.id,name:s.name,duration:s.duration,muted:s.muted})),arrangement,tracks:getUniqueTracks(),bpm:projectBPM});
+const getSessionState=()=>({tracks:getUniqueTracks(),bpm:projectBPM});
 
 let masterCtx=null;
 let mediaRecorder=null, recStream=null, recChunks=[], recStartTime=0, recTimerInterval=null;
-let activePlaySrcs=[], stopPlayAllFlag=false, activeCellBtn=null;
+let activePlaySrcs=[];
 let playheadLoop=null, sessionPlayStartCtxTime=0, sessionPlayDuration=0;
 const decodedCache=new Map();
 
@@ -416,6 +287,11 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
+// ── RECORDING ──────────────────────────
+// guideSrc set => masterCtx stays open (overdub: guide must keep playing).
+// Otherwise masterCtx closes before getUserMedia (Android communication-mode routing fix).
+// DO NOT change this conditional.
+let guideSrc=null;
 async function startRecording(){
   if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
     decodedCache.clear();
@@ -423,7 +299,7 @@ async function startRecording(){
     masterCtx=null;
     clickGainNode=null;
   }
-  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}})}
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
@@ -432,24 +308,20 @@ async function startRecording(){
   mediaRecorder.start(100);recStartTime=Date.now();
   return true;
 }
-const stopRecording=(isOD=false)=>new Promise(res=>{
+const stopRecording=()=>new Promise(res=>{
   mediaRecorder.onstop=async()=>{
     const blob=new Blob(recChunks,{type:mediaRecorder.mimeType});
     const dur=(Date.now()-recStartTime)/1000;
     const buf=await blob.arrayBuffer();
-    if(isOD){pendingODBuffer=buf;pendingODMime=mediaRecorder.mimeType;pendingODDuration=dur}
-    else{pendingBuffer=buf;pendingMime=mediaRecorder.mimeType;pendingDuration=dur}
+    pendingODBuffer=buf;pendingODMime=mediaRecorder.mimeType;pendingODDuration=dur;
     recStream.getTracks().forEach(t=>t.stop());res();
   };
   mediaRecorder.stop();
 });
 
-function startMetronomeEl(id,bpm){const a=document.getElementById(id);if(a&&bpm)a.style.animation=`metro-swing ${(60/bpm)*2}s ease-in-out infinite`}
-function stopMetronomeEl(id){const a=document.getElementById(id);if(a)a.style.animation='none'}
-
 async function drawSessionTrackWaveform(canvasEl,layer){
   if(!canvasEl||!layer)return;
-  canvasEl.width=canvasEl.offsetWidth||300;canvasEl.height=canvasEl.offsetHeight||54;
+  canvasEl.width=canvasEl.offsetWidth||300;canvasEl.height=canvasEl.offsetHeight||46;
   const ctx=canvasEl.getContext('2d');
   ctx.fillStyle='#162438';ctx.fillRect(0,0,canvasEl.width,canvasEl.height);
   try{
@@ -462,27 +334,19 @@ async function drawSessionTrackWaveform(canvasEl,layer){
 }
 
 function updatePlayhead(progress){
-  document.querySelectorAll('.playhead').forEach(ph=>{const w=ph.parentElement;if(!w)return;ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`});
+  document.querySelectorAll('#session-tracks .playhead').forEach(ph=>{const w=ph.parentElement;if(!w)return;ph.style.transform=`translateX(${Math.round(progress*w.offsetWidth)}px)`});
   document.getElementById('session-time-display').textContent=fmtTime(sessionPlayDuration*progress);
-  const seg=document.querySelector(`[data-focus-sec-tl="${sessionFocusedSecId}"]`);
-  if(seg){let ph=seg.querySelector('.tl-ph');if(!ph){ph=document.createElement('div');ph.className='tl-ph';seg.appendChild(ph)}ph.style.left=Math.round(progress*seg.offsetWidth)+'px'}
 }
 function startPlayheadLoop(duration){
   sessionPlayDuration=duration;sessionPlayStartCtxTime=getMasterCtx().currentTime;
   function tick(){const ctx=masterCtx;if(!ctx)return;const elapsed=ctx.currentTime-sessionPlayStartCtxTime;const progress=Math.min(elapsed/Math.max(duration,0.001),1);updatePlayhead(progress);if(progress<1)playheadLoop=setTimeout(tick,33)}
   tick();
 }
-function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0);document.querySelectorAll('.tl-ph').forEach(el=>el.remove())}
+function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playheadLoop=null}updatePlayhead(0)}
 
 // ── CLICK ──────────────────────────────
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
 let clickGainNode=null, clickVolume=0.7;
-
-function updateClickToggle(){
-  const btn=document.getElementById('click-toggle');if(!btn)return;
-  btn.textContent=clickOn?'♩ on':'♩ off';
-  btn.classList.toggle('on',clickOn);
-}
 
 function startClick(bpm){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
@@ -500,7 +364,7 @@ function startClick(bpm){
       o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,clickNextTime);g.gain.exponentialRampToValueAtTime(0.001,clickNextTime+0.04);
       o.connect(g);g.connect(clickGainNode);o.start(clickNextTime);o.stop(clickNextTime+0.05);
       const b=clickBeat%4,t=Math.max(0,(clickNextTime-c.currentTime)*1000);
-      setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}},t);
+      setTimeout(()=>{const el=document.getElementById('cb'+b);if(el){el.style.height='32px';setTimeout(()=>{el.style.height='8px'},100)}const sb=document.getElementById('clkbar'+b);if(sb){sb.style.height='30px';sb.style.opacity='1';setTimeout(()=>{sb.style.height='14px';sb.style.opacity='.5'},120)}},t);
       clickNextTime+=iv;clickBeat++;
     }
     clickTimeout=setTimeout(sched,100);
@@ -512,18 +376,29 @@ function killClick(){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}clickGainNode=null}
 }
-
-document.getElementById('click-toggle').addEventListener('click',()=>{
-  if(!projectBPM){showAIResponse('קבע BPM קודם');return}
-  clickOn=!clickOn;updateClickToggle();
-  if(clickOn){startClick(projectBPM)}else{stopClick()}
-});
+function scheduleClickRange(startAt,duration){
+  const ctx=getMasterCtx();
+  if(!clickGainNode||clickGainNode.context!==ctx){
+    if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}}
+    clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
+  }
+  clickGainNode.gain.setValueAtTime(clickVolume,startAt);
+  const iv=60/projectBPM;let t=startAt,beat=0;const oscs=[];
+  while(t<startAt+duration){
+    const a=beat%4===0;const o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
+    o.connect(g);g.connect(clickGainNode);o.start(t);o.stop(t+0.05);oscs.push(o);
+    t+=iv;beat++;
+  }
+  return oscs;
+}
 
 document.getElementById('click-vol').addEventListener('input',e=>{
   clickVolume=e.target.value/100;
-  if(clickOn&&clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
+  if(clickGainNode) clickGainNode.gain.setValueAtTime(clickVolume,getMasterCtx().currentTime);
 });
 
+// ── ALIGNMENT ──────────────────────────
 async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   const ctx=getMasterCtx();
   const [guideBuf,newBuf]=await Promise.all([ctx.decodeAudioData(guideArrayBuf.slice()),ctx.decodeAudioData(newArrayBuf.slice())]);
@@ -541,226 +416,203 @@ async function alignLayer(guideArrayBuf, newArrayBuf, currentOffsetMs) {
   return{correctedOffsetMs:currentOffsetMs+bestLag*10,shiftMs:bestLag*10,correlation:bestScore};
 }
 
-// ── TIMELINE (direction:ltr — segments flow left to right) ──
-function renderTimeline(){
-  const container=document.getElementById('timeline-rows');
-  if(!container||!arrangement.length){if(container)container.innerHTML='';return}
-  container.innerHTML='';
-  const tracks=getUniqueTracks();
-  const totalDur=arrangement.reduce((s,id)=>{const sec=sections.find(x=>x.id===id);return s+(sec?.duration||0)},0)||1;
-  tracks.forEach(trackName=>{
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px;direction:ltr';
-    const lbl=document.createElement('div');lbl.className='tl-track-label';lbl.textContent=trackName;row.appendChild(lbl);
-    const segsWrap=document.createElement('div');segsWrap.style.cssText='display:flex;gap:2px;flex:1;height:32px';
-    arrangement.forEach(secId=>{
-      const sec=sections.find(s=>s.id===secId);if(!sec)return;
-      const layer=getLayer(secId,trackName);const pct=Math.max(5,(sec.duration/totalDur)*100);
-      const seg=document.createElement('div');
-      seg.className='tl-segment'+(layer?'':' empty')+(sessionFocusedSecId===secId?' focused':'');
-      seg.style.cssText=`width:${pct}%;flex-shrink:0`;seg.textContent=layer?sec.name:'';
-      seg.dataset.focusSecTl=secId;segsWrap.appendChild(seg);
-    });
-    row.appendChild(segsWrap);container.appendChild(row);
-  });
-}
-
-document.addEventListener('click',e=>{
-  const seg=e.target.closest('[data-focus-sec-tl]');
-  if(seg){sessionFocusedSecId=seg.dataset.focusSecTl;renderTimeline();renderSessionView()}
-});
-
-async function renderSessionView(){
-  const panel=document.getElementById('session-tracks');panel.innerHTML='';
-  const secId=sessionFocusedSecId||(arrangement[0]||'');
-  const sec=sections.find(s=>s.id===secId);
-  document.getElementById('session-section-label').textContent=sec?sec.name:'לחץ על קטע בtimeline';
-  if(!secId||!sec)return;
-  const tracks=getUniqueTracks();
-  for(const trackName of tracks){
-    const layer=getLayer(secId,trackName);
-    const row=document.createElement('div');row.className='session-track-row';
-    const label=document.createElement('div');label.className='session-track-name';label.textContent=trackName;
-    const msWrap=document.createElement('div');msWrap.className='ms-btns';
-    const mBtn=document.createElement('button');mBtn.className='ms-btn'+(mutedTracks.has(trackName)?' m-on':'');mBtn.textContent='M';
-    const sBtn=document.createElement('button');sBtn.className='ms-btn'+(soloTrack===trackName?' s-on':'');sBtn.textContent='S';
-    msWrap.appendChild(mBtn);msWrap.appendChild(sBtn);
-    const wrap=document.createElement('div');wrap.className='session-canvas-wrap';
-    const canvas=document.createElement('canvas');canvas.className='session-waveform';
-    const ph=document.createElement('div');ph.className='playhead';
-    wrap.appendChild(canvas);wrap.appendChild(ph);
-    row.appendChild(label);row.appendChild(msWrap);row.appendChild(wrap);
-    panel.appendChild(row);
-    if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
-    mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSessionView()});
-    sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSessionView()});
-    wrap.addEventListener('click',e=>{const rect=wrap.getBoundingClientRect();showAIResponse(`סמן: ${fmtTime((sec.duration||0)*(e.clientX-rect.left)/rect.width)} — אמור לAI מה לעשות`)});
-  }
-}
-
 const showScreen=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')};
+function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
 
-document.querySelectorAll('.tab').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    activeTab=btn.dataset.tab;
-    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===activeTab));
-    document.getElementById('panel-grid').style.display=activeTab==='grid'?'block':'none';
-    document.getElementById('panel-session').style.display=activeTab==='session'?'flex':'none';
-    if(activeTab==='session'){renderTimeline();renderSessionView()}
-  });
-});
-
+// ── BPM WIZARD ─────────────────────────
 let bpmAdjFrom='welcome';
 const updateBPMDisplay=()=>document.getElementById('bpm-adj-num').textContent=currentBPM;
 document.getElementById('bpm-start').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='welcome';startClick(currentBPM);showScreen('screen-bpm-adjust')});
-document.getElementById('bpm-adj-back').addEventListener('click',()=>{killClick();clickOn=false;updateClickToggle();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
+document.getElementById('bpm-adj-back').addEventListener('click',()=>{killClick();showScreen(bpmAdjFrom==='home'?'screen-home':'screen-bpm-welcome')});
 const adjBPM=d=>{currentBPM=Math.max(40,Math.min(220,currentBPM+d));updateBPMDisplay();startClick(currentBPM)};
 document.getElementById('bpm-m5').addEventListener('click',()=>adjBPM(-5));
 document.getElementById('bpm-m1').addEventListener('click',()=>adjBPM(-1));
 document.getElementById('bpm-p1').addEventListener('click',()=>adjBPM(1));
 document.getElementById('bpm-p5').addEventListener('click',()=>adjBPM(5));
 document.getElementById('bpm-confirm').addEventListener('click',async()=>{await lockBPM(currentBPM)});
+async function ensureMainSection(){
+  if(!sections.find(s=>s.id===MAIN_ID)){
+    const sec={id:MAIN_ID,name:'main',duration:0,muted:false};
+    sections.push(sec);await dbPut('sections',sec);
+    if(!arrangement.includes(MAIN_ID)){arrangement.push(MAIN_ID);await saveArrangement(arrangement)}
+  }
+}
 async function lockBPM(bpm){
   projectBPM=bpm;await dbPut('meta',{key:'project',bpm});
   document.getElementById('bpm-chip').textContent=`♩ ${bpm}`;
-  killClick();clickOn=false;updateClickToggle();
+  killClick();
+  await ensureMainSection();
+  renderSession();
   showScreen('screen-home');
 }
 document.getElementById('bpm-chip').addEventListener('click',()=>{currentBPM=projectBPM||120;updateBPMDisplay();bpmAdjFrom='home';startClick(currentBPM);showScreen('screen-bpm-adjust')});
 
-function showAIResponse(msg){document.getElementById('ai-response').textContent=msg}
+// ── SESSION VIEW ───────────────────────
+let recordingTrack=null;
+let recIsFirst=false;
+let recRefStartTime=0;
+let backingSrcs=[];
 
-function buildRefSelect(){
-  const sel=document.getElementById('ref-select');
-  sel.innerHTML='<option value="none">ללא</option><option value="click">♩ קליק בלבד</option>';
-  sections.forEach(sec=>{const o=document.createElement('option');o.value=sec.id;o.textContent=sec.name;sel.appendChild(o)});
-  sel.value=sections.length?sections[0].id:'click';
-}
+function renderSession(){
+  const panel=document.getElementById('session-tracks');panel.innerHTML='';
+  const tracks=getUniqueTracks();
 
-function renderHome(){
-  const empty=document.getElementById('empty-state');const wrap=document.getElementById('grid-wrap');const playAllBtn=document.getElementById('btn-play-all');
-  if(!sections.length){empty.style.display='flex';wrap.style.display='none';playAllBtn.style.display='none';return}
-  empty.style.display='none';wrap.style.display='block';playAllBtn.style.display=arrangement.length>1?'block':'none';
-  const tracks=getUniqueTracks();const grid=document.getElementById('session-grid');grid.innerHTML='';
-  const thead=document.createElement('thead');const hrow=document.createElement('tr');
-  const thSec=document.createElement('th');thSec.className='grid-th section-col';thSec.textContent='';hrow.appendChild(thSec);
-  tracks.forEach(t=>{const th=document.createElement('th');th.className='grid-th';th.textContent=t;hrow.appendChild(th)});
-  const thAdd=document.createElement('th');thAdd.className='grid-th';thAdd.textContent='+';hrow.appendChild(thAdd);
-  thead.appendChild(hrow);grid.appendChild(thead);
-  const tbody=document.createElement('tbody');
-  arrangement.forEach(secId=>{
-    const sec=sections.find(s=>s.id===secId);if(!sec)return;
-    const row=document.createElement('tr');
-    const tdLabel=document.createElement('td');tdLabel.className='grid-td-label'+(sessionFocusedSecId===secId?' focused':'');tdLabel.textContent=sec.name;tdLabel.dataset.focusSec=secId;row.appendChild(tdLabel);
-    tracks.forEach(trackName=>{
-      const td=document.createElement('td');td.className='grid-td';const layer=getLayer(sec.id,trackName);
-      if(layer){const btn=document.createElement('button');btn.className='grid-play-btn';btn.textContent='▶';btn.dataset.layerId=layer.id;td.appendChild(btn)}
-      else{const btn=document.createElement('button');btn.className='grid-add-btn';btn.textContent='+';btn.dataset.addSecId=sec.id;btn.dataset.addTrack=trackName;td.appendChild(btn)}
-      row.appendChild(td);
-    });
-    const tdNew=document.createElement('td');tdNew.className='grid-td';
-    const btnNew=document.createElement('button');btnNew.className='grid-add-btn';btnNew.textContent='+';btnNew.dataset.addSecId=secId;btnNew.dataset.addTrack='new';tdNew.appendChild(btnNew);row.appendChild(tdNew);
-    tbody.appendChild(row);
-  });
-  grid.appendChild(tbody);
-}
-
-document.getElementById('session-grid').addEventListener('click',async e=>{
-  const focusBtn=e.target.closest('[data-focus-sec]');
-  const playBtn=e.target.closest('[data-layer-id]');
-  const addBtn=e.target.closest('[data-add-sec-id]');
-  if(focusBtn){sessionFocusedSecId=focusBtn.dataset.focusSec;renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}return}
-  if(playBtn){
-    stopAllSrcs();stopPlayheadLoop();
-    if(activeCellBtn&&activeCellBtn!==playBtn){activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null}
-    if(activeCellBtn===playBtn){activeCellBtn.classList.remove('playing');activeCellBtn.textContent='▶';activeCellBtn=null;return}
-    const layer=layers.find(l=>l.id===playBtn.dataset.layerId);if(!layer)return;
-    activeCellBtn=playBtn;playBtn.classList.add('playing');playBtn.textContent='■';
-    const ctx=getMasterCtx();const buf=await getDecodedBuffer(layer.id,layer.buffer);
-    const src=ctx.createBufferSource();src.buffer=buf;const gain=ctx.createGain();gain.gain.value=layer.volume??1;const pan=ctx.createStereoPanner();pan.pan.value=layer.pan??0;
-    src.connect(pan);pan.connect(gain);gain.connect(ctx.destination);activePlaySrcs=[src];
-    src.start(ctx.currentTime+0.05,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
-    src.onended=()=>{playBtn.classList.remove('playing');playBtn.textContent='▶';activeCellBtn=null;activePlaySrcs=[]};return;
+  // click row (virtual)
+  if(projectBPM){
+    const crow=document.createElement('div');crow.className='session-track-row click-row';
+    const cname=document.createElement('div');cname.className='track-name';cname.textContent='click';
+    const cspacer=document.createElement('div');cspacer.className='track-ctrl';cspacer.style.width='64px';
+    const cms=document.createElement('div');cms.className='ms-btns';
+    const cm=document.createElement('button');cm.className='ms-btn'+(mutedTracks.has('click')?' m-on':'');cm.textContent='M';
+    const cs=document.createElement('button');cs.className='ms-btn'+(soloTrack==='click'?' s-on':'');cs.textContent='S';
+    cms.appendChild(cm);cms.appendChild(cs);
+    const cbars=document.createElement('div');cbars.className='clk-bars';
+    for(let i=0;i<8;i++){const b=document.createElement('div');b.className='clk-bar';if(i<4)b.id='clkbar'+i;cbars.appendChild(b)}
+    crow.appendChild(cname);crow.appendChild(cspacer);crow.appendChild(cms);crow.appendChild(cbars);
+    panel.appendChild(crow);
+    cm.addEventListener('click',()=>{if(mutedTracks.has('click'))mutedTracks.delete('click');else mutedTracks.add('click');renderSession()});
+    cs.addEventListener('click',()=>{soloTrack=soloTrack==='click'?null:'click';renderSession()});
   }
-  if(addBtn){
-    const secId=addBtn.dataset.addSecId,trackRaw=addBtn.dataset.addTrack;
-    const existingTracks=getUniqueTracks();
-    if(trackRaw==='new'&&existingTracks.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);return}
-    if(trackRaw==='new')openTrackModal(secId,'');else enterOverdub(secId,trackRaw);
+
+  const displayTracks=tracks.slice();
+  if(recordingTrack && !displayTracks.includes(recordingTrack)) displayTracks.push(recordingTrack);
+
+  if(!displayTracks.length){
+    const e=document.createElement('div');e.className='session-empty';
+    e.innerHTML='<div class="ic">🎸</div><div style="font-weight:700">אין ערוצים עדיין</div><div style="font-size:13px;opacity:.7">לחץ "+ ערוץ חדש" כדי להקליט</div>';
+    panel.appendChild(e);return;
   }
-});
 
-document.getElementById('sess-play-btn').addEventListener('click',async()=>{
-  const btn=document.getElementById('sess-play-btn');
-  if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶';return}
-  const secId=sessionFocusedSecId;if(!secId)return;
-  const secLayers=layers.filter(l=>l.sectionId===secId&&shouldPlay(l.trackName));if(!secLayers.length)return;
-  const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-  const maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000),0.001);
-  const ctx=getMasterCtx();const now=ctx.currentTime+0.1;
-  const srcs=decoded.map((b,i)=>{const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s});
-  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';startPlayheadLoop(maxDur);
-  setTimeout(()=>{if(sessPlaying){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;btn.textContent='▶'}},maxDur*1000+300);
-});
+  displayTracks.forEach(trackName=>{
+    const layer=getLayer(trackName);
+    const locked=!!layer;
+    const row=document.createElement('div');row.className='session-track-row';row.dataset.track=trackName;
+    const name=document.createElement('div');name.className='track-name';name.textContent=trackName;
 
-let isRecording=false;
-function enterRecord(name){
-  document.getElementById('rec-section-name').textContent=name;
-  document.getElementById('rec-bpm').textContent=projectBPM?`♩ ${projectBPM}`:'';
-  buildRefSelect();
-  document.getElementById('rec-instruction').textContent='בחר reference ולחץ להקלטה';
-  document.getElementById('rec-timer').textContent='00:00';
-  document.getElementById('rec-timer').classList.remove('recording');document.getElementById('rec-indicator').classList.remove('recording');
-  document.getElementById('rec-btn').textContent='●';document.getElementById('rec-btn').classList.remove('recording');
-  isRecording=false;startMetronomeEl('metro-arm',projectBPM);showScreen('screen-record');
-}
-document.getElementById('rec-back').addEventListener('click',()=>{
-  if(isRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isRecording=false}
-  if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
-  stopClick();stopMetronomeEl('metro-arm');showScreen('screen-home');
-});
-document.getElementById('rec-btn').addEventListener('click',async()=>{
-  if(!isRecording){
-    const ok=await startRecording();if(!ok)return;
-    isRecording=true;
-    document.getElementById('rec-instruction').textContent='מקליט... לחץ לעצור';
-    document.getElementById('rec-timer').classList.add('recording');document.getElementById('rec-indicator').classList.add('recording');
-    document.getElementById('rec-btn').textContent='■';document.getElementById('rec-btn').classList.add('recording');
-    recTimerInterval=setInterval(()=>{document.getElementById('rec-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    const refVal=document.getElementById('ref-select').value;
-    if(refVal==='click'&&projectBPM){
-      startClick(projectBPM);
-    } else if(refVal!=='none'&&refVal!=='click'){
-      if(projectBPM) startClick(projectBPM);
-      const refLayer=getFirstLayer(refVal);
-      if(refLayer){
-        const ctx=getMasterCtx();const buf=await getDecodedBuffer(refLayer.id,refLayer.buffer);
-        refGuideSrc=ctx.createBufferSource();refGuideSrc.buffer=buf;refGuideSrc.loop=true;
-        const refGain=ctx.createGain();refGain.gain.value=0.7;
-        refGuideSrc.connect(refGain);refGain.connect(ctx.destination);refGuideSrc.start(ctx.currentTime);
-      }
+    const ctrl=document.createElement('div');ctrl.className='track-ctrl';
+    const recBtn=document.createElement('button');recBtn.className='tbtn rec'+(locked?' locked':'')+(recordingTrack===trackName?' armed':'');
+    recBtn.textContent=recordingTrack===trackName?'■':'●';
+    const playBtn=document.createElement('button');playBtn.className='tbtn play';playBtn.textContent='▶';playBtn.dataset.track=trackName;
+    if(!layer){playBtn.classList.add('locked')}
+    ctrl.appendChild(recBtn);ctrl.appendChild(playBtn);
+
+    const msWrap=document.createElement('div');msWrap.className='ms-btns';
+    const mBtn=document.createElement('button');mBtn.className='ms-btn'+(mutedTracks.has(trackName)?' m-on':'');mBtn.textContent='M';
+    const sBtn=document.createElement('button');sBtn.className='ms-btn'+(soloTrack===trackName?' s-on':'');sBtn.textContent='S';
+    msWrap.appendChild(mBtn);msWrap.appendChild(sBtn);
+
+    const wrap=document.createElement('div');wrap.className='session-canvas-wrap';
+    const canvas=document.createElement('canvas');canvas.className='session-waveform';
+    const ph=document.createElement('div');ph.className='playhead';
+    wrap.appendChild(canvas);wrap.appendChild(ph);
+
+    row.appendChild(name);row.appendChild(ctrl);row.appendChild(msWrap);row.appendChild(wrap);
+
+    if(recordingTrack===trackName){
+      const meta=document.createElement('div');meta.className='row-rec-meta';meta.id='rec-row-meta';
+      meta.innerHTML='<span class="rec-indicator recording"></span><span id="rec-row-timer">00:00</span>';
+      row.appendChild(meta);row.classList.add('recording-row');
     }
-  }else{
-    clearInterval(recTimerInterval);await stopRecording();
-    stopClick();
-    if(refGuideSrc){try{refGuideSrc.stop()}catch(e){}refGuideSrc=null}
-    isRecording=false;enterReview();
-  }
-});
+    panel.appendChild(row);
+    if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
 
+    recBtn.addEventListener('click',()=>{ if(locked)return; toggleInlineRecord(trackName); });
+    playBtn.addEventListener('click',()=>auditionTrack(trackName,playBtn));
+    mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSession()});
+    sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSession()});
+    attachLongPressDelete(row,trackName);
+  });
+}
+
+function attachLongPressDelete(row,trackName){
+  let t=null;
+  const start=()=>{t=setTimeout(()=>askDeleteTrack(trackName),650)};
+  const cancel=()=>{if(t){clearTimeout(t);t=null}};
+  row.addEventListener('touchstart',start,{passive:true});
+  row.addEventListener('touchend',cancel);row.addEventListener('touchcancel',cancel);row.addEventListener('touchmove',cancel);
+  row.addEventListener('mousedown',start);row.addEventListener('mouseup',cancel);row.addEventListener('mouseleave',cancel);
+}
+
+async function toggleInlineRecord(trackName){
+  if(recordingTrack && recordingTrack!==trackName) return;
+  if(sessPlaying){stopSession()}
+  if(recordingTrack===trackName){ await stopInlineRecord(); return; }
+  await startInlineRecord(trackName);
+}
+
+async function startInlineRecord(trackName){
+  recIsFirst=!getFirstLayer();
+  overdubTrackName=trackName;
+  guideSrc=null;backingSrcs=[];
+  if(!recIsFirst){
+    const ctx=getMasterCtx();
+    const startAt=ctx.currentTime+0.15;recRefStartTime=startAt;
+    const monitorLayers=layers.filter(l=>l.sectionId===MAIN_ID);
+    for(const l of monitorLayers){
+      const buf=await getDecodedBuffer(l.id,l.buffer);
+      const s=ctx.createBufferSource();s.buffer=buf;s.loop=true;
+      const g=ctx.createGain();g.gain.value=(l.volume??1)*0.85;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
+      s.connect(p);p.connect(g);g.connect(ctx.destination);
+      s.start(startAt+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);
+      backingSrcs.push(s);
+      if(l.id===getFirstLayer()?.id) guideSrc=s;
+    }
+    if(projectBPM) startClick(projectBPM);
+  }
+  const ok=await startRecording();
+  if(!ok){ stopBacking(); return; }
+  pendingODOffsetMs=recIsFirst?0:(getMasterCtx().currentTime-recRefStartTime)*1000;
+  recordingTrack=trackName;
+  renderSession();
+  recTimerInterval=setInterval(()=>{const el=document.getElementById('rec-row-timer');if(el)el.textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
+}
+function stopBacking(){
+  backingSrcs.forEach(s=>{try{s.stop()}catch(e){}});backingSrcs=[];
+  if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
+  stopClick();
+}
+async function stopInlineRecord(){
+  clearInterval(recTimerInterval);
+  await stopRecording();
+  stopBacking();
+  const wasFirst=recIsFirst;
+  recordingTrack=null;
+  if(wasFirst){
+    pendingName=overdubTrackName;
+    pendingODOffsetMs=0;
+    enterReview();
+  }else{
+    enterODReview();
+  }
+}
+
+let auditionBtn=null;
+async function auditionTrack(trackName,btn){
+  const layer=getLayer(trackName);if(!layer)return;
+  if(auditionBtn===btn){stopAllSrcs();btn.classList.remove('playing');btn.textContent='▶';auditionBtn=null;return}
+  stopAllSrcs();if(auditionBtn){auditionBtn.classList.remove('playing');auditionBtn.textContent='▶'}
+  auditionBtn=btn;btn.classList.add('playing');btn.textContent='■';
+  const ctx=getMasterCtx();const buf=await getDecodedBuffer(layer.id,layer.buffer);
+  const src=ctx.createBufferSource();src.buffer=buf;const g=ctx.createGain();g.gain.value=layer.volume??1;const p=ctx.createStereoPanner();p.pan.value=layer.pan??0;
+  src.connect(p);p.connect(g);g.connect(ctx.destination);activePlaySrcs=[src];
+  src.start(ctx.currentTime+0.03,(layer.clipOffset||0)/1000,layer.clipDuration?layer.clipDuration/1000:undefined);
+  src.onended=()=>{btn.classList.remove('playing');btn.textContent='▶';auditionBtn=null;activePlaySrcs=[]};
+}
+
+// ── REVIEW (first track) ──
 let reviewPlaying=false;
 function enterReview(){
   document.getElementById('review-name').textContent=pendingName;
-  document.getElementById('review-duration').textContent=fmtTime(pendingDuration);
+  document.getElementById('review-duration').textContent=fmtTime(pendingODDuration);
   reviewPlaying=false;const btn=document.getElementById('review-play-btn');btn.textContent='▶';btn.style.background='var(--s2)';
-  stopMetronomeEl('metro-arm');showScreen('screen-review');
+  showScreen('screen-review');
 }
 document.getElementById('review-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('review-play-btn');
   if(reviewPlaying){stopAllSrcs();reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)'}
   else{
     reviewPlaying=true;btn.textContent='■';btn.style.background='var(--teal)';
-    const ctx=getMasterCtx();const buf=await ctx.decodeAudioData(pendingBuffer.slice());
+    const ctx=getMasterCtx();const buf=await ctx.decodeAudioData(pendingODBuffer.slice());
     const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
     activePlaySrcs=[src];src.start(ctx.currentTime);
     src.onended=()=>{reviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
@@ -768,101 +620,22 @@ document.getElementById('review-play-btn').addEventListener('click',async()=>{
 });
 document.getElementById('btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();
-  const secId=uid(),layerId=uid();
-  const sec={id:secId,name:pendingName,duration:pendingDuration,muted:false};
-  const layer={id:layerId,sectionId:secId,trackName:pendingTrackName||'track 1',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-  sections.push(sec);layers.push(layer);arrangement.push(secId);
+  const layerId=uid();
+  const layer={id:layerId,sectionId:MAIN_ID,trackName:pendingName||'track 1',buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+  layers.push(layer);
+  const sec=sections.find(s=>s.id===MAIN_ID);if(sec){sec.duration=Math.max(sec.duration||0,pendingODDuration);await dbPut('sections',sec)}
   decodedCache.delete(layerId);
-  await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);
-  renderHome();if(activeTab==='session'){renderTimeline();renderSessionView()}showScreen('screen-home');
+  await dbPut('layers',layer);
+  renderSession();showScreen('screen-home');
 });
-document.getElementById('btn-redo').addEventListener('click',()=>{stopAllSrcs();enterRecord(pendingName)});
+document.getElementById('btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(pendingName);showScreen('screen-home')});
 
-let isContRecording=false;
-document.getElementById('btn-cont-rec').addEventListener('click',()=>{
-  document.getElementById('cont-bpm').textContent=projectBPM?`♩ ${projectBPM}`:'';
-  document.getElementById('cont-timer').textContent='00:00';document.getElementById('cont-instruction').textContent='לחץ להתחיל';
-  document.getElementById('cont-timer').classList.remove('recording');document.getElementById('cont-indicator').classList.remove('recording');
-  document.getElementById('cont-rec-btn').textContent='●';document.getElementById('cont-rec-btn').classList.remove('recording');
-  isContRecording=false;startMetronomeEl('cont-metro',projectBPM);showScreen('screen-cont-rec');
-});
-document.getElementById('cont-back').addEventListener('click',()=>{
-  if(isContRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isContRecording=false}
-  stopClick();stopMetronomeEl('cont-metro');showScreen('screen-home');
-});
-document.getElementById('cont-rec-btn').addEventListener('click',async()=>{
-  if(!isContRecording){
-    const ok=await startRecording();if(!ok)return;
-    isContRecording=true;
-    document.getElementById('cont-instruction').textContent='מקליט... לחץ לעצור';
-    document.getElementById('cont-timer').classList.add('recording');document.getElementById('cont-indicator').classList.add('recording');
-    document.getElementById('cont-rec-btn').textContent='■';document.getElementById('cont-rec-btn').classList.add('recording');
-    recTimerInterval=setInterval(()=>{document.getElementById('cont-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-    if(projectBPM) startClick(projectBPM);
-  }else{
-    clearInterval(recTimerInterval);await stopRecording();stopClick();stopMetronomeEl('cont-metro');isContRecording=false;
-    const secId=uid(),layerId=uid();
-    const sec={id:secId,name:'Full Take',duration:pendingDuration,muted:false};
-    const layer={id:layerId,sectionId:secId,trackName:pendingTrackName||'track 1',buffer:pendingBuffer,mimeType:pendingMime,offsetMs:0,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-    sections.push(sec);layers.push(layer);arrangement.push(secId);
-    sessionFocusedSecId=secId;decodedCache.delete(layerId);
-    await dbPut('sections',sec);await dbPut('layers',layer);await saveArrangement(arrangement);renderHome();
-    activeTab='session';
-    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='session'));
-    document.getElementById('panel-grid').style.display='none';document.getElementById('panel-session').style.display='flex';
-    showScreen('screen-home');setTimeout(()=>{renderTimeline();renderSessionView()},100);
-    showAIResponse('Full Take מוכן — אמור לAI: "סמן A-part מ-0:00 עד 0:32"');
-  }
-});
-
-let isODRecording=false, guideStartCtxTime=0, guideSrc=null;
-async function enterOverdub(sectionId,trackName){
-  overdubSectionId=sectionId;overdubTrackName=trackName;
-  const sec=sections.find(s=>s.id===sectionId);
-  document.getElementById('od-section-name').textContent=sec?.name||'';document.getElementById('od-track-label').textContent=trackName;
-  document.getElementById('od-bpm').textContent=projectBPM?`♩ ${projectBPM}`:'';document.getElementById('od-timer').textContent='00:00';
-  document.getElementById('od-instruction').textContent='שמע את הtrack הראשון ולחץ הקלט';
-  document.getElementById('od-timer').classList.remove('recording');document.getElementById('od-indicator').classList.remove('recording');
-  document.getElementById('od-rec-btn').textContent='●';document.getElementById('od-rec-btn').classList.remove('recording');
-  document.getElementById('od-guide-wave').style.display='none';isODRecording=false;
-  const firstLayer=getFirstLayer(sectionId);
-  if(firstLayer){
-    const ctx=getMasterCtx();const buf=await getDecodedBuffer(firstLayer.id,firstLayer.buffer);
-    guideSrc=ctx.createBufferSource();guideSrc.buffer=buf;guideSrc.loop=true;
-    const g=ctx.createGain();g.gain.value=0.8;guideSrc.connect(g);g.connect(ctx.destination);
-    guideStartCtxTime=ctx.currentTime;guideSrc.start(guideStartCtxTime);
-    document.getElementById('od-guide-wave').style.display='flex';
-  }
-  startMetronomeEl('od-metro-arm',projectBPM);
-  if(projectBPM) startClick(projectBPM);
-  showScreen('screen-overdub');
-}
-document.getElementById('od-back').addEventListener('click',()=>{
-  if(isODRecording){clearInterval(recTimerInterval);mediaRecorder?.stop();isODRecording=false}
-  if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-  stopClick();stopMetronomeEl('od-metro-arm');showScreen('screen-home');
-});
-document.getElementById('od-rec-btn').addEventListener('click',async()=>{
-  if(!isODRecording){
-    const ok=await startRecording();if(!ok)return;
-    const ctx=getMasterCtx();pendingODOffsetMs=(ctx.currentTime-guideStartCtxTime)*1000;
-    isODRecording=true;
-    document.getElementById('od-instruction').textContent='מקליט... לחץ לעצור';
-    document.getElementById('od-timer').classList.add('recording');document.getElementById('od-indicator').classList.add('recording');
-    document.getElementById('od-rec-btn').textContent='■';document.getElementById('od-rec-btn').classList.add('recording');
-    recTimerInterval=setInterval(()=>{document.getElementById('od-timer').textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
-  }else{
-    clearInterval(recTimerInterval);await stopRecording(true);
-    if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
-    stopClick();stopMetronomeEl('od-metro-arm');isODRecording=false;enterODReview();
-  }
-});
-async function enterODReview(){
-  const sec=sections.find(s=>s.id===overdubSectionId);
-  document.getElementById('od-review-section').textContent=sec?.name||'';
+// ── REVIEW OVERDUB ──
+function enterODReview(){
+  document.getElementById('od-review-section').textContent=overdubTrackName;
   document.getElementById('od-review-offset').textContent=`raw offset: ${Math.round(pendingODOffsetMs)}ms`;
   const tagsEl=document.getElementById('od-review-layers');tagsEl.innerHTML='';
-  layers.filter(l=>l.sectionId===overdubSectionId).forEach(l=>{const t=document.createElement('div');t.className='od-layer-tag';t.textContent=l.trackName;tagsEl.appendChild(t)});
+  layers.filter(l=>l.sectionId===MAIN_ID).forEach(l=>{const t=document.createElement('div');t.className='od-layer-tag';t.textContent=l.trackName;tagsEl.appendChild(t)});
   const nt=document.createElement('div');nt.className='od-layer-tag';nt.style.background='rgba(13,148,136,.2)';nt.textContent=overdubTrackName+' ✦';tagsEl.appendChild(nt);
   document.getElementById('od-review-play-btn').textContent='▶';document.getElementById('od-review-play-btn').style.background='var(--s2)';
   showScreen('screen-od-review');
@@ -871,7 +644,7 @@ let odReviewPlaying=false;
 document.getElementById('od-review-play-btn').addEventListener('click',async()=>{
   const btn=document.getElementById('od-review-play-btn');
   if(odReviewPlaying){stopAllSrcs();odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';return}
-  const secLayers=layers.filter(l=>l.sectionId===overdubSectionId);
+  const secLayers=layers.filter(l=>l.sectionId===MAIN_ID);
   const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
   const odBuf=await getMasterCtx().decodeAudioData(pendingODBuffer.slice());
   const ctx=getMasterCtx();const now=ctx.currentTime+0.1;
@@ -881,11 +654,10 @@ document.getElementById('od-review-play-btn').addEventListener('click',async()=>
   activePlaySrcs=[...srcs,odSrc];
   odSrc.onended=()=>{odReviewPlaying=false;btn.textContent='▶';btn.style.background='var(--s2)';activePlaySrcs=[]};
 });
-
 document.getElementById('od-btn-keep').addEventListener('click',async()=>{
   stopAllSrcs();showAIResponse('מיישר...');
   let finalOffsetMs=pendingODOffsetMs;
-  const firstLayer=getFirstLayer(overdubSectionId);
+  const firstLayer=getFirstLayer();
   if(firstLayer){
     try{
       const {correctedOffsetMs,shiftMs,correlation}=await alignLayer(firstLayer.buffer,pendingODBuffer,pendingODOffsetMs);
@@ -896,31 +668,82 @@ document.getElementById('od-btn-keep').addEventListener('click',async()=>{
     }catch(e){showAIResponse('שמור ללא יישור (שגיאה)')}
   }else{showAIResponse('')}
   const layerId=uid();
-  const layer={id:layerId,sectionId:overdubSectionId,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:finalOffsetMs,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
-  layers.push(layer);await dbPut('layers',layer);renderHome();showScreen('screen-home');
+  const layer={id:layerId,sectionId:MAIN_ID,trackName:overdubTrackName,buffer:pendingODBuffer,mimeType:pendingODMime,offsetMs:finalOffsetMs,volume:1.0,pan:0.0,clipOffset:0,clipDuration:null};
+  layers.push(layer);
+  const sec=sections.find(s=>s.id===MAIN_ID);if(sec){sec.duration=Math.max(sec.duration||0,pendingODDuration+finalOffsetMs/1000);await dbPut('sections',sec)}
+  decodedCache.delete(layerId);
+  await dbPut('layers',layer);renderSession();showScreen('screen-home');
 });
-document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();enterOverdub(overdubSectionId,overdubTrackName)});
+document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(overdubTrackName);showScreen('screen-home')});
 
-async function playAll(){
-  if(!arrangement.length)return;stopPlayAllFlag=false;showScreen('screen-playing');
-  for(let i=0;i<arrangement.length;i++){
-    if(stopPlayAllFlag)break;
-    const sec=sections.find(s=>s.id===arrangement[i]);const secLayers=layers.filter(l=>l.sectionId===arrangement[i]);
-    if(!sec||!secLayers.length||sec.muted)continue;
-    document.getElementById('playing-name').textContent=sec.name;document.getElementById('playing-counter').textContent=`${i+1} / ${arrangement.length}`;document.getElementById('playing-progress-fill').style.width='0%';
+// ── SESSION PLAYBACK ──
+function stopSession(){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶';if(clickGainNode)clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
+document.getElementById('sess-play-btn').addEventListener('click',async()=>{
+  if(recordingTrack)return;
+  const btn=document.getElementById('sess-play-btn');
+  if(sessPlaying){stopSession();return}
+  const secLayers=layers.filter(l=>l.sectionId===MAIN_ID&&shouldPlay(l.trackName));
+  const ctx=getMasterCtx();const now=ctx.currentTime+0.12;
+  let maxDur=0.001;const srcs=[];
+  if(secLayers.length){
     const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-    const maxDur=Math.max(...decoded.map((b,idx)=>b.duration+(secLayers[idx].offsetMs||0)/1000));
-    const ctx=getMasterCtx();const now=ctx.currentTime+0.1;
-    const srcs=decoded.map((b,idx)=>{const l=secLayers[idx];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);return s});
-    activePlaySrcs=srcs;
-    await new Promise(res=>{let el=0;const tick=setInterval(()=>{if(stopPlayAllFlag){clearInterval(tick);res();return}el+=0.1;document.getElementById('playing-progress-fill').style.width=Math.min(100,(el/maxDur)*100)+'%';if(el>=maxDur){clearInterval(tick);res()}},100)});
-    stopAllSrcs();
+    maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000),0.001);
+    decoded.forEach((b,i)=>{const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);srcs.push(s)});
   }
-  if(!stopPlayAllFlag)showScreen('screen-home');
-}
-document.getElementById('btn-play-all').addEventListener('click',playAll);
-document.getElementById('btn-stop-playing').addEventListener('click',()=>{stopPlayAllFlag=true;stopAllSrcs();showScreen('screen-home')});
+  if(projectBPM&&shouldPlay('click')){
+    const clickDur=Math.max(maxDur,4);
+    const oscs=scheduleClickRange(now,clickDur);srcs.push(...oscs);
+    if(!secLayers.length)maxDur=clickDur;
+  }
+  if(!srcs.length)return;
+  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';startPlayheadLoop(maxDur);
+  setTimeout(()=>{if(sessPlaying)stopSession()},maxDur*1000+350);
+});
 
+// ── ADD TRACK ──
+function openTrackModal(){
+  const i=document.getElementById('track-input');i.value='';
+  document.getElementById('track-modal').classList.add('open');setTimeout(()=>i.focus(),300);
+}
+const closeTrackModal=()=>document.getElementById('track-modal').classList.remove('open');
+document.getElementById('btn-add-track').addEventListener('click',()=>{
+  const existing=getUniqueTracks();
+  if(existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);return}
+  openTrackModal();
+});
+document.getElementById('track-confirm').addEventListener('click',()=>{
+  const v=document.getElementById('track-input').value.trim();if(!v)return;
+  const existing=getUniqueTracks();
+  if(existing.includes(v)){showAIResponse('כבר יש ערוץ בשם הזה');return}
+  if(existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
+  closeTrackModal();
+  pendingName=v;overdubTrackName=v;
+  startInlineRecord(v);
+});
+document.getElementById('track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('track-confirm').click()});
+document.getElementById('track-modal').addEventListener('click',e=>{if(e.target===document.getElementById('track-modal'))closeTrackModal()});
+
+// ── DELETE TRACK ──
+let pendingDeleteTrack=null;
+function askDeleteTrack(trackName){
+  if(recordingTrack)return;
+  pendingDeleteTrack=trackName;
+  document.getElementById('confirm-title').textContent='למחוק ערוץ?';
+  document.getElementById('confirm-sub').textContent=`"${trackName}" יימחק לצמיתות. אי אפשר לבטל.`;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+const closeConfirm=()=>{document.getElementById('confirm-modal').classList.remove('open');pendingDeleteTrack=null};
+document.getElementById('confirm-cancel').addEventListener('click',closeConfirm);
+document.getElementById('confirm-modal').addEventListener('click',e=>{if(e.target===document.getElementById('confirm-modal'))closeConfirm()});
+document.getElementById('confirm-ok').addEventListener('click',async()=>{
+  const trackName=pendingDeleteTrack;if(!trackName){closeConfirm();return}
+  const layer=getLayer(trackName);
+  if(layer){decodedCache.delete(layer.id);await dbDelete('layers',layer.id);layers=layers.filter(l=>l.id!==layer.id)}
+  if(soloTrack===trackName)soloTrack=null;mutedTracks.delete(trackName);
+  closeConfirm();renderSession();showAIResponse(`"${trackName}" נמחק`);
+});
+
+// ── AI BAR + VOICE ──
 async function sendAICommand(cmd){
   if(!cmd)return;document.getElementById('ai-input').value='';showAIResponse('...');
   const result=await callAI(cmd,getSessionState());showAIResponse(result.message||'');
@@ -941,40 +764,7 @@ document.getElementById('ai-mic-btn').addEventListener('click',()=>{
   document.getElementById('ai-mic-btn').classList.add('listening');recognition.start();
 });
 
-const openNameModal=()=>{
-  const i=document.getElementById('modal-input');i.value=defaultSectionName();
-  document.getElementById('modal-track-input').value='';
-  document.getElementById('name-modal').classList.add('open');setTimeout(()=>i.focus(),300);
-};
-const closeNameModal=()=>document.getElementById('name-modal').classList.remove('open');
-document.getElementById('btn-new-section').addEventListener('click',openNameModal);
-document.getElementById('modal-confirm').addEventListener('click',()=>{
-  const v=document.getElementById('modal-input').value.trim();if(!v)return;
-  pendingName=v;
-  pendingTrackName=document.getElementById('modal-track-input').value.trim()||'track 1';
-  closeNameModal();enterRecord(v);
-});
-document.getElementById('modal-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-track-input').focus()});
-document.getElementById('modal-track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('modal-confirm').click()});
-document.getElementById('name-modal').addEventListener('click',e=>{if(e.target===document.getElementById('name-modal'))closeNameModal()});
-
-let trackModalSectionId='';
-function openTrackModal(secId,def){
-  trackModalSectionId=secId;const sec=sections.find(s=>s.id===secId);
-  document.getElementById('track-modal-title').textContent=`ערוץ חדש — ${sec?.name||''}`;
-  const i=document.getElementById('track-input');i.value=def||'';
-  document.getElementById('track-modal').classList.add('open');setTimeout(()=>i.focus(),300);
-}
-const closeTrackModal=()=>document.getElementById('track-modal').classList.remove('open');
-document.getElementById('track-confirm').addEventListener('click',()=>{
-  const v=document.getElementById('track-input').value.trim();if(!v)return;
-  const existing=getUniqueTracks();
-  if(!existing.includes(v)&&existing.length>=FREE_TRACK_LIMIT){showAIResponse(`${FREE_TRACK_LIMIT} ערוצים = שיר שלם 🎸 Laylo Pro לעוד`);closeTrackModal();return}
-  closeTrackModal();enterOverdub(trackModalSectionId,v);
-});
-document.getElementById('track-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('track-confirm').click()});
-document.getElementById('track-modal').addEventListener('click',e=>{if(e.target===document.getElementById('track-modal'))closeTrackModal()});
-
+// ── INIT ──
 async function init(){
   if(!sessionStorage.getItem('laylo-session')){
     await new Promise(r=>{const req=indexedDB.deleteDatabase('laylo-v2');req.onsuccess=req.onerror=r});
@@ -985,13 +775,16 @@ async function init(){
   sections=await dbGetAll('sections');layers=await dbGetAll('layers');
   const savedArr=await loadArrangement();const ids=new Set(sections.map(s=>s.id));
   arrangement=savedArr.filter(id=>ids.has(id));sections.forEach(s=>{if(!arrangement.includes(s.id))arrangement.push(s.id)});
-  if(arrangement.length)sessionFocusedSecId=arrangement[0];
-  updateClickToggle();
-  if(project?.bpm){projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;renderHome();showScreen('screen-home')}
+  if(project?.bpm){
+    projectBPM=project.bpm;document.getElementById('bpm-chip').textContent=`♩ ${projectBPM}`;
+    await ensureMainSection();
+    renderSession();showScreen('screen-home');
+  }
   else showScreen('screen-bpm-welcome');
 }
 init().catch(console.error);
 
+// TEMP — 3s long-press on logo = hard reset
 ;(()=>{
   let t=null;const logo=document.getElementById('home-logo');if(!logo)return;
   logo.addEventListener('touchstart',e=>{e.preventDefault();t=setTimeout(()=>{indexedDB.deleteDatabase('laylo-v2');location.reload()},3000)},{passive:false});
