@@ -207,7 +207,7 @@
 </div>
 
 <script>
-// Sprint 5.2 — M/S fully wired: backing + click respect shouldPlay during overdub
+// Sprint 5.3 — backing via <audio> element (zero WebAudio loopback) + anchored click grid
 
 async function callAI(prompt, sessionState) {
   try {
@@ -258,6 +258,7 @@ let sessPlaying=false;
 let pendingTracks=[];
 let auditionSrc=null, auditionTrackName=null;
 let recMetroInterval=null;
+let monitorAudioEl=null, monitorUrl=null;
 
 const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -286,7 +287,8 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// guideSrc set => masterCtx stays open (overdub). Otherwise close before getUserMedia (Android fix).
+// masterCtx closes before getUserMedia (Android communication-mode fix).
+// Backing is played via <audio> element, NOT WebAudio — so guideSrc stays null and this ALWAYS closes.
 let guideSrc=null;
 async function startRecording(){
   if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
@@ -344,7 +346,7 @@ function stopPlayheadLoop(){if(playheadLoop){clearTimeout(playheadLoop);playhead
 let clickTimeout=null, clickBeat=0, clickNextTime=0, clickRunning=false;
 let clickGainNode=null, clickVolume=0.7;
 
-function startClick(bpm){
+function startClick(bpm,anchorTime){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   const ctx=getMasterCtx();
   if(!clickGainNode||clickGainNode.context!==ctx){
@@ -352,7 +354,9 @@ function startClick(bpm){
     clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
   }
   clickGainNode.gain.setValueAtTime(clickVolume,ctx.currentTime);
-  const iv=60/bpm;clickBeat=0;clickNextTime=ctx.currentTime+0.1;clickRunning=true;
+  const iv=60/bpm;clickBeat=0;
+  clickNextTime=(typeof anchorTime==='number'&&anchorTime>ctx.currentTime+0.02)?anchorTime:ctx.currentTime+0.1;
+  clickRunning=true;
   function sched(){
     if(!clickRunning)return;const c=getMasterCtx();
     while(clickNextTime<c.currentTime+0.3){
@@ -367,26 +371,10 @@ function startClick(bpm){
   }
   sched();
 }
-function stopClick(){if(clickGainNode) clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
+function stopClick(){clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}if(clickGainNode)clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
 function killClick(){
   clickRunning=false;if(clickTimeout){clearTimeout(clickTimeout);clickTimeout=null}
   if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}clickGainNode=null}
-}
-function scheduleClickRange(startAt,duration){
-  const ctx=getMasterCtx();
-  if(!clickGainNode||clickGainNode.context!==ctx){
-    if(clickGainNode){try{clickGainNode.disconnect()}catch(e){}}
-    clickGainNode=ctx.createGain();clickGainNode.connect(ctx.destination);
-  }
-  clickGainNode.gain.setValueAtTime(clickVolume,startAt);
-  const iv=60/projectBPM;let t=startAt,beat=0;const oscs=[];
-  while(t<startAt+duration){
-    const a=beat%4===0;const o=ctx.createOscillator(),g=ctx.createGain();
-    o.frequency.value=a?1200:900;g.gain.setValueAtTime(a?.8:.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
-    o.connect(g);g.connect(clickGainNode);o.start(t);o.stop(t+0.05);oscs.push(o);
-    t+=iv;beat++;
-  }
-  return oscs;
 }
 document.getElementById('click-vol').addEventListener('input',e=>{
   clickVolume=e.target.value/100;
@@ -509,13 +497,14 @@ function renderSession(){
 
 function attachLongPressDelete(row,trackName){
   let t=null,sx=0,sy=0;
+  const onBtn=e=>e.target.closest('button');
   const fire=()=>{row.style.background='';askDeleteTrack(trackName)};
   const start=(x,y)=>{sx=x;sy=y;row.style.transition='background .5s';row.style.background='rgba(239,68,68,.18)';t=setTimeout(fire,500)};
   const cancel=()=>{if(t){clearTimeout(t);t=null}row.style.background='';row.style.transition=''};
-  row.addEventListener('touchstart',e=>start(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+  row.addEventListener('touchstart',e=>{if(onBtn(e))return;start(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
   row.addEventListener('touchmove',e=>{if(Math.abs(e.touches[0].clientX-sx)>14||Math.abs(e.touches[0].clientY-sy)>14)cancel()},{passive:true});
   row.addEventListener('touchend',cancel);row.addEventListener('touchcancel',cancel);
-  row.addEventListener('mousedown',e=>start(e.clientX,e.clientY));row.addEventListener('mouseup',cancel);row.addEventListener('mouseleave',cancel);
+  row.addEventListener('mousedown',e=>{if(onBtn(e))return;start(e.clientX,e.clientY)});row.addEventListener('mouseup',cancel);row.addEventListener('mouseleave',cancel);
 }
 
 async function toggleInlineRecord(trackName){
@@ -525,55 +514,61 @@ async function toggleInlineRecord(trackName){
   await startInlineRecord(trackName);
 }
 
+// Render monitor mix (layers filtered by M/S + baked click) into a WAV blob.
+// Played via <audio> so masterCtx stays CLOSED during capture — zero WebAudio loopback.
+async function renderBackingLoop(){
+  const monitor=layers.filter(l=>l.sectionId===MAIN_ID && shouldPlay(l.trackName));
+  const playClick=projectBPM && shouldPlay('click');
+  if(!monitor.length && !playClick) return null;
+  let decoded=[];
+  if(monitor.length){
+    const tmp=new (window.AudioContext||window.webkitAudioContext)();
+    decoded=await Promise.all(monitor.map(async l=>({l,buf:await tmp.decodeAudioData(l.buffer.slice())})));
+    await tmp.close();
+  }
+  const beat=projectBPM?60/projectBPM:0.5;
+  let loopLen=0;decoded.forEach(({l,buf})=>loopLen=Math.max(loopLen,(l.offsetMs||0)/1000+buf.duration));
+  if(projectBPM){const bar=beat*4;loopLen=Math.max(loopLen,bar);loopLen=Math.ceil(loopLen/bar)*bar;}
+  else if(!loopLen) loopLen=2;
+  const sr=44100;
+  const off=new OfflineAudioContext(2,Math.max(1,Math.ceil(loopLen*sr)),sr);
+  decoded.forEach(({l,buf})=>{const s=off.createBufferSource();s.buffer=buf;const g=off.createGain();g.gain.value=(l.volume??1)*0.9;const p=off.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(off.destination);s.start((l.offsetMs||0)/1000,(l.clipOffset||0)/1000)});
+  if(playClick){for(let n=0,t=0;t<loopLen-0.0005;n++,t=n*beat){const a=n%4===0;const o=off.createOscillator(),g=off.createGain();o.frequency.value=a?1200:900;g.gain.setValueAtTime((a?.8:.5)*clickVolume,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);o.connect(g);g.connect(off.destination);o.start(t);o.stop(t+0.05)}}
+  return audioBufferToWavBlob(await off.startRendering());
+}
+function audioBufferToWavBlob(ab){
+  const nCh=ab.numberOfChannels,sr=ab.sampleRate,len=ab.length,bps=2,blockAlign=nCh*bps,dataLen=len*blockAlign;
+  const view=new DataView(new ArrayBuffer(44+dataLen));let p=0;
+  const ws=s=>{for(let i=0;i<s.length;i++)view.setUint8(p++,s.charCodeAt(i))},w32=v=>{view.setUint32(p,v,true);p+=4},w16=v=>{view.setUint16(p,v,true);p+=2};
+  ws('RIFF');w32(36+dataLen);ws('WAVE');ws('fmt ');w32(16);w16(1);w16(nCh);w32(sr);w32(sr*blockAlign);w16(blockAlign);w16(16);ws('data');w32(dataLen);
+  const chans=[];for(let c=0;c<nCh;c++)chans.push(ab.getChannelData(c));
+  for(let i=0;i<len;i++)for(let c=0;c<nCh;c++){let s=Math.max(-1,Math.min(1,chans[c][i]));view.setInt16(p,s<0?s*0x8000:s*0x7FFF,true);p+=2}
+  return new Blob([view.buffer],{type:'audio/wav'});
+}
+
 async function startInlineRecord(trackName){
   stopAudition();if(sessPlaying)stopSession();
   recIsFirst=!getFirstLayer();
   overdubTrackName=trackName;pendingName=trackName;
   guideSrc=null;backingSrcs=[];
-
-  if(!recIsFirst){
-    // ── overdub: play only tracks the user wants to hear (M/S respected) ──
-    const ctx=getMasterCtx();
-    const startAt=ctx.currentTime+0.15;recRefStartTime=startAt;
-    // filter by shouldPlay — user controls monitor mix with M/S before pressing ●
-    const monitorLayers=layers.filter(l=>l.sectionId===MAIN_ID && shouldPlay(l.trackName));
-    for(const l of monitorLayers){
-      const buf=await getDecodedBuffer(l.id,l.buffer);
-      const s=ctx.createBufferSource();s.buffer=buf;s.loop=true;
-      const g=ctx.createGain();g.gain.value=(l.volume??1)*0.85;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;
-      s.connect(p);p.connect(g);g.connect(ctx.destination);
-      s.start(startAt+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000);
-      backingSrcs.push(s);
-    }
-    // click: start always (so scheduler runs), but mute gain if M is on
-    // this keeps masterCtx alive and visual bars pulsing regardless
-    if(projectBPM){
-      startClick(projectBPM);
-      if(!shouldPlay('click')) stopClick(); // gain→0 immediately if click muted
-    }
-    // guideSrc keeps masterCtx open — use first backing src, or a sentinel if all tracks muted
-    // alignment always uses getFirstLayer().buffer post-hoc, independent of what played
-    if(backingSrcs.length){
-      guideSrc=backingSrcs[0];
-    } else if(projectBPM){
-      guideSrc={stop(){}}; // click scheduler keeps ctx open; use dummy sentinel
-    }
+  const playClick=projectBPM && shouldPlay('click');
+  let backingBlob=null;
+  try{backingBlob=await renderBackingLoop();}catch(e){console.log('[backing render failed]',e);}
+  let playStartMs=0;
+  if(backingBlob){
+    if(monitorUrl){URL.revokeObjectURL(monitorUrl);monitorUrl=null}
+    monitorUrl=URL.createObjectURL(backingBlob);
+    if(!monitorAudioEl)monitorAudioEl=new Audio();
+    monitorAudioEl.loop=true;monitorAudioEl.src=monitorUrl;
+    try{monitorAudioEl.currentTime=0;await monitorAudioEl.play();}catch(e){}
+    playStartMs=Date.now();
   }
-
   const ok=await startRecording();
   if(!ok){stopBacking();return}
-
-  // first track: masterCtx was closed before getUserMedia — now reopen and start click
-  if(recIsFirst && projectBPM){
-    startClick(projectBPM);
-    if(!shouldPlay('click')) stopClick();
-    startRecMetronomeVisual(projectBPM);
-  }
-
-  pendingODOffsetMs=recIsFirst?0:(getMasterCtx().currentTime-recRefStartTime)*1000;
+  pendingODOffsetMs=(recIsFirst||!backingBlob)?0:Math.max(0,recStartTime-playStartMs);
   recordingTrack=trackName;
   renderSession();
-  if(!recIsFirst && projectBPM) startRecMetronomeVisual(projectBPM);
+  if(playClick) startRecMetronomeVisual(projectBPM);
   recTimerInterval=setInterval(()=>{const el=document.getElementById('rec-row-timer');if(el)el.textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
 }
 
@@ -590,9 +585,10 @@ function stopRecMetronomeVisual(){if(recMetroInterval){clearInterval(recMetroInt
 
 function stopBacking(){
   backingSrcs.forEach(s=>{try{s.stop()}catch(e){}});backingSrcs=[];
-  if(guideSrc && typeof guideSrc.stop==='function'){try{guideSrc.stop()}catch(e){}}
-  guideSrc=null;
-  stopClick();
+  if(monitorAudioEl){try{monitorAudioEl.pause()}catch(e){}}
+  if(monitorUrl){URL.revokeObjectURL(monitorUrl);monitorUrl=null}
+  if(guideSrc){try{guideSrc.stop()}catch(e){}guideSrc=null}
+  stopClick();stopRecMetronomeVisual();
 }
 async function stopInlineRecord(){
   clearInterval(recTimerInterval);stopRecMetronomeVisual();
@@ -696,13 +692,15 @@ document.getElementById('od-btn-keep').addEventListener('click',async()=>{
 document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(overdubTrackName);showScreen('screen-home')});
 
 // ── SESSION PLAYBACK ──
-function stopSession(){stopAllSrcs();stopPlayheadLoop();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶';if(clickGainNode)clickGainNode.gain.setValueAtTime(0,getMasterCtx().currentTime)}
+function stopSession(){stopAllSrcs();stopClick();stopPlayheadLoop();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶'}
 document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   if(recordingTrack)return;
   const btn=document.getElementById('sess-play-btn');
   if(sessPlaying){stopSession();return}
   stopAudition();
   const secLayers=layers.filter(l=>l.sectionId===MAIN_ID&&shouldPlay(l.trackName));
+  const playClick=projectBPM&&shouldPlay('click');
+  if(!secLayers.length&&!playClick)return;
   const ctx=getMasterCtx();const now=ctx.currentTime+0.12;
   let maxDur=0.001;const srcs=[];
   if(secLayers.length){
@@ -710,14 +708,12 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
     maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000),0.001);
     decoded.forEach((b,i)=>{const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);srcs.push(s)});
   }
-  if(projectBPM&&shouldPlay('click')){
-    const clickDur=Math.max(maxDur,4);
-    const oscs=scheduleClickRange(now,clickDur);srcs.push(...oscs);
-    if(!secLayers.length)maxDur=clickDur;
+  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';
+  if(playClick) startClick(projectBPM,now);
+  if(secLayers.length){
+    startPlayheadLoop(maxDur);
+    setTimeout(()=>{if(sessPlaying)stopSession()},maxDur*1000+350);
   }
-  if(!srcs.length)return;
-  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';startPlayheadLoop(maxDur);
-  setTimeout(()=>{if(sessPlaying)stopSession()},maxDur*1000+350);
 });
 
 // ── ADD TRACK ──
