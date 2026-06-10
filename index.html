@@ -60,7 +60,7 @@
     .ms-btn.s-on{background:rgba(13,148,136,.2);color:var(--teal2);border-color:var(--teal)}
     .session-canvas-wrap{flex:1;position:relative;height:46px;background:var(--s2);border-radius:8px;overflow:hidden}
     .session-waveform{width:100%;height:100%;display:block}
-    .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--teal2);pointer-events:none}
+    .playhead{position:absolute;top:0;bottom:0;left:0;width:2px;background:var(--teal2);pointer-events:none;transition:transform .03s linear}
     .clk-bars{flex:1;display:flex;gap:4px;align-items:center;height:46px;padding:0 10px;background:var(--s2);border-radius:8px}
     .clk-bar{width:5px;height:14px;border-radius:3px;background:var(--teal);opacity:.5;transition:height .08s,opacity .08s}
     .row-rec-meta{position:absolute;left:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--red);background:var(--bg);padding:2px 8px;border-radius:10px}
@@ -204,7 +204,7 @@
 </div>
 
 <script>
-// Sprint 5.4 — live M/S gain, AEC only when monitoring, tiled backing loop (no loop-point gap)
+// Sprint 5.5 — getUserMedia FIRST (sets Android routing), then close masterCtx, then start backing
 
 async function callAI(prompt, sessionState) {
   try {
@@ -285,27 +285,23 @@ async function getDecodedBuffer(layerId,buf){
 }
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
-// masterCtx closes before getUserMedia (Android communication-mode fix).
-// Backing plays via <audio> element so guideSrc stays null → ALWAYS closes → clean capture.
+// guideSrc kept for legacy conditional-close guard (always null in 5.5 — backing via <audio>)
 let guideSrc=null;
-async function startRecording(monitoring=false){
-  if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
-    decodedCache.clear();
-    await masterCtx.close();
-    masterCtx=null;
-    clickGainNode=null;
-  }
-  // AEC only when a monitor mix is playing — removes the click/backing from the microphone capture.
-  // First/clean takes: all false for studio-quality audio.
+
+// Step A — get mic stream. Call FIRST, before any audio output changes.
+// On Android this establishes communication-mode routing (headphones if plugged in).
+async function getMicStream(monitoring=false){
   const cons={echoCancellation:monitoring,noiseSuppression:false,autoGainControl:false};
-  try{recStream=await navigator.mediaDevices.getUserMedia({audio:cons})}
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:cons});return true}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
+}
+// Step B — start MediaRecorder on the already-open stream
+function startMediaRecorder(){
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
   recChunks=[];
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data)};
   mediaRecorder.start(100);recStartTime=Date.now();
-  return true;
 }
 const stopRecording=()=>new Promise(res=>{
   mediaRecorder.onstop=async()=>{
@@ -515,8 +511,7 @@ async function toggleInlineRecord(trackName){
   await startInlineRecord(trackName);
 }
 
-// Render monitor mix (M/S filtered layers + click) as a tiled WAV blob.
-// Tiled ~60s: avoids the audible gap at the <audio loop> point on Android.
+// Render monitor mix (M/S filtered layers + click) as a tiled WAV blob (~60s, no loop-point gap).
 async function renderBackingLoop(){
   const monitor=layers.filter(l=>l.sectionId===MAIN_ID && shouldPlay(l.trackName));
   const playClick=projectBPM && shouldPlay('click');
@@ -553,30 +548,54 @@ function audioBufferToWavBlob(ab){
   return new Blob([view.buffer],{type:'audio/wav'});
 }
 
+function killAllAudio(){
+  stopSession();stopAudition();killClick();stopBacking();
+}
+
 async function startInlineRecord(trackName){
-  stopAudition();if(sessPlaying)stopSession();
+  killAllAudio();
   recIsFirst=!getFirstLayer();
   overdubTrackName=trackName;pendingName=trackName;
   guideSrc=null;backingSrcs=[];
-  const playClick=projectBPM && shouldPlay('click');
-  let backing=null;
-  try{backing=await renderBackingLoop();}catch(e){console.log('[backing render failed]',e);}
-  let playStartMs=0;
-  if(backing&&backing.blob){
-    if(monitorUrl){URL.revokeObjectURL(monitorUrl);monitorUrl=null}
-    monitorUrl=URL.createObjectURL(backing.blob);
-    if(!monitorAudioEl)monitorAudioEl=new Audio();
-    monitorAudioEl.loop=true;monitorAudioEl.src=monitorUrl;
-    try{monitorAudioEl.currentTime=0;await monitorAudioEl.play();}catch(e){}
-    playStartMs=Date.now();
+
+  // ── CRITICAL ORDER ─────────────────────────────────────────────────────
+  // 1. getUserMedia FIRST → Android establishes communication-mode routing
+  //    before any audio output starts. This ensures the <audio> backing will
+  //    play through the already-established route (headphones if plugged in).
+  // 2. Close masterCtx AFTER getUserMedia (routing already set).
+  // 3. Render + start <audio> backing AFTER masterCtx is gone.
+  // ──────────────────────────────────────────────────────────────────────
+  const hasMonitor=!recIsFirst || (projectBPM && shouldPlay('click'));
+  const gotMic=await getMicStream(hasMonitor);
+  if(!gotMic) return;
+
+  // Close masterCtx now (routing established, safe to close)
+  if(masterCtx && masterCtx.state!=='closed'){
+    decodedCache.clear();await masterCtx.close();masterCtx=null;clickGainNode=null;
   }
-  const monitoring=!!(backing&&backing.blob);
-  const ok=await startRecording(monitoring);
-  if(!ok){stopBacking();return}
-  pendingODOffsetMs=(recIsFirst||!monitoring)?0:Math.max(0,recStartTime-playStartMs);
+
+  // Render backing loop offline and play via <audio>
+  let playStartMs=0;
+  if(hasMonitor){
+    try{
+      const backing=await renderBackingLoop();
+      if(backing?.blob){
+        if(monitorUrl){URL.revokeObjectURL(monitorUrl);monitorUrl=null}
+        monitorUrl=URL.createObjectURL(backing.blob);
+        if(!monitorAudioEl) monitorAudioEl=new Audio();
+        monitorAudioEl.loop=true;monitorAudioEl.src=monitorUrl;
+        monitorAudioEl.currentTime=0;
+        await monitorAudioEl.play().catch(()=>{});
+        playStartMs=Date.now();
+        if(projectBPM && shouldPlay('click')) startRecMetronomeVisual(projectBPM);
+      }
+    }catch(e){console.log('[backing error]',e);}
+  }
+
+  startMediaRecorder();
+  pendingODOffsetMs=(recIsFirst||!playStartMs)?0:Math.max(0,recStartTime-playStartMs);
   recordingTrack=trackName;
   renderSession();
-  if(playClick) startRecMetronomeVisual(projectBPM);
   recTimerInterval=setInterval(()=>{const el=document.getElementById('rec-row-timer');if(el)el.textContent=fmtTime((Date.now()-recStartTime)/1000)},250);
 }
 
@@ -702,8 +721,9 @@ document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs
 // ── SESSION PLAYBACK — live M/S ──
 function stopSession(){stopAllSrcs();stopClick();stopPlayheadLoop();playGains.clear();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶'}
 function applyLiveMix(){
+  if(!sessPlaying) return;
   playGains.forEach((g,name)=>{const l=getLayer(name);try{g.gain.value=shouldPlay(name)?(l?(l.volume??1):1):0}catch(e){}});
-  if(clickGainNode&&clickRunning){try{clickGainNode.gain.value=(projectBPM&&shouldPlay('click'))?clickVolume:0}catch(e){}}
+  if(clickGainNode&&clickRunning){try{clickGainNode.gain.value=shouldPlay('click')?clickVolume:0}catch(e){}}
 }
 document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   if(recordingTrack)return;
@@ -717,7 +737,6 @@ document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   if(allLayers.length){
     const decoded=await Promise.all(allLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
     maxDur=Math.max(...decoded.map((b,i)=>b.duration+(allLayers[i].offsetMs||0)/1000),0.001);
-    // start ALL layers; muted ones at gain=0 so un-muting mid-play is instant and in sync
     decoded.forEach((b,i)=>{const l=allLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=shouldPlay(l.trackName)?(l.volume??1):0;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);activePlaySrcs.push(s);playGains.set(l.trackName,g)});
   }
   sessPlaying=true;btn.textContent='■';
