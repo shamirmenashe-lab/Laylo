@@ -27,8 +27,6 @@
     .back-btn{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px}
     .center-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px}
     .sub{font-size:14px;color:var(--muted);line-height:1.6}
-    .rec-timer{font-family:'IBM Plex Mono',monospace;font-size:52px;font-weight:600;letter-spacing:-.03em}
-    .rec-timer.recording{color:var(--red)}
     .rec-indicator{width:12px;height:12px;border-radius:50%;background:var(--muted)}
     .rec-indicator.recording{background:var(--red);animation:blink 1s infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
@@ -39,7 +37,6 @@
     .adj-btn:active{background:var(--teal);border-color:var(--teal)}
     .click-bars{display:flex;gap:6px;align-items:flex-end;height:32px}
     .click-bar{width:6px;border-radius:3px;background:var(--teal);transition:height .08s}
-    .rec-bpm-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:.08em}
     .session-top-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;flex-shrink:0}
     .session-proj-name{font-size:13px;font-weight:700;color:var(--teal2)}
     .session-time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
@@ -207,7 +204,7 @@
 </div>
 
 <script>
-// Sprint 5.3 — backing via <audio> element (zero WebAudio loopback) + anchored click grid
+// Sprint 5.4 — live M/S gain, AEC only when monitoring, tiled backing loop (no loop-point gap)
 
 async function callAI(prompt, sessionState) {
   try {
@@ -259,6 +256,7 @@ let pendingTracks=[];
 let auditionSrc=null, auditionTrackName=null;
 let recMetroInterval=null;
 let monitorAudioEl=null, monitorUrl=null;
+let playGains=new Map();
 
 const FREE_TRACK_LIMIT=4;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -288,16 +286,19 @@ async function getDecodedBuffer(layerId,buf){
 function stopAllSrcs(){activePlaySrcs.forEach(s=>{try{s.stop()}catch(e){}});activePlaySrcs=[]}
 
 // masterCtx closes before getUserMedia (Android communication-mode fix).
-// Backing is played via <audio> element, NOT WebAudio — so guideSrc stays null and this ALWAYS closes.
+// Backing plays via <audio> element so guideSrc stays null → ALWAYS closes → clean capture.
 let guideSrc=null;
-async function startRecording(){
+async function startRecording(monitoring=false){
   if(masterCtx && masterCtx.state!=='closed' && !guideSrc){
     decodedCache.clear();
     await masterCtx.close();
     masterCtx=null;
     clickGainNode=null;
   }
-  try{recStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
+  // AEC only when a monitor mix is playing — removes the click/backing from the microphone capture.
+  // First/clean takes: all false for studio-quality audio.
+  const cons={echoCancellation:monitoring,noiseSuppression:false,autoGainControl:false};
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:cons})}
   catch(e){alert('לא ניתן לגשת למיקרופון.');return false}
   const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'';
   mediaRecorder=new MediaRecorder(recStream,mime?{mimeType:mime}:{});
@@ -446,8 +447,8 @@ function renderSession(){
     for(let i=0;i<8;i++){const b=document.createElement('div');b.className='clk-bar';if(i<4)b.id='clkbar'+i;cbars.appendChild(b)}
     crow.appendChild(cname);crow.appendChild(cspacer);crow.appendChild(cms);crow.appendChild(cbars);
     panel.appendChild(crow);
-    cm.addEventListener('click',()=>{if(mutedTracks.has('click'))mutedTracks.delete('click');else mutedTracks.add('click');renderSession()});
-    cs.addEventListener('click',()=>{soloTrack=soloTrack==='click'?null:'click';renderSession()});
+    cm.addEventListener('click',()=>{if(mutedTracks.has('click'))mutedTracks.delete('click');else mutedTracks.add('click');renderSession();if(sessPlaying)applyLiveMix()});
+    cs.addEventListener('click',()=>{soloTrack=soloTrack==='click'?null:'click';renderSession();if(sessPlaying)applyLiveMix()});
   }
 
   const displayTracks=tracks.slice();
@@ -489,8 +490,8 @@ function renderSession(){
     if(layer) setTimeout(()=>drawSessionTrackWaveform(canvas,layer),0);
     recBtn.addEventListener('click',()=>{if(locked)return;toggleInlineRecord(trackName)});
     playBtn.addEventListener('click',()=>auditionTrack(trackName,playBtn));
-    mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSession()});
-    sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSession()});
+    mBtn.addEventListener('click',()=>{if(mutedTracks.has(trackName))mutedTracks.delete(trackName);else mutedTracks.add(trackName);renderSession();if(sessPlaying)applyLiveMix()});
+    sBtn.addEventListener('click',()=>{soloTrack=soloTrack===trackName?null:trackName;renderSession();if(sessPlaying)applyLiveMix()});
     attachLongPressDelete(row,trackName);
   });
 }
@@ -514,8 +515,8 @@ async function toggleInlineRecord(trackName){
   await startInlineRecord(trackName);
 }
 
-// Render monitor mix (layers filtered by M/S + baked click) into a WAV blob.
-// Played via <audio> so masterCtx stays CLOSED during capture — zero WebAudio loopback.
+// Render monitor mix (M/S filtered layers + click) as a tiled WAV blob.
+// Tiled ~60s: avoids the audible gap at the <audio loop> point on Android.
 async function renderBackingLoop(){
   const monitor=layers.filter(l=>l.sectionId===MAIN_ID && shouldPlay(l.trackName));
   const playClick=projectBPM && shouldPlay('click');
@@ -530,11 +531,17 @@ async function renderBackingLoop(){
   let loopLen=0;decoded.forEach(({l,buf})=>loopLen=Math.max(loopLen,(l.offsetMs||0)/1000+buf.duration));
   if(projectBPM){const bar=beat*4;loopLen=Math.max(loopLen,bar);loopLen=Math.ceil(loopLen/bar)*bar;}
   else if(!loopLen) loopLen=2;
-  const sr=44100;
-  const off=new OfflineAudioContext(2,Math.max(1,Math.ceil(loopLen*sr)),sr);
-  decoded.forEach(({l,buf})=>{const s=off.createBufferSource();s.buffer=buf;const g=off.createGain();g.gain.value=(l.volume??1)*0.9;const p=off.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(off.destination);s.start((l.offsetMs||0)/1000,(l.clipOffset||0)/1000)});
-  if(playClick){for(let n=0,t=0;t<loopLen-0.0005;n++,t=n*beat){const a=n%4===0;const o=off.createOscillator(),g=off.createGain();o.frequency.value=a?1200:900;g.gain.setValueAtTime((a?.8:.5)*clickVolume,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);o.connect(g);g.connect(off.destination);o.start(t);o.stop(t+0.05)}}
-  return audioBufferToWavBlob(await off.startRendering());
+  const reps=Math.max(1,Math.ceil(60/loopLen));
+  const totalLen=loopLen*reps;
+  const sr=22050;
+  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(totalLen*sr)),sr);
+  for(let r=0;r<reps;r++){
+    const base=r*loopLen;
+    decoded.forEach(({l,buf})=>{const s=off.createBufferSource();s.buffer=buf;const g=off.createGain();g.gain.value=(l.volume??1)*0.9;s.connect(g);g.connect(off.destination);s.start(base+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000)});
+  }
+  if(playClick){for(let n=0,t=0;t<totalLen-0.0005;n++,t=n*beat){const a=n%4===0;const o=off.createOscillator(),g=off.createGain();o.frequency.value=a?1200:900;g.gain.setValueAtTime((a?.8:.5)*clickVolume,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);o.connect(g);g.connect(off.destination);o.start(t);o.stop(t+0.05)}}
+  const rendered=await off.startRendering();
+  return {blob:audioBufferToWavBlob(rendered), loopLen};
 }
 function audioBufferToWavBlob(ab){
   const nCh=ab.numberOfChannels,sr=ab.sampleRate,len=ab.length,bps=2,blockAlign=nCh*bps,dataLen=len*blockAlign;
@@ -552,20 +559,21 @@ async function startInlineRecord(trackName){
   overdubTrackName=trackName;pendingName=trackName;
   guideSrc=null;backingSrcs=[];
   const playClick=projectBPM && shouldPlay('click');
-  let backingBlob=null;
-  try{backingBlob=await renderBackingLoop();}catch(e){console.log('[backing render failed]',e);}
+  let backing=null;
+  try{backing=await renderBackingLoop();}catch(e){console.log('[backing render failed]',e);}
   let playStartMs=0;
-  if(backingBlob){
+  if(backing&&backing.blob){
     if(monitorUrl){URL.revokeObjectURL(monitorUrl);monitorUrl=null}
-    monitorUrl=URL.createObjectURL(backingBlob);
+    monitorUrl=URL.createObjectURL(backing.blob);
     if(!monitorAudioEl)monitorAudioEl=new Audio();
     monitorAudioEl.loop=true;monitorAudioEl.src=monitorUrl;
     try{monitorAudioEl.currentTime=0;await monitorAudioEl.play();}catch(e){}
     playStartMs=Date.now();
   }
-  const ok=await startRecording();
+  const monitoring=!!(backing&&backing.blob);
+  const ok=await startRecording(monitoring);
   if(!ok){stopBacking();return}
-  pendingODOffsetMs=(recIsFirst||!backingBlob)?0:Math.max(0,recStartTime-playStartMs);
+  pendingODOffsetMs=(recIsFirst||!monitoring)?0:Math.max(0,recStartTime-playStartMs);
   recordingTrack=trackName;
   renderSession();
   if(playClick) startRecMetronomeVisual(projectBPM);
@@ -691,26 +699,30 @@ document.getElementById('od-btn-keep').addEventListener('click',async()=>{
 });
 document.getElementById('od-btn-redo').addEventListener('click',()=>{stopAllSrcs();startInlineRecord(overdubTrackName);showScreen('screen-home')});
 
-// ── SESSION PLAYBACK ──
-function stopSession(){stopAllSrcs();stopClick();stopPlayheadLoop();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶'}
+// ── SESSION PLAYBACK — live M/S ──
+function stopSession(){stopAllSrcs();stopClick();stopPlayheadLoop();playGains.clear();sessPlaying=false;document.getElementById('sess-play-btn').textContent='▶'}
+function applyLiveMix(){
+  playGains.forEach((g,name)=>{const l=getLayer(name);try{g.gain.value=shouldPlay(name)?(l?(l.volume??1):1):0}catch(e){}});
+  if(clickGainNode&&clickRunning){try{clickGainNode.gain.value=(projectBPM&&shouldPlay('click'))?clickVolume:0}catch(e){}}
+}
 document.getElementById('sess-play-btn').addEventListener('click',async()=>{
   if(recordingTrack)return;
   const btn=document.getElementById('sess-play-btn');
   if(sessPlaying){stopSession();return}
   stopAudition();
-  const secLayers=layers.filter(l=>l.sectionId===MAIN_ID&&shouldPlay(l.trackName));
-  const playClick=projectBPM&&shouldPlay('click');
-  if(!secLayers.length&&!playClick)return;
+  const allLayers=layers.filter(l=>l.sectionId===MAIN_ID);
+  if(!allLayers.length&&!projectBPM)return;
   const ctx=getMasterCtx();const now=ctx.currentTime+0.12;
-  let maxDur=0.001;const srcs=[];
-  if(secLayers.length){
-    const decoded=await Promise.all(secLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
-    maxDur=Math.max(...decoded.map((b,i)=>b.duration+(secLayers[i].offsetMs||0)/1000),0.001);
-    decoded.forEach((b,i)=>{const l=secLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=l.volume??1;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);srcs.push(s)});
+  let maxDur=0.001;activePlaySrcs=[];playGains=new Map();
+  if(allLayers.length){
+    const decoded=await Promise.all(allLayers.map(l=>getDecodedBuffer(l.id,l.buffer)));
+    maxDur=Math.max(...decoded.map((b,i)=>b.duration+(allLayers[i].offsetMs||0)/1000),0.001);
+    // start ALL layers; muted ones at gain=0 so un-muting mid-play is instant and in sync
+    decoded.forEach((b,i)=>{const l=allLayers[i];const s=ctx.createBufferSource();s.buffer=b;const g=ctx.createGain();g.gain.value=shouldPlay(l.trackName)?(l.volume??1):0;const p=ctx.createStereoPanner();p.pan.value=l.pan??0;s.connect(p);p.connect(g);g.connect(ctx.destination);s.start(now+(l.offsetMs||0)/1000,(l.clipOffset||0)/1000,l.clipDuration?l.clipDuration/1000:undefined);activePlaySrcs.push(s);playGains.set(l.trackName,g)});
   }
-  activePlaySrcs=srcs;sessPlaying=true;btn.textContent='■';
-  if(playClick) startClick(projectBPM,now);
-  if(secLayers.length){
+  sessPlaying=true;btn.textContent='■';
+  if(projectBPM){startClick(projectBPM,now);if(clickGainNode)clickGainNode.gain.value=shouldPlay('click')?clickVolume:0}
+  if(allLayers.length){
     startPlayheadLoop(maxDur);
     setTimeout(()=>{if(sessPlaying)stopSession()},maxDur*1000+350);
   }
