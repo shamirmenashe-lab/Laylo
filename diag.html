@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  LAYLO · CLICK-BLEED DIAGNOSTIC  —  ***TEMP DIAGNOSTIC HARNESS***
+  ============================================================================
+  מטרה: לקבוע אם זליגת הקליק היא אקוסטית או דיגיטלית (loopback / מסלול AEC).
+  קובץ נפרד. לא נוגע ב-index.html / deck.html. כל הקובץ זמני — לזרוק אחרי האבחון.
+  ============================================================================
+-->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Laylo · Click-Bleed Diagnostic</title>
+<style>
+  :root{
+    --bg:#14110d; --bg2:#1c1813; --amber:#f5a623; --amber-dim:#9c7322;
+    --ink:#efe2cc; --ink-dim:#8a7c66; --line:#2e2820;
+    --good:#5fae6b; --bad:#e0623a; --warn:#e0a93a;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;}
+  body{max-width:480px; margin:0 auto; padding:18px 16px 56px; min-height:100vh;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .logo{font-weight:800; letter-spacing:.5px; font-size:19px;}
+  .logo .dot{color:var(--amber);}
+  .badge{font:600 10px/1 var(--mono); color:var(--bg); background:var(--amber);
+    padding:4px 7px; border-radius:5px; letter-spacing:1px;}
+  h1{font-size:13px; font-weight:600; color:var(--ink-dim); letter-spacing:.5px;
+    margin:2px 0 14px; text-transform:uppercase;}
+  .card{background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:12px;}
+  .intro{font-size:13.5px; line-height:1.65; color:var(--ink);}
+  .intro b{color:var(--amber); font-weight:600;}
+  .intro ol{margin:8px 0 0; padding-inline-start:20px;}
+  .intro li{margin:3px 0;}
+  button.start{width:100%; border:none; border-radius:12px; padding:18px;
+    background:var(--amber); color:#1a1206; font:800 17px/1 system-ui; letter-spacing:.5px;
+    cursor:pointer; transition:transform .08s, opacity .2s;}
+  button.start:active{transform:scale(.98);}
+  button.start:disabled{opacity:.4; cursor:default;}
+  .status{font:600 12.5px/1.5 var(--mono); color:var(--amber); text-align:center;
+    margin:14px 4px; min-height:18px; letter-spacing:.3px;}
+  .status.rec{color:var(--bad);}
+  .status .rec-dot{display:inline-block; width:9px; height:9px; border-radius:50%;
+    background:var(--bad); margin-inline-end:6px; animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  .test{display:flex; align-items:center; gap:11px; padding:12px 13px;
+    border:1px solid var(--line); border-radius:11px; margin-bottom:9px;
+    background:var(--bg2); opacity:.5; transition:opacity .25s, border-color .25s;}
+  .test.active{opacity:1; border-color:var(--amber-dim);}
+  .test.done{opacity:1;}
+  .test .tag{font:700 11px/1 var(--mono); color:var(--ink-dim); width:30px; flex:none;}
+  .test .meta{flex:1; min-width:0;}
+  .test .name{font-size:13px; font-weight:600;}
+  .test .sub{font:500 10.5px/1.4 var(--mono); color:var(--ink-dim); margin-top:2px;}
+  .test .num{font:800 26px/1 var(--mono); letter-spacing:-.5px; min-width:74px;
+    text-align:end; flex:none;}
+  .test .num small{font-size:11px; font-weight:600; color:var(--ink-dim);}
+  .bar{height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:7px;}
+  .bar > i{display:block; height:100%; background:var(--amber); width:0; transition:width .5s;}
+  .play{border:1px solid var(--line); background:transparent; color:var(--ink-dim);
+    font:600 10px var(--mono); border-radius:6px; padding:5px 8px; cursor:pointer; flex:none;}
+  .play:active{color:var(--amber);}
+  .verdict{display:none; border-radius:12px; padding:16px; margin-top:6px;
+    border:1.5px solid var(--amber); background:linear-gradient(180deg,#221a10,#1a140d);}
+  .verdict.show{display:block; animation:rise .4s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px);}}
+  .verdict .vk{font:700 11px/1 var(--mono); letter-spacing:1.5px; color:var(--amber);}
+  .verdict .vt{font-size:21px; font-weight:800; margin:8px 0 4px;}
+  .verdict.acoustic .vt{color:var(--warn);}
+  .verdict.digital .vt{color:var(--bad);}
+  .verdict.aec .vt{color:var(--bad);}
+  .verdict.inconcl .vt{color:var(--ink-dim);}
+  .verdict p{font-size:13px; line-height:1.6; margin:8px 0 0; color:var(--ink);}
+  .verdict .fix{margin-top:12px; padding-top:12px; border-top:1px solid var(--line);
+    font-size:12.5px; line-height:1.6; color:var(--ink-dim);}
+  .verdict .fix b{color:var(--amber);}
+  .err{color:var(--bad); font-size:13px; text-align:center; margin-top:12px; line-height:1.5;}
+  footer{margin-top:22px; font:500 10px/1.6 var(--mono); color:var(--ink-dim);
+    text-align:center; opacity:.7;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">layl<span class="dot">o</span></div>
+    <div class="badge">DIAG · TEMP</div>
+  </header>
+  <h1>אבחון זליגת קליק</h1>
+
+  <div class="card intro" id="introCard">
+    <b>מה זה עושה:</b> מריץ 4 הקלטות קצרות (4 שניות כל אחת) ומודד כמה אנרגיה של
+    תדרי הקליק (900/1200Hz) נכנסת למיקרופון בכל תנאי. מזה נדע אם הזליגה
+    <b>אקוסטית</b> או <b>דיגיטלית</b>.
+    <ol>
+      <li>חבר <b>אוזניות חוטיות</b> (כמו בהקלטה רגילה).</li>
+      <li>שב בחדר <b>שקט</b>.</li>
+      <li>במהלך כל הבדיקה — <b>אל תנגן ואל תדבר</b>. רק תן לקליק לרוץ.</li>
+      <li>אשר הרשאת מיקרופון כשתתבקש.</li>
+    </ol>
+  </div>
+
+  <button class="start" id="startBtn">התחל אבחון</button>
+  <div class="status" id="status"></div>
+  <div class="err hide" id="err"></div>
+
+  <div id="tests"></div>
+
+  <div class="verdict" id="verdict">
+    <div class="vk" id="vk">פסק</div>
+    <div class="vt" id="vt"></div>
+    <p id="vp"></p>
+    <div class="fix" id="vfix"></div>
+  </div>
+
+  <footer>
+    TEMP harness · getUserMedia-first · click via &lt;audio&gt; · offline Goertzel<br>
+    לזרוק אחרי האבחון — לא חלק מ-production
+  </footer>
+
+  <audio id="clickEl" loop playsinline></audio>
+
+<script>
+const REC_MS      = 4000;
+const GAP_MS      = 600;
+const CLICK_FREQS = [900, 1200];
+const REF_FREQS   = [700, 1500];
+const BLEED_MARGIN_DB = 6;
+
+const TESTS = [
+  { id:'T1', tag:'T1', name:'Baseline',  sub:'EC/AGC/NS · עוצמה מלאה · קליק',
+    ec:true,  agc:true,  ns:true,  vol:1, playClick:true },
+  { id:'T2', tag:'T2', name:'Muted out', sub:'EC/AGC/NS · muted · קליק',
+    ec:true,  agc:true,  ns:true,  vol:0, playClick:true },
+  { id:'T3', tag:'T3', name:'Raw mic',   sub:'בלי EC/AGC/NS · עוצמה מלאה · קליק',
+    ec:false, agc:false, ns:false, vol:1, playClick:true },
+  { id:'T4', tag:'T4', name:'Floor',     sub:'בלי קליק · רצפת רעש',
+    ec:true,  agc:true,  ns:true,  vol:1, playClick:false },
+];
+
+const $ = s => document.querySelector(s);
+const startBtn = $('#startBtn');
+const statusEl = $('#status');
+const errEl    = $('#err');
+const testsEl  = $('#tests');
+const clickEl  = $('#clickEl');
+const results  = {};
+
+TESTS.forEach(t=>{
+  const row = document.createElement('div');
+  row.className='test'; row.id='row-'+t.id;
+  row.innerHTML = `
+    <div class="tag">${t.tag}</div>
+    <div class="meta">
+      <div class="name">${t.name}</div>
+      <div class="sub">${t.sub}</div>
+      <div class="bar"><i id="bar-${t.id}"></i></div>
+    </div>
+    <button class="play hide" id="play-${t.id}">▶︎ נגן</button>
+    <div class="num" id="num-${t.id}">—</div>`;
+  testsEl.appendChild(row);
+});
+
+function buildClickWav(){
+  const sr=48000, dur=4.0, n=Math.floor(sr*dur);
+  const buf=new Float32Array(n);
+  const interval=0.5, burst=0.040;
+  for(let c=0; c*interval<dur; c++){
+    const start=Math.floor(c*interval*sr);
+    const len=Math.floor(burst*sr);
+    for(let i=0;i<len;i++){
+      const t=i/sr;
+      const env=Math.exp(-t*55);
+      let s=0; CLICK_FREQS.forEach(f=> s+=Math.sin(2*Math.PI*f*t));
+      buf[start+i]=0.55*env*(s/CLICK_FREQS.length);
+    }
+  }
+  return encodeWavMono(buf, sr);
+}
+function encodeWavMono(samples, sr){
+  const n=samples.length, bytes=n*2, ab=new ArrayBuffer(44+bytes), v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF'); v.setUint32(4,36+bytes,true); ws(8,'WAVE'); ws(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,bytes,true);
+  let o=44; for(let i=0;i<n;i++){let x=Math.max(-1,Math.min(1,samples[i]));
+    v.setInt16(o,x<0?x*0x8000:x*0x7fff,true); o+=2;}
+  return URL.createObjectURL(new Blob([ab],{type:'audio/wav'}));
+}
+
+function goertzel(x, sr, freq){
+  const w=2*Math.PI*freq/sr, coeff=2*Math.cos(w);
+  let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s0=x[i]+coeff*s1-s2; s2=s1; s1=s0;}
+  const power=s1*s1+s2*s2-coeff*s1*s2;
+  return Math.max(power,0)/x.length;
+}
+function bleedScore(mono, sr){
+  const band=CLICK_FREQS.reduce((a,f)=>a+goertzel(mono,sr,f),0)/CLICK_FREQS.length;
+  const ref =REF_FREQS.reduce((a,f)=>a+goertzel(mono,sr,f),0)/REF_FREQS.length;
+  return 10*Math.log10((band+1e-12)/(ref+1e-12));
+}
+
+function pickMime(){
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function runTest(t){
+  setStatus(`${t.tag} — מקליט…`, true);
+  markActive(t.id);
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio:{ echoCancellation:t.ec, autoGainControl:t.agc, noiseSuppression:t.ns, channelCount:1 }
+  });
+  clickEl.muted  = (t.vol===0);
+  clickEl.volume = t.vol;
+  if(t.playClick){ clickEl.currentTime=0; try{ await clickEl.play(); }catch(e){} }
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
+  const chunks=[];
+  rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  const stopped=new Promise(res=> rec.onstop=res);
+  rec.start();
+  await delay(REC_MS);
+  rec.stop();
+  await stopped;
+  clickEl.pause();
+  stream.getTracks().forEach(tr=>tr.stop());
+  const blob=new Blob(chunks,{type:mime||'audio/webm'});
+  const arr=await blob.arrayBuffer();
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const audio=await ac.decodeAudioData(arr.slice(0));
+  ac.close();
+  const mono=audio.getChannelData(0);
+  const db=bleedScore(mono, audio.sampleRate);
+  results[t.id]={ bleedDb:db, blobUrl:URL.createObjectURL(blob) };
+  paintResult(t, db);
+}
+
+async function runAll(){
+  errEl.classList.add('hide'); startBtn.disabled=true;
+  $('#introCard').classList.add('hide');
+  $('#verdict').classList.remove('show');
+  clickEl.src = buildClickWav();
+  try{
+    for(const t of TESTS){ await runTest(t); await delay(GAP_MS); }
+    setStatus('הושלם ✓', false);
+    showVerdict();
+  }catch(e){
+    setStatus('', false);
+    errEl.textContent = (e&&e.name==='NotAllowedError')
+      ? 'הרשאת מיקרופון נדחתה. אשר גישה ונסה שוב.'
+      : 'שגיאה: '+(e&&e.message?e.message:e);
+    errEl.classList.remove('hide');
+  }finally{
+    clickEl.pause(); startBtn.disabled=false; startBtn.textContent='הרץ שוב';
+  }
+}
+
+function showVerdict(){
+  const floor=results.T4.bleedDb;
+  const over = id => results[id].bleedDb - floor;
+  const has  = id => results[id].bleedDb > floor + BLEED_MARGIN_DB;
+  const v=$('#verdict'); v.className='verdict show';
+  const vt=$('#vt'), vp=$('#vp'), vfix=$('#vfix');
+  const r2=over('T2').toFixed(1), r3=over('T3').toFixed(1), r1=over('T1').toFixed(1);
+  if(!has('T1')){
+    v.classList.add('inconcl');
+    vt.textContent='לא שוחזר';
+    vp.textContent=`הקליק כמעט לא מופיע אפילו ב-Baseline (${r1}dB מעל הרצפה). יכול להיות שהחדר רועש מדי, האוזניות לא חוברו, או שהבעיה לא קורית כרגע. נסה שוב בחדר שקט עם אוזניות חוטיות.`;
+    vfix.innerHTML='<b>צעד הבא:</b> ודא אוזניות חוטיות מחוברות + שקט מוחלט, והרץ שוב.';
+    return;
+  }
+  if(!has('T2') && has('T3')){
+    v.classList.add('acoustic');
+    vt.textContent='זליגה אקוסטית';
+    vp.textContent=`כשהשתקנו את הפלט הקולי (T2) הקליק נעלם (${r2}dB מעל הרצפה), אבל בלי EC הוא עדיין שם (T3: ${r3}dB). כלומר הקליק יוצא מהאוזניות ומודלף לאוויר אל המיקרופון — בעיה פיזית, לא דיגיטלית.`;
+    vfix.innerHTML='<b>כיוון תיקון:</b> הנמך עוצמת מוניטור בזמן הקלטה, אוזניות אטומות יותר, או הפרד פיזית מיק מהאוזניות. <b>notch לא יפתור אקוסטיקה.</b>';
+  }else if(!has('T2') && !has('T3')){
+    v.classList.add('aec');
+    vt.textContent='מסלול AEC (דיגיטלי)';
+    vp.textContent=`גם muting (T2: ${r2}dB) וגם כיבוי echo-cancellation (T3: ${r3}dB) מורידים את הקליק לרצפה, אבל ב-Baseline הוא חזק (${r1}dB). זה החתימה של מסלול ה-AEC: אנדרואיד מזריק את אות-הייחוס של הקליק לתוך הקלט.`;
+    vfix.innerHTML='<b>כיוון תיקון — מבטיח:</b> הקלט עם <b>echoCancellation:false, autoGainControl:false, noiseSuppression:false</b>. זה מסיר את מסלול עיבוד-הקול שגורם לזליגה. נבדוק שזה לא פוגע באיכות.';
+  }else{
+    v.classList.add('digital');
+    vt.textContent='Loopback דיגיטלי עמוק';
+    vp.textContent=`גם כשהפלט מושתק לגמרי (T2: ${r2}dB מעל הרצפה) הקליק עדיין מוקלט. כלומר הוא נכנס מתחת לעוצמה — loopback ברמת ה-HAL של אנדרואיד, לא דרך האוויר ולא דרך ה-EC הרגיל.`;
+    vfix.innerHTML='<b>כיוון תיקון:</b> נסה הקלטה raw (EC off) + לבדוק אם דגם/דפדפן ספציפי. ייתכן שצריך לעקוף את ה-MediaRecorder path. <b>שלח לי את דגם הטלפון</b> — זה משנה את הפתרון.';
+  }
+}
+
+function setStatus(txt, rec){
+  statusEl.className='status'+(rec?' rec':'');
+  statusEl.innerHTML=(rec?'<span class="rec-dot"></span>':'')+txt;
+}
+function markActive(id){
+  document.querySelectorAll('.test').forEach(r=>r.classList.remove('active'));
+  $('#row-'+id).classList.add('active');
+}
+function paintResult(t, db){
+  const row=$('#row-'+t.id); row.classList.remove('active'); row.classList.add('done');
+  const num=$('#num-'+t.id);
+  num.innerHTML = db.toFixed(1)+'<small> dB</small>';
+  const isFloor = (t.id==='T4');
+  num.style.color = isFloor ? 'var(--ink-dim)'
+                  : db>14 ? 'var(--bad)' : db>6 ? 'var(--warn)' : 'var(--good)';
+  $('#bar-'+t.id).style.width = Math.max(0,Math.min(100, (db/30)*100))+'%';
+  const pb=$('#play-'+t.id);
+  pb.classList.remove('hide');
+  pb.onclick=()=>{ const a=new Audio(results[t.id].blobUrl); a.play(); };
+}
+
+startBtn.addEventListener('click', runAll);
+</script>
+</body>
+</html>
