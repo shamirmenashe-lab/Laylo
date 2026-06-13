@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  LAYLO · LEAK-CANCEL PROOF  —  ***TEMP DIAGNOSTIC HARNESS #2***
+  ============================================================================
+-->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Laylo · Leak-Cancel Proof</title>
+<style>
+  :root{
+    --bg:#14110d; --bg2:#1c1813; --amber:#f5a623; --amber-dim:#9c7322;
+    --ink:#efe2cc; --ink-dim:#8a7c66; --line:#2e2820;
+    --good:#5fae6b; --bad:#e0623a; --warn:#e0a93a;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;}
+  body{max-width:480px; margin:0 auto; padding:18px 16px 56px; min-height:100vh;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .logo{font-weight:800; letter-spacing:.5px; font-size:19px;}
+  .logo .dot{color:var(--amber);}
+  .badge{font:600 10px/1 var(--mono); color:var(--bg); background:var(--amber);
+    padding:4px 7px; border-radius:5px; letter-spacing:1px;}
+  h1{font-size:13px; font-weight:600; color:var(--ink-dim); letter-spacing:.5px;
+    margin:2px 0 14px; text-transform:uppercase;}
+  .card{background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:12px; font-size:13.5px; line-height:1.6;}
+  .card b{color:var(--amber); font-weight:600;}
+  .step{border:1px solid var(--line); border-radius:12px; background:var(--bg2);
+    padding:14px; margin-bottom:12px; opacity:.45; transition:opacity .3s, border-color .3s;}
+  .step.on{opacity:1; border-color:var(--amber-dim);}
+  .step.done{opacity:1;}
+  .step .head{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .step .n{font:800 22px/1 var(--mono); color:var(--amber); width:26px;}
+  .step .t{font-size:14.5px; font-weight:700;}
+  .step .d{font-size:12px; color:var(--ink-dim); line-height:1.5; margin-bottom:11px;}
+  .step button{width:100%; border:none; border-radius:10px; padding:15px;
+    background:var(--amber); color:#1a1206; font:800 15px/1 system-ui;
+    cursor:pointer; transition:transform .08s, opacity .2s;}
+  .step button:active{transform:scale(.98);}
+  .step button:disabled{opacity:.35; cursor:default;}
+  .status{font:600 12px/1.5 var(--mono); text-align:center; margin:10px 2px 0;
+    min-height:16px; color:var(--amber); letter-spacing:.3px;}
+  .status.rec{color:var(--bad);}
+  .status .rdot{display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--bad); margin-inline-end:6px; animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  .fp-info{display:none; margin-top:10px; font:600 11px/1.7 var(--mono); color:var(--ink-dim);}
+  .fp-info.show{display:block;}
+  .fp-info b{color:var(--good);}
+  .res{display:none; margin-top:12px;}
+  .res.show{display:block; animation:rise .4s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px);}}
+  .ab{display:flex; gap:10px;}
+  .cell{flex:1; border:1px solid var(--line); border-radius:11px; padding:12px;
+    text-align:center; background:var(--bg);}
+  .cell .lbl{font:700 10px/1 var(--mono); color:var(--ink-dim); letter-spacing:1px;}
+  .cell .val{font:800 30px/1.1 var(--mono); margin:8px 0 2px; letter-spacing:-1px;}
+  .cell .val small{font-size:12px; color:var(--ink-dim); font-weight:600;}
+  .cell .play{margin-top:9px; border:1px solid var(--line); background:transparent;
+    color:var(--ink-dim); font:600 10px var(--mono); border-radius:6px;
+    padding:6px 10px; cursor:pointer; width:auto;}
+  .cell .play:active{color:var(--amber);}
+  .delta{text-align:center; margin-top:12px; padding:12px; border-radius:11px;
+    border:1.5px solid var(--amber); background:linear-gradient(180deg,#221a10,#1a140d);}
+  .delta .dv{font:800 24px/1 var(--mono); letter-spacing:-.5px;}
+  .delta .dt{font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.5;}
+  .delta.win .dv{color:var(--good);}
+  .delta.meh .dv{color:var(--warn);}
+  .delta.fail .dv{color:var(--bad);}
+  .err{color:var(--bad); font-size:13px; text-align:center; margin-top:10px; line-height:1.5;}
+  footer{margin-top:22px; font:500 10px/1.6 var(--mono); color:var(--ink-dim);
+    text-align:center; opacity:.7;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">layl<span class="dot">o</span></div>
+    <div class="badge">CANCEL-PROOF · TEMP</div>
+  </header>
+  <h1>הוכחת ביטול זליגה</h1>
+
+  <div class="card">
+    <b>איך זה עובד:</b> שלב 1 לוכד את טביעת-הדליפה של הטלפון שלך (הקליק רץ,
+    אתה שקט — מה שנקלט זו הדליפה עצמה). שלב 2 מקליט שוב באותם תנאים, מחסר את
+    הטביעה, ומראה לפני/אחרי באותו מדד dB של האבחון הקודם — להשוואה ישירה
+    מול ה-29.8dB של T1. <b>אוזניות מחוברות, חדר שקט, לא מנגנים ולא מדברים.</b>
+  </div>
+
+  <div class="step on" id="step1">
+    <div class="head"><div class="n">1</div><div class="t">לכידת טביעת דליפה</div></div>
+    <div class="d">5 שניות. הקליק מתנגן באוזניות — שב בשקט. ההקלטה תפורק
+      למופעי הקליק וימוצעו לתבנית נקייה.</div>
+    <button id="btn1">לכוד טביעה</button>
+    <div class="fp-info" id="fpInfo"></div>
+  </div>
+
+  <div class="step" id="step2">
+    <div class="head"><div class="n">2</div><div class="t">הוכחת חיסור</div></div>
+    <div class="d">עוד 5 שניות באותם תנאים. החיסור ירוץ על ההקלטה החדשה —
+      אם המספר צונח לכיוון הרצפה (~6dB-), הגישה מוכחת.</div>
+    <button id="btn2" disabled>הקלט ובדוק חיסור</button>
+    <div class="res" id="res">
+      <div class="ab">
+        <div class="cell">
+          <div class="lbl">לפני</div>
+          <div class="val" id="vBefore">—</div>
+          <button class="play" id="pBefore">▶︎ נגן</button>
+        </div>
+        <div class="cell">
+          <div class="lbl">אחרי חיסור</div>
+          <div class="val" id="vAfter">—</div>
+          <button class="play" id="pAfter">▶︎ נגן</button>
+        </div>
+      </div>
+      <div class="delta" id="delta">
+        <div class="dv" id="dv">—</div>
+        <div class="dt" id="dt"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="err hide" id="err"></div>
+
+  <footer>
+    TEMP harness #2 · fingerprint avg → per-click matched subtract<br>
+    אותו מדד Goertzel כמו diag.html · לזרוק אחרי ההוכחה
+  </footer>
+
+  <audio id="clickEl" loop playsinline></audio>
+
+<script>
+const REC_MS      = 5000;
+const CLICK_FREQS = [900, 1200];
+const REF_FREQS   = [700, 1500];
+const CLICK_INTERVAL = 0.5;
+const CLICK_BURST    = 0.040;
+const TPL_LEN_S      = 0.090;
+const EC_ON = true;
+
+let fingerprint = null;
+let beforeUrl=null, afterUrl=null;
+
+const $=s=>document.querySelector(s);
+const clickEl=$('#clickEl');
+const statusEl=$('#status'), errEl=$('#err');
+
+function buildClickWav(){
+  const sr=48000, dur=4.0, n=Math.floor(sr*dur);
+  const buf=new Float32Array(n);
+  for(let c=0; c*CLICK_INTERVAL<dur; c++){
+    const start=Math.floor(c*CLICK_INTERVAL*sr);
+    const len=Math.floor(CLICK_BURST*sr);
+    for(let i=0;i<len;i++){
+      const t=i/sr, env=Math.exp(-t*55);
+      let s=0; CLICK_FREQS.forEach(f=> s+=Math.sin(2*Math.PI*f*t));
+      buf[start+i]=0.55*env*(s/CLICK_FREQS.length);
+    }
+  }
+  return encodeWavMono(buf,sr);
+}
+function encodeWavMono(samples,sr){
+  const n=samples.length,bytes=n*2,ab=new ArrayBuffer(44+bytes),v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+bytes,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,bytes,true);
+  let o=44;for(let i=0;i<n;i++){let x=Math.max(-1,Math.min(1,samples[i]));
+    v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return URL.createObjectURL(new Blob([ab],{type:'audio/wav'}));
+}
+
+function goertzel(x,sr,freq){
+  const w=2*Math.PI*freq/sr,coeff=2*Math.cos(w);
+  let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s0=x[i]+coeff*s1-s2;s2=s1;s1=s0;}
+  return Math.max(s1*s1+s2*s2-coeff*s1*s2,0)/x.length;
+}
+function bleedScore(mono,sr){
+  const band=CLICK_FREQS.reduce((a,f)=>a+goertzel(mono,sr,f),0)/CLICK_FREQS.length;
+  const ref =REF_FREQS.reduce((a,f)=>a+goertzel(mono,sr,f),0)/REF_FREQS.length;
+  return 10*Math.log10((band+1e-12)/(ref+1e-12));
+}
+function refinePeak(x,tpl,center,radius){
+  let best=-Infinity,bestPos=center;
+  const lo=Math.max(0,center-radius), hi=Math.min(x.length-tpl.length,center+radius);
+  for(let p=lo;p<=hi;p++){
+    let dot=0,en=0;
+    for(let i=0;i<tpl.length;i++){const xv=x[p+i];dot+=xv*tpl[i];en+=xv*xv;}
+    const score=dot/Math.sqrt(en+1e-12);
+    if(score>best){best=score;bestPos=p;}
+  }
+  return {pos:bestPos,score:best};
+}
+function findInstances(x,sr,tpl){
+  const intSamp=Math.round(CLICK_INTERVAL*sr);
+  const radius=Math.round(0.060*sr);
+  let anchor=refinePeak(x,tpl,Math.round(0.75*sr),Math.round(0.75*sr));
+  const out=[];
+  for(let p=anchor.pos; p<x.length-tpl.length; p+=intSamp){
+    const r=refinePeak(x,tpl,p,radius);
+    out.push(r.pos);
+    p=r.pos;
+  }
+  for(let p=anchor.pos-intSamp; p>=0; p-=intSamp){
+    const r=refinePeak(x,tpl,p,radius);
+    out.unshift(r.pos);
+    p=r.pos;
+  }
+  return out;
+}
+function syntheticTpl(sr){
+  const len=Math.floor(CLICK_BURST*sr), t=new Float32Array(len);
+  for(let i=0;i<len;i++){
+    const tt=i/sr, env=Math.exp(-tt*55);
+    let s=0; CLICK_FREQS.forEach(f=> s+=Math.sin(2*Math.PI*f*tt));
+    t[i]=env*(s/CLICK_FREQS.length);
+  }
+  return t;
+}
+
+function pickMime(){
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function recordPass(){
+  const stream=await navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:EC_ON,autoGainControl:EC_ON,noiseSuppression:EC_ON,channelCount:1}
+  });
+  clickEl.muted=false; clickEl.volume=1; clickEl.currentTime=0;
+  try{await clickEl.play();}catch(e){}
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const stopped=new Promise(res=>rec.onstop=res);
+  rec.start(); await delay(REC_MS); rec.stop(); await stopped;
+  clickEl.pause(); stream.getTracks().forEach(t=>t.stop());
+  const blob=new Blob(chunks,{type:mime||'audio/webm'});
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const audio=await ac.decodeAudioData(await blob.arrayBuffer());
+  ac.close();
+  return {mono:audio.getChannelData(0).slice(0), sr:audio.sampleRate};
+}
+
+async function captureFingerprint(){
+  lock(true); setStatus('שלב 1 — מקליט טביעה…',true);
+  try{
+    const {mono,sr}=await recordPass();
+    const tplLen=Math.floor(TPL_LEN_S*sr);
+    let positions=findInstances(mono,sr,syntheticTpl(sr));
+    let tpl=averageAt(mono,positions,tplLen);
+    positions=findInstances(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)));
+    tpl=averageAt(mono,positions,tplLen);
+    const fpDb=bleedScore(mono,sr);
+    fingerprint={tpl,sr,nInstances:positions.length,snrDb:fpDb};
+    const fi=$('#fpInfo'); fi.classList.add('show');
+    fi.innerHTML=`<b>✓ טביעה נלכדה</b> · ${positions.length} מופעים מוצעו · `+
+      `רמת דליפה בהקלטה: ${fpDb.toFixed(1)}dB`;
+    $('#step1').classList.add('done');
+    $('#step2').classList.add('on'); $('#btn2').disabled=false;
+    setStatus('טביעה מוכנה. עבור לשלב 2.',false);
+  }catch(e){fail(e);}finally{lock(false);}
+}
+function averageAt(x,positions,len){
+  const acc=new Float32Array(len); let n=0;
+  positions.forEach(p=>{
+    if(p+len<=x.length){for(let i=0;i<len;i++)acc[i]+=x[p+i]; n++;}
+  });
+  if(n>0)for(let i=0;i<len;i++)acc[i]/=n;
+  return acc;
+}
+
+async function proveSubtraction(){
+  if(!fingerprint)return;
+  lock(true); setStatus('שלב 2 — מקליט פס בדיקה…',true);
+  try{
+    const {mono,sr}=await recordPass();
+    if(Math.abs(sr-fingerprint.sr)>1) throw new Error('sample-rate השתנה בין שלבים');
+    const before=mono.slice(0);
+    const tpl=fingerprint.tpl;
+    const positions=findInstances(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)));
+    const after=mono.slice(0);
+    positions.forEach(p=>{
+      if(p+tpl.length>after.length)return;
+      let dot=0,en=0;
+      for(let i=0;i<tpl.length;i++){dot+=after[p+i]*tpl[i];en+=tpl[i]*tpl[i];}
+      const a=dot/(en+1e-12);
+      for(let i=0;i<tpl.length;i++)after[p+i]-=a*tpl[i];
+    });
+    const dbB=bleedScore(before,sr), dbA=bleedScore(after,sr);
+    beforeUrl=encodeWavMono(before,sr); afterUrl=encodeWavMono(after,sr);
+    paint(dbB,dbA,positions.length);
+    $('#step2').classList.add('done');
+    setStatus('הושלם ✓',false);
+  }catch(e){fail(e);}finally{lock(false);}
+}
+
+function paint(dbB,dbA,n){
+  $('#res').classList.add('show');
+  $('#vBefore').innerHTML=dbB.toFixed(1)+'<small> dB</small>';
+  $('#vAfter').innerHTML =dbA.toFixed(1)+'<small> dB</small>';
+  $('#vBefore').style.color = dbB>14?'var(--bad)':dbB>6?'var(--warn)':'var(--good)';
+  $('#vAfter').style.color  = dbA>14?'var(--bad)':dbA>6?'var(--warn)':'var(--good)';
+  const drop=dbB-dbA, d=$('#delta');
+  $('#dv').textContent=(drop>=0?'−':'+')+Math.abs(drop).toFixed(1)+'dB';
+  d.className='delta '+(drop>=15?'win':drop>=7?'meh':'fail');
+  $('#dt').textContent =
+    drop>=15 ? `הגישה מוכחת — החיסור ניקה ${drop.toFixed(0)}dB על ${n} קליקים. אפשר לחבר ל-deck.` :
+    drop>=7  ? `שיפור חלקי (${n} קליקים). כנראה הדליפה לא יציבה לגמרי — שווה הרצה נוספת לאימות.` :
+               `החיסור לא תפס. ייתכן שהדליפה משתנה בין הקלטות או שהאיתור החטיא — שלח לי את שני המספרים ונחפור.`;
+  $('#pBefore').onclick=()=>new Audio(beforeUrl).play();
+  $('#pAfter').onclick =()=>new Audio(afterUrl).play();
+}
+function setStatus(t,rec){
+  statusEl.className='status'+(rec?' rec':'');
+  statusEl.innerHTML=(rec?'<span class="rdot"></span>':'')+t;
+}
+function lock(b){$('#btn1').disabled=b; $('#btn2').disabled=b||!fingerprint;}
+function fail(e){
+  setStatus('',false);
+  errEl.textContent=(e&&e.name==='NotAllowedError')
+    ?'הרשאת מיקרופון נדחתה. אשר ונסה שוב.'
+    :'שגיאה: '+(e&&e.message?e.message:e);
+  errEl.classList.remove('hide');
+}
+
+clickEl.src=buildClickWav();
+$('#btn1').addEventListener('click',captureFingerprint);
+$('#btn2').addEventListener('click',proveSubtraction);
+</script>
+</body>
+</html>
