@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!--
+  LAYLO · SILENT CLICK  —  ***TEMP DIAGNOSTIC HARNESS #4***
+  vibrate + flash metronome. DeviceMotion self-audit. TEMP.
+-->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Laylo · Silent Click</title>
+<style>
+  :root{
+    --bg:#14110d; --bg2:#1c1813; --amber:#f5a623; --amber-dim:#9c7322;
+    --ink:#efe2cc; --ink-dim:#8a7c66; --line:#2e2820;
+    --good:#5fae6b; --bad:#e0623a; --warn:#e0a93a;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    overscroll-behavior:none;}
+  body{max-width:480px; margin:0 auto; padding:18px 16px 56px; min-height:100vh;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .logo{font-weight:800; letter-spacing:.5px; font-size:19px;}
+  .logo .dot{color:var(--amber);}
+  .badge{font:600 10px/1 var(--mono); color:var(--bg); background:var(--amber);
+    padding:4px 7px; border-radius:5px; letter-spacing:1px;}
+  h1{font-size:13px; font-weight:600; color:var(--ink-dim); letter-spacing:.5px;
+    margin:2px 0 14px; text-transform:uppercase;}
+  .card{background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:12px; font-size:13.5px; line-height:1.6;}
+  .card b{color:var(--amber); font-weight:600;}
+  .face{position:relative; border:1px solid var(--line); border-radius:16px;
+    background:var(--bg2); height:240px; margin-bottom:12px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;}
+  .face .num{font:800 150px/1 var(--mono); color:var(--ink-dim);
+    letter-spacing:-6px; transition:color .05s; user-select:none;}
+  .face.pulse .num{color:var(--amber);}
+  .face .flash{position:absolute; inset:0; background:var(--amber); opacity:0;
+    pointer-events:none;}
+  .face.pulse .flash{opacity:.16; transition:none;}
+  .face .flash{transition:opacity .22s;}
+  .face .bpm{position:absolute; top:12px; inset-inline-start:14px;
+    font:700 12px var(--mono); color:var(--ink-dim); letter-spacing:1px;}
+  .bpmRow{display:flex; gap:10px; align-items:center; margin-bottom:12px;}
+  .bpmRow button{flex:none; width:54px; height:48px; border:1px solid var(--line);
+    border-radius:10px; background:var(--bg2); color:var(--amber);
+    font:800 22px var(--mono); cursor:pointer;}
+  .bpmRow .bv{flex:1; text-align:center; font:800 26px var(--mono); letter-spacing:-.5px;}
+  .bpmRow .bv small{display:block; font:600 10px var(--mono); color:var(--ink-dim);
+    letter-spacing:1.5px; margin-top:2px;}
+  button.run{width:100%; border:none; border-radius:12px; padding:18px;
+    background:var(--amber); color:#1a1206; font:800 17px/1 system-ui;
+    cursor:pointer; transition:transform .08s;}
+  button.run:active{transform:scale(.98);}
+  button.run.stop{background:var(--bad); color:#fff;}
+  .status{font:600 12px/1.5 var(--mono); text-align:center; margin:12px 2px;
+    min-height:16px; color:var(--amber); letter-spacing:.3px;}
+  .res{display:none;}
+  .res.show{display:block; animation:rise .4s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px);}}
+  .grid3{display:flex; gap:10px;}
+  .cell{flex:1; border:1px solid var(--line); border-radius:11px; padding:12px 8px;
+    text-align:center; background:var(--bg2);}
+  .cell .lbl{font:700 9.5px/1.3 var(--mono); color:var(--ink-dim); letter-spacing:.8px;}
+  .cell .val{font:800 24px/1.1 var(--mono); margin-top:7px; letter-spacing:-1px;}
+  .cell .val small{font-size:11px; color:var(--ink-dim); font-weight:600;}
+  .hist{margin-top:10px; border:1px solid var(--line); border-radius:11px;
+    background:var(--bg2); padding:11px 13px;}
+  .hist .lbl{font:700 10px/1 var(--mono); color:var(--ink-dim); letter-spacing:1px;
+    margin-bottom:8px;}
+  .hist canvas{width:100%; height:54px; display:block;}
+  .delta{text-align:center; margin-top:12px; padding:12px; border-radius:11px;
+    border:1.5px solid var(--amber); background:linear-gradient(180deg,#221a10,#1a140d);}
+  .delta .dv{font:800 22px/1.2 var(--mono);}
+  .delta .dt{font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.5;}
+  .delta.win .dv{color:var(--good);}
+  .delta.meh .dv{color:var(--warn);}
+  .delta.fail .dv{color:var(--bad);}
+  .err{color:var(--bad); font-size:13px; text-align:center; margin-top:10px; line-height:1.5;}
+  footer{margin-top:22px; font:500 10px/1.6 var(--mono); color:var(--ink-dim);
+    text-align:center; opacity:.7;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">layl<span class="dot">o</span></div>
+    <div class="badge">SILENT · TEMP</div>
+  </header>
+  <h1>מטרונום שקט — רטט + אור</h1>
+
+  <div class="card">
+    <b>אפס צליל = אפס זליגה.</b> הפעימה ברטט ובהבזק. בזמן הריצה
+    מד-התאוצה של הטלפון מקשיב לרטט של עצמו ומודד כמה הוא מדויק.
+    <b>שים את הטלפון על משטח קשיח</b> (שולחן) — כך המדידה הכי נקייה.
+    16 פעימות ואז דוח דיוק.
+  </div>
+
+  <div class="face" id="face">
+    <div class="flash"></div>
+    <div class="bpm" id="bpmTag">80 BPM</div>
+    <div class="num" id="beatNum">—</div>
+  </div>
+
+  <div class="bpmRow">
+    <button id="bpmDown">−</button>
+    <div class="bv"><span id="bpmVal">80</span><small>BPM</small></div>
+    <button id="bpmUp">+</button>
+  </div>
+
+  <button class="run" id="runBtn">התחל 16 פעימות + מדידה</button>
+  <div class="status" id="status"></div>
+  <div class="err hide" id="err"></div>
+
+  <div class="res" id="res">
+    <div class="grid3">
+      <div class="cell">
+        <div class="lbl">פולסים<br>שזוהו</div>
+        <div class="val" id="vDet">—</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">JITTER<br>חציוני</div>
+        <div class="val" id="vJit">—</div>
+      </div>
+      <div class="cell">
+        <div class="lbl">סטייה<br>מקס׳</div>
+        <div class="val" id="vMax">—</div>
+      </div>
+    </div>
+    <div class="hist">
+      <div class="lbl">סטיית כל פעימה מהיעד (ms)</div>
+      <canvas id="histCv" width="640" height="108"></canvas>
+    </div>
+    <div class="delta" id="delta">
+      <div class="dv" id="dv">—</div>
+      <div class="dt" id="dt"></div>
+    </div>
+  </div>
+
+  <footer>
+    TEMP harness #4 · vibrate + flash · self-audit via DeviceMotion<br>
+    סוף הסולם: תבנית → NLMS → שקט · לזרוק אחרי ההוכחה
+  </footer>
+
+<script>
+const N_BEATS=16;
+const VIB_MS=35;
+const USABLE_JITTER_MS=15;
+let bpm=80;
+
+const $=s=>document.querySelector(s);
+const face=$('#face'), beatNum=$('#beatNum'), statusEl=$('#status'), errEl=$('#err');
+let running=false;
+
+function schedule(targets,onBeat,onDone){
+  let i=0;
+  function arm(){
+    if(!running||i>=targets.length){onDone();return;}
+    const wait=targets[i]-performance.now();
+    setTimeout(()=>{
+      if(!running){onDone();return;}
+      onBeat(i,performance.now());
+      i++; arm();
+    },Math.max(0,wait));
+  }
+  arm();
+}
+
+const motion={samples:[],active:false,lastMag:0,ema:0};
+function motionHandler(e){
+  if(!motion.active)return;
+  const a=e.accelerationIncludingGravity||e.acceleration;
+  if(!a)return;
+  const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);
+  motion.ema=motion.ema*0.95+mag*0.05;
+  const hp=Math.abs(mag-motion.ema);
+  motion.samples.push({t:performance.now(),v:hp});
+}
+function detectPulses(samples,targets,period){
+  const win=period*0.5, out=[];
+  targets.forEach(tg=>{
+    let best=0,bestT=null;
+    samples.forEach(s=>{
+      if(Math.abs(s.t-tg)<=win && s.v>best){best=s.v;bestT=s.t;}
+    });
+    out.push(best>0.25?{t:bestT,offset:bestT-tg}:null);
+  });
+  return out;
+}
+
+async function run(){
+  const btn=$('#runBtn');
+  if(running){running=false;return;}
+  errEl.classList.add('hide'); $('#res').classList.remove('show');
+  const canVibe=!!navigator.vibrate;
+  if(!canVibe){
+    errEl.textContent='Vibration API לא נתמך בדפדפן הזה (iOS Safari לא תומך). הפולס החזותי ירוץ, אבל מדידת רטט לא אפשרית.';
+    errEl.classList.remove('hide');
+  }
+  try{
+    if(window.DeviceMotionEvent&&typeof DeviceMotionEvent.requestPermission==='function')
+      await DeviceMotionEvent.requestPermission();
+  }catch(e){}
+  window.addEventListener('devicemotion',motionHandler);
+  running=true; btn.textContent='עצור'; btn.classList.add('stop');
+  setStatus('רץ — הנח את הטלפון על משטח קשיח');
+  const period=60000/bpm;
+  const t0=performance.now()+600;
+  const targets=Array.from({length:N_BEATS},(_,i)=>t0+i*period);
+  const fired=[];
+  motion.samples=[]; motion.ema=0; motion.active=true;
+  schedule(targets,
+    (i,now)=>{
+      fired.push(now);
+      if(canVibe)navigator.vibrate(VIB_MS);
+      beatNum.textContent=(i%4)+1;
+      face.classList.add('pulse');
+      setTimeout(()=>face.classList.remove('pulse'),90);
+    },
+    ()=>{
+      motion.active=false;
+      window.removeEventListener('devicemotion',motionHandler);
+      running=false; btn.textContent='הרץ שוב'; btn.classList.remove('stop');
+      beatNum.textContent='—';
+      setStatus('מנתח…');
+      setTimeout(()=>analyze(targets,fired,period,canVibe),150);
+    });
+}
+
+function analyze(targets,fired,period,canVibe){
+  const det=detectPulses(motion.samples,targets,period).filter(Boolean);
+  const useAccel=det.length>=Math.floor(N_BEATS*0.6);
+  const offsets=useAccel
+    ? det.map(d=>d.offset)
+    : fired.map((f,i)=>f-targets[i]);
+  if(!offsets.length){setStatus('');fail('לא זוהו פולסים. ודא שהטלפון על משטח קשיח ונסה שוב.');return;}
+  const abs=offsets.map(Math.abs).sort((a,b)=>a-b);
+  const med=abs[Math.floor(abs.length/2)];
+  const mx=abs[abs.length-1];
+  $('#res').classList.add('show');
+  $('#vDet').textContent=useAccel?det.length+'/'+N_BEATS:'—';
+  $('#vJit').innerHTML=med.toFixed(1)+'<small> ms</small>';
+  $('#vMax').innerHTML=mx.toFixed(1)+'<small> ms</small>';
+  $('#vJit').style.color=med<=USABLE_JITTER_MS?'var(--good)':med<=30?'var(--warn)':'var(--bad)';
+  const d=$('#delta');
+  if(med<=USABLE_JITTER_MS){
+    d.className='delta win';
+    $('#dv').textContent='שמיש מוזיקלית ✓';
+    $('#dt').textContent=`jitter חציוני ${med.toFixed(1)}ms (${(med/period*100).toFixed(1)}% מפעימה ב-${bpm}BPM)${useAccel?' — נמדד פיזית במד-התאוצה':' — נמדד ב-scheduler (המד לא קלט; נסה על שולחן)'}. רטט+אור יכולים להחליף קליק קולי.`;
+  }else if(med<=30){
+    d.className='delta meh';
+    $('#dv').textContent='גבולי';
+    $('#dt').textContent=`jitter ${med.toFixed(1)}ms — מורגש לנגן מדויק, אבל Click Sync מיישר לגריד בדיעבד אז ייתכן שעדיין שמיש. שלח צילום.`;
+  }else{
+    d.className='delta fail';
+    $('#dv').textContent='לא מספיק מדויק';
+    $('#dt').textContent=`jitter ${med.toFixed(1)}ms — רחוק מדי לנגינה. בטלפון הזה הרטט לא תחליף; נשארים בסולם הביטול (תבנית/NLMS) או count-in קולי + הקלטה שקטה.`;
+  }
+  const cv=$('#histCv'),ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const W=cv.width,H=cv.height,mid=H/2,pad=8;
+  const scale=Math.max(20,mx)*1.2;
+  ctx.strokeStyle='#2e2820';ctx.beginPath();ctx.moveTo(pad,mid);ctx.lineTo(W-pad,mid);ctx.stroke();
+  const bw=(W-2*pad)/offsets.length;
+  offsets.forEach((o,i)=>{
+    const h=(o/scale)*(H/2-4);
+    ctx.fillStyle=Math.abs(o)<=USABLE_JITTER_MS?'#5fae6b':'#e0623a';
+    ctx.fillRect(pad+i*bw+bw*0.2, h<0?mid+h:mid, bw*0.6, Math.abs(h)||1);
+  });
+  setStatus('הושלם ✓');
+}
+
+function setStatus(t){statusEl.className='status';statusEl.textContent=t;}
+function fail(t){errEl.textContent=t;errEl.classList.remove('hide');}
+
+$('#bpmUp').onclick=()=>{bpm=Math.min(200,bpm+5);$('#bpmVal').textContent=bpm;$('#bpmTag').textContent=bpm+' BPM';};
+$('#bpmDown').onclick=()=>{bpm=Math.max(40,bpm-5);$('#bpmVal').textContent=bpm;$('#bpmTag').textContent=bpm+' BPM';};
+$('#runBtn').addEventListener('click',run);
+</script>
+</body>
+</html>
