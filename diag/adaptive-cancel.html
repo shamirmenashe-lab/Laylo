@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<!--
+  LAYLO · ADAPTIVE LEAK CANCELLER  —  ***TEMP DIAGNOSTIC HARNESS #3***
+  NLMS adaptive filter. Temp. Do not include in production.
+-->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Laylo · Adaptive Cancel</title>
+<style>
+  :root{
+    --bg:#14110d; --bg2:#1c1813; --amber:#f5a623; --amber-dim:#9c7322;
+    --ink:#efe2cc; --ink-dim:#8a7c66; --line:#2e2820;
+    --good:#5fae6b; --bad:#e0623a; --warn:#e0a93a;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;}
+  body{max-width:480px; margin:0 auto; padding:18px 16px 56px; min-height:100vh;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .logo{font-weight:800; letter-spacing:.5px; font-size:19px;}
+  .logo .dot{color:var(--amber);}
+  .badge{font:600 10px/1 var(--mono); color:var(--bg); background:var(--amber);
+    padding:4px 7px; border-radius:5px; letter-spacing:1px;}
+  h1{font-size:13px; font-weight:600; color:var(--ink-dim); letter-spacing:.5px;
+    margin:2px 0 14px; text-transform:uppercase;}
+  .card{background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:12px; font-size:13.5px; line-height:1.6;}
+  .card b{color:var(--amber); font-weight:600;}
+  button.run{width:100%; border:none; border-radius:12px; padding:18px;
+    background:var(--amber); color:#1a1206; font:800 17px/1 system-ui;
+    cursor:pointer; transition:transform .08s, opacity .2s;}
+  button.run:active{transform:scale(.98);}
+  button.run:disabled{opacity:.4; cursor:default;}
+  .status{font:600 12px/1.5 var(--mono); text-align:center; margin:12px 2px;
+    min-height:16px; color:var(--amber); letter-spacing:.3px;}
+  .status.rec{color:var(--bad);}
+  .status .rdot{display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--bad); margin-inline-end:6px; animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  .res{display:none;}
+  .res.show{display:block; animation:rise .4s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px);}}
+  .ab{display:flex; gap:10px;}
+  .cell{flex:1; border:1px solid var(--line); border-radius:11px; padding:12px;
+    text-align:center; background:var(--bg2);}
+  .cell .lbl{font:700 10px/1 var(--mono); color:var(--ink-dim); letter-spacing:1px;}
+  .cell .val{font:800 30px/1.1 var(--mono); margin:8px 0 2px; letter-spacing:-1px;}
+  .cell .val small{font-size:12px; color:var(--ink-dim); font-weight:600;}
+  .cell .play{margin-top:9px; border:1px solid var(--line); background:transparent;
+    color:var(--ink-dim); font:600 10px var(--mono); border-radius:6px;
+    padding:6px 10px; cursor:pointer;}
+  .cell .play:active{color:var(--amber);}
+  .conv{margin-top:10px; border:1px solid var(--line); border-radius:11px;
+    background:var(--bg2); padding:11px 13px;}
+  .conv .lbl{font:700 10px/1 var(--mono); color:var(--ink-dim); letter-spacing:1px;
+    margin-bottom:8px;}
+  .conv canvas{width:100%; height:54px; display:block;}
+  .delta{text-align:center; margin-top:12px; padding:12px; border-radius:11px;
+    border:1.5px solid var(--amber); background:linear-gradient(180deg,#221a10,#1a140d);}
+  .delta .dv{font:800 24px/1 var(--mono); letter-spacing:-.5px;}
+  .delta .dt{font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.5;}
+  .delta.win .dv{color:var(--good);}
+  .delta.meh .dv{color:var(--warn);}
+  .delta.fail .dv{color:var(--bad);}
+  .err{color:var(--bad); font-size:13px; text-align:center; margin-top:10px; line-height:1.5;}
+  footer{margin-top:22px; font:500 10px/1.6 var(--mono); color:var(--ink-dim);
+    text-align:center; opacity:.7;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">layl<span class="dot">o</span></div>
+    <div class="badge">ADAPTIVE · TEMP</div>
+  </header>
+  <h1>ביטול אדפטיבי (NLMS)</h1>
+
+  <div class="card">
+    <b>מתי הכלי הזה:</b> אם חיסור התבנית הקבועה נתן שיפור חלש. כאן הפילטר
+    <b>לומד את מסלול הדליפה תוך-כדי</b> — לא מניח שהיא יציבה ולא תלוי בדגם
+    הטלפון. הקלטה אחת של 6 שניות: קליק רץ, אתה שקט. בסוף — לפני/אחרי
+    באותו מדד dB של האבחונים הקודמים, וגם עקומת הלמידה של הפילטר.
+  </div>
+
+  <button class="run" id="runBtn">הרץ ביטול אדפטיבי</button>
+  <div class="status" id="status"></div>
+  <div class="err hide" id="err"></div>
+
+  <div class="res" id="res">
+    <div class="ab">
+      <div class="cell">
+        <div class="lbl">לפני</div>
+        <div class="val" id="vBefore">—</div>
+        <button class="play" id="pBefore">▶︎ נגן</button>
+      </div>
+      <div class="cell">
+        <div class="lbl">אחרי NLMS</div>
+        <div class="val" id="vAfter">—</div>
+        <button class="play" id="pAfter">▶︎ נגן</button>
+      </div>
+    </div>
+    <div class="conv">
+      <div class="lbl">עקומת למידה — שארית הדליפה לאורך הזמן</div>
+      <canvas id="convCv" width="640" height="108"></canvas>
+    </div>
+    <div class="delta" id="delta">
+      <div class="dv" id="dv">—</div>
+      <div class="dt" id="dt"></div>
+    </div>
+  </div>
+
+  <footer>
+    TEMP harness #3 · NLMS 768 taps @16kHz · ref = הקליק שאנחנו מייצרים<br>
+    fallback לסולם: תבנית קבועה → אדפטיבי → מטרונום שקט · לזרוק אחרי ההוכחה
+  </footer>
+
+  <audio id="clickEl" loop playsinline></audio>
+
+<script>
+const REC_MS=6000;
+const CLICK_FREQS=[900,1200], REF_FREQS=[700,1500];
+const CLICK_INTERVAL=0.5, CLICK_BURST=0.040;
+const PROC_SR=16000;
+const NLMS_TAPS=768;
+const NLMS_MU=0.6, NLMS_EPS=1e-6;
+
+const $=s=>document.querySelector(s);
+const clickEl=$('#clickEl'), statusEl=$('#status'), errEl=$('#err');
+let beforeUrl=null, afterUrl=null;
+
+function buildClick(sr){
+  const dur=4.0, n=Math.floor(sr*dur), buf=new Float32Array(n);
+  for(let c=0;c*CLICK_INTERVAL<dur;c++){
+    const start=Math.floor(c*CLICK_INTERVAL*sr), len=Math.floor(CLICK_BURST*sr);
+    for(let i=0;i<len;i++){
+      const t=i/sr, env=Math.exp(-t*55);
+      let s=0; CLICK_FREQS.forEach(f=>s+=Math.sin(2*Math.PI*f*t));
+      buf[start+i]=0.55*env*(s/CLICK_FREQS.length);
+    }
+  }
+  return buf;
+}
+function encodeWavMono(samples,sr){
+  const n=samples.length,bytes=n*2,ab=new ArrayBuffer(44+bytes),v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+bytes,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,bytes,true);
+  let o=44;for(let i=0;i<n;i++){let x=Math.max(-1,Math.min(1,samples[i]));
+    v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return URL.createObjectURL(new Blob([ab],{type:'audio/wav'}));
+}
+
+function goertzel(x,sr,f){
+  const w=2*Math.PI*f/sr,c=2*Math.cos(w); let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s0=x[i]+c*s1-s2;s2=s1;s1=s0;}
+  return Math.max(s1*s1+s2*s2-c*s1*s2,0)/x.length;
+}
+function bleedScore(x,sr){
+  const b=CLICK_FREQS.reduce((a,f)=>a+goertzel(x,sr,f),0)/CLICK_FREQS.length;
+  const r=REF_FREQS.reduce((a,f)=>a+goertzel(x,sr,f),0)/REF_FREQS.length;
+  return 10*Math.log10((b+1e-12)/(r+1e-12));
+}
+function resampleTo(x,srIn,srOut){
+  if(Math.abs(srIn-srOut)<1) return x.slice(0);
+  const ratio=srIn/srOut, nOut=Math.floor(x.length/ratio), out=new Float32Array(nOut);
+  const win=Math.max(1,Math.round(ratio));
+  for(let j=0;j<nOut;j++){
+    const center=j*ratio; let acc=0,n=0;
+    for(let k=-win;k<=win;k++){
+      const idx=Math.round(center)+k;
+      if(idx>=0&&idx<x.length){acc+=x[idx];n++;}
+    }
+    out[j]=acc/n;
+  }
+  return out;
+}
+function coarseAlign(rec,ref,sr){
+  const span=Math.floor(0.6*sr), seg=Math.min(rec.length,Math.floor(2.0*sr));
+  let best=-Infinity,bestLag=0;
+  for(let lag=0;lag<span;lag++){
+    let dot=0;
+    for(let i=0;i<seg-lag;i+=2) dot+=rec[i+lag]*ref[i%ref.length];
+    if(dot>best){best=dot;bestLag=lag;}
+  }
+  return bestLag;
+}
+function nlms(rec,refAligned,taps,mu,eps){
+  const n=rec.length, w=new Float32Array(taps), out=new Float32Array(n);
+  const blocks=120, blockLen=Math.floor(n/blocks), curve=new Float32Array(blocks);
+  let bAcc=0,bN=0,bI=0;
+  for(let i=0;i<n;i++){
+    let y=0,en=0;
+    const base=i-taps+1;
+    for(let k=0;k<taps;k++){
+      const idx=base+k, xv=(idx>=0&&idx<refAligned.length)?refAligned[idx]:0;
+      y+=w[taps-1-k]*xv; en+=xv*xv;
+    }
+    const e=rec[i]-y; out[i]=e;
+    const g=mu/(en+eps);
+    for(let k=0;k<taps;k++){
+      const idx=base+k, xv=(idx>=0&&idx<refAligned.length)?refAligned[idx]:0;
+      w[taps-1-k]+=g*e*xv;
+    }
+    bAcc+=e*e; bN++;
+    if(bN>=blockLen&&bI<blocks){curve[bI++]=10*Math.log10(bAcc/bN+1e-12);bAcc=0;bN=0;}
+  }
+  return {out,curve};
+}
+
+function pickMime(){
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;
+  return '';
+}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function recordPass(){
+  const stream=await navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,autoGainControl:true,noiseSuppression:true,channelCount:1}
+  });
+  clickEl.currentTime=0; try{await clickEl.play();}catch(e){}
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const stopped=new Promise(res=>rec.onstop=res);
+  rec.start(); await delay(REC_MS); rec.stop(); await stopped;
+  clickEl.pause(); stream.getTracks().forEach(t=>t.stop());
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const audio=await ac.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
+  ac.close();
+  return {mono:audio.getChannelData(0).slice(0), sr:audio.sampleRate};
+}
+
+async function run(){
+  const btn=$('#runBtn'); btn.disabled=true; errEl.classList.add('hide');
+  $('#res').classList.remove('show');
+  try{
+    setStatus('מקליט 6 שניות — שב בשקט…',true);
+    const {mono,sr}=await recordPass();
+    setStatus('מעבד — יישור…',false); await delay(30);
+    const rec16=resampleTo(mono,sr,PROC_SR);
+    const one=buildClick(PROC_SR);
+    const ref=new Float32Array(rec16.length+PROC_SR);
+    for(let i=0;i<ref.length;i++)ref[i]=one[i%one.length];
+    const lag=coarseAlign(rec16,one,PROC_SR);
+    const refAligned=new Float32Array(rec16.length);
+    for(let i=0;i<rec16.length;i++){
+      const j=i-lag; refAligned[i]=(j>=0)?ref[j%one.length]:0;
+    }
+    setStatus('מעבד — הפילטר לומד…',false); await delay(30);
+    const {out,curve}=nlms(rec16,refAligned,NLMS_TAPS,NLMS_MU,NLMS_EPS);
+    const dbB=bleedScore(rec16,PROC_SR);
+    const half=out.subarray(Math.floor(out.length/2));
+    const dbA=bleedScore(half,PROC_SR);
+    beforeUrl=encodeWavMono(rec16,PROC_SR);
+    afterUrl =encodeWavMono(out,PROC_SR);
+    paint(dbB,dbA,curve,lag);
+    setStatus('הושלם ✓',false);
+  }catch(e){
+    setStatus('',false);
+    errEl.textContent=(e&&e.name==='NotAllowedError')
+      ?'הרשאת מיקרופון נדחתה. אשר ונסה שוב.'
+      :'שגיאה: '+(e&&e.message?e.message:e);
+    errEl.classList.remove('hide');
+  }finally{btn.disabled=false; btn.textContent='הרץ שוב';}
+}
+
+function paint(dbB,dbA,curve,lag){
+  $('#res').classList.add('show');
+  $('#vBefore').innerHTML=dbB.toFixed(1)+'<small> dB</small>';
+  $('#vAfter').innerHTML =dbA.toFixed(1)+'<small> dB</small>';
+  $('#vBefore').style.color=dbB>14?'var(--bad)':dbB>6?'var(--warn)':'var(--good)';
+  $('#vAfter').style.color =dbA>14?'var(--bad)':dbA>6?'var(--warn)':'var(--good)';
+  const drop=dbB-dbA, d=$('#delta');
+  $('#dv').textContent=(drop>=0?'−':'+')+Math.abs(drop).toFixed(1)+'dB';
+  d.className='delta '+(drop>=15?'win':drop>=7?'meh':'fail');
+  $('#dt').textContent=
+    drop>=15?`הפילטר נעל את מסלול הדליפה (יישור ${Math.round(lag/PROC_SR*1000)}ms). זה המנגנון שנכניס לכיול — מאומן פעם אחת, רץ על כל הקלטה.`:
+    drop>=7 ?`התכנסות חלקית. תסתכל על עקומת הלמידה — אם היא יורדת בסוף, הקלטה ארוכה יותר תסגור. שלח צילום.`:
+             `הפילטר לא נעל. או שהיישור החטיא או שהדליפה לא-ליניארית — שלח צילום של העקומה והמספרים, ועוברים לשלב 3 בסולם (מטרונום שקט).`;
+  const cv=$('#convCv'),ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  let mn=Infinity,mx=-Infinity;
+  curve.forEach(v=>{if(isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v);}});
+  const pad=8,W=cv.width,H=cv.height;
+  ctx.strokeStyle='#f5a623';ctx.lineWidth=2.5;ctx.beginPath();
+  curve.forEach((v,i)=>{
+    const x=pad+(W-2*pad)*i/(curve.length-1);
+    const y=pad+(H-2*pad)*(1-(v-mn)/((mx-mn)||1));
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+  $('#pBefore').onclick=()=>new Audio(beforeUrl).play();
+  $('#pAfter').onclick =()=>new Audio(afterUrl).play();
+}
+function setStatus(t,rec){
+  statusEl.className='status'+(rec?' rec':'');
+  statusEl.innerHTML=(rec?'<span class="rdot"></span>':'')+t;
+}
+
+clickEl.src=encodeWavMono(buildClick(48000),48000);
+$('#runBtn').addEventListener('click',run);
+</script>
+</body>
+</html>
