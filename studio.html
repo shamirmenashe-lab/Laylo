@@ -118,8 +118,9 @@ canvas.rcv{display:block;}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--red);pointer-events:none;
   z-index:10;left:0;box-shadow:0 0 6px rgba(214,59,40,.5);border-radius:1px;}
 
-.transport{height:var(--transport);display:flex;align-items:center;justify-content:space-between;
-  padding:0 14px;gap:8px;background:var(--bg2);border-top:1.5px solid var(--line2);flex:none;}
+.transport{min-height:var(--transport);display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;padding-bottom:max(14px,env(safe-area-inset-bottom));gap:8px;background:var(--bg2);
+  border-top:1.5px solid var(--line2);flex:none;}
 .t-time{font:800 22px/1 var(--mono);color:var(--ink);letter-spacing:1px;min-width:62px;}
 .tkeys{display:flex;gap:6px;}
 .tkey{width:46px;height:46px;border-radius:10px;border:1.5px solid var(--line2);background:var(--bg);
@@ -235,7 +236,7 @@ const DEV_RESET=true;  // TEMP — מאפס DB בכל טעינה. כבה ל-prod
 const tracks=[];
 const state=[];
 for(let i=0;i<6;i++){
-  tracks.push({id:i,name:NAMES[i],buffer:null,dur:0,seed:(i+1)*97});
+  tracks.push({id:i,name:NAMES[i],buffer:null,dur:0,seed:(i+1)*97,offsetSec:0});
   state.push({recTarget:i===0,hear:true});
 }
 let bpm=80, clickOn=true;
@@ -247,6 +248,7 @@ let fpSampleRate=48000;
 let audioCtx=null;
 let activeSources=[];
 let mediaStream=null, mediaRec=null, recChunks=[], recStartPos=0;
+let liveAnalyser=null, liveRaf=null, liveData=null, liveSamples=[];
 
 const $=s=>document.querySelector(s);
 
@@ -254,6 +256,58 @@ function getCtx(){
   if(!audioCtx||audioCtx.state==='closed')
     audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   return audioCtx;
+}
+
+/* ── LIVE CLICK SCHEDULER — WebAudio, follows `bpm` in real time, never recorded ──
+   Uses a dedicated gain node so toggling click never restarts the scheduler (no drift).
+   This plays through speakers/headphones for monitoring only; it is NOT in the mic feed. */
+let clickGain=null, clickTimer=null, clickNextTime=0, clickRunning=false;
+function ensureClickGain(){
+  const ctx=getCtx();
+  if(!clickGain||clickGain.context!==ctx){
+    if(clickGain){try{clickGain.disconnect();}catch(e){}}
+    clickGain=ctx.createGain();
+    clickGain.gain.value=clickOn?0.5:0;
+    clickGain.connect(ctx.destination);
+  }
+  return clickGain;
+}
+function scheduleClickTick(time,accent){
+  const ctx=getCtx(), g=ensureClickGain();
+  const osc=ctx.createOscillator(), env=ctx.createGain();
+  osc.frequency.value=accent?1200:900;
+  env.gain.setValueAtTime(0.0001,time);
+  env.gain.exponentialRampToValueAtTime(accent?0.9:0.6,time+0.002);
+  env.gain.exponentialRampToValueAtTime(0.0001,time+0.045);
+  osc.connect(env);env.connect(g);
+  osc.start(time);osc.stop(time+0.06);
+}
+function startClickScheduler(){
+  const ctx=getCtx();
+  if(ctx.state==='suspended')ctx.resume();
+  ensureClickGain();
+  clickRunning=true;
+  let beat=0;
+  clickNextTime=ctx.currentTime+0.1;
+  const loop=()=>{
+    if(!clickRunning)return;
+    const period=60/bpm;                         // ← reads LIVE bpm every tick
+    while(clickNextTime < ctx.currentTime + 0.2){
+      scheduleClickTick(clickNextTime, beat%4===0);
+      clickNextTime += period;
+      beat++;
+    }
+    clickTimer=setTimeout(loop,40);
+  };
+  loop();
+}
+function stopClickScheduler(){
+  clickRunning=false;
+  if(clickTimer){clearTimeout(clickTimer);clickTimer=null;}
+}
+function setClickAudible(on){
+  ensureClickGain();
+  try{ clickGain.gain.setTargetAtTime(on?0.5:0, getCtx().currentTime, 0.01); }catch(e){}
 }
 
 function clickSamples(sr,durSec){
@@ -354,6 +408,43 @@ function subtractLeak(mono,sr){
   return out;
 }
 
+/* ── LIVE WAVEFORM during recording: paints a growing envelope on the target row ── */
+function startLiveWave(ti){
+  const row=$('#row'+ti); if(!row)return;
+  let cv=row.querySelector('canvas');
+  if(!cv){cv=document.createElement('canvas');row.appendChild(cv);}
+  const H=row.offsetHeight-12||50;
+  const draw=()=>{
+    if(!liveAnalyser){return;}
+    liveAnalyser.getByteTimeDomainData(liveData);
+    // peak of this frame
+    let peak=0;
+    for(let i=0;i<liveData.length;i++){const v=Math.abs(liveData[i]-128)/128;if(v>peak)peak=v;}
+    liveSamples.push(peak);
+    // draw the growing envelope, scrolling within the visible row width
+    const W=Math.max(4,Math.floor(posSec*pxPerSec));
+    cv.width=W;cv.height=H;cv.style.width=W+'px';
+    const ctx2=cv.getContext('2d');
+    ctx2.strokeStyle=COLORS[ti];ctx2.lineWidth=1.5;
+    const n=liveSamples.length;
+    for(let x=0;x<W;x++){
+      const idx=Math.floor(x/W*n);
+      const p=liveSamples[idx]||0;
+      const h=p*H*0.9;
+      ctx2.beginPath();
+      ctx2.moveTo(x,H/2-h/2);
+      ctx2.lineTo(x,H/2+h/2);
+      ctx2.stroke();
+    }
+    liveRaf=requestAnimationFrame(draw);
+  };
+  liveRaf=requestAnimationFrame(draw);
+}
+function stopLiveWave(){
+  if(liveRaf){cancelAnimationFrame(liveRaf);liveRaf=null;}
+  if(liveAnalyser){try{liveAnalyser.disconnect();}catch(e){}liveAnalyser=null;}
+  liveData=null;liveSamples=[];
+}
 function pickMime(){
   for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
     if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;
@@ -364,10 +455,21 @@ async function startRecording(){
   if(ti<0){toast('בחר ערוץ יעד (⬤)');return false;}
   try{
     mediaStream=await navigator.mediaDevices.getUserMedia({
-      audio:{echoCancellation:true,autoGainControl:true,noiseSuppression:true,channelCount:1}
+      audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false,channelCount:1}
     });
   }catch(e){ toast('מיקרופון נדחה — בדוק הרשאות'); return false; }
-  const backingBlob=renderBacking(TOTAL, true);
+  // ── live waveform tap: analyser on the mic stream (monitor only, not recorded) ──
+  try{
+    const ctx=getCtx(); if(ctx.state==='suspended')ctx.resume();
+    const micSrc=ctx.createMediaStreamSource(mediaStream);
+    liveAnalyser=ctx.createAnalyser();
+    liveAnalyser.fftSize=512;
+    micSrc.connect(liveAnalyser);          // NOT connected to destination → no monitoring feedback
+    liveData=new Uint8Array(liveAnalyser.frequencyBinCount);
+    liveSamples=[];
+    startLiveWave(ti);
+  }catch(e){ console.log('// DBG live analyser failed',e); }
+  const backingBlob=renderBacking(TOTAL, false); // click is now a LIVE scheduler, never baked into mic feed
   const el=$('#backingEl');
   el.src=URL.createObjectURL(backingBlob);
   el.currentTime=0;
@@ -382,6 +484,7 @@ async function startRecording(){
   return true;
 }
 async function stopRecording(){
+  stopLiveWave();
   if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop();
   $('#backingEl').pause();
   if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
@@ -416,7 +519,7 @@ async function runCalibration(){
   let stream;
   try{
     stream=await navigator.mediaDevices.getUserMedia({
-      audio:{echoCancellation:true,autoGainControl:true,noiseSuppression:true,channelCount:1}
+      audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false,channelCount:1}
     });
   }catch(e){ $('#calRes').textContent='מיקרופון נדחה'; return; }
   const sr0=48000;
@@ -477,7 +580,7 @@ function dbGet(k){return new Promise((res,rej)=>{
 async function persist(){
   if(leakFingerprint) await dbPut('fp',{sr:fpSampleRate,data:Array.from(leakFingerprint)});
   const tdata=tracks.map(t=>t.buffer?{
-    dur:t.dur,sr:t.buffer.sampleRate,data:Array.from(t.buffer.getChannelData(0))
+    dur:t.dur,sr:t.buffer.sampleRate,offsetSec:t.offsetSec||0,data:Array.from(t.buffer.getChannelData(0))
   }:null);
   await dbPut('tracks',tdata);
   await dbPut('meta',{bpm,clickOn,state});
@@ -494,7 +597,7 @@ async function restore(){
   if(td){const ctx=getCtx();
     td.forEach((t,i)=>{if(t){const b=ctx.createBuffer(1,t.data.length,t.sr);
       b.getChannelData(0).set(Float32Array.from(t.data));
-      tracks[i].buffer=b;tracks[i].dur=t.dur;}});}
+      tracks[i].buffer=b;tracks[i].dur=t.dur;tracks[i].offsetSec=t.offsetSec||0;}});}
 }
 
 function startPlayback(fromSec){
@@ -506,15 +609,14 @@ function startPlayback(fromSec){
     if(!t.buffer||!state[i].hear)return;
     const src=ctx.createBufferSource();src.buffer=t.buffer;
     src.connect(ctx.destination);
-    src.start(t0, Math.min(fromSec,t.buffer.duration));
+    const off=t.offsetSec||0;
+    const localPos=fromSec-off;                      // where in THIS clip we are
+    if(localPos>=t.buffer.duration)return;            // clip already finished
+    if(localPos>=0){ src.start(t0, localPos); }       // mid-clip
+    else { src.start(t0 - localPos); }                // clip starts in the future
     activeSources.push(src);
   });
-  if(clickOn){
-    const clk=ctx.createBuffer(1,Math.floor(ctx.sampleRate*TOTAL),ctx.sampleRate);
-    clk.getChannelData(0).set(clickSamples(ctx.sampleRate,TOTAL));
-    const src=ctx.createBufferSource();src.buffer=clk;src.connect(ctx.destination);
-    src.start(t0,fromSec);activeSources.push(src);
-  }
+  // click handled by live scheduler (started in transport handlers), not baked here
 }
 function stopSources(){activeSources.forEach(s=>{try{s.stop();}catch(e){}});activeSources=[];}
 
@@ -578,17 +680,71 @@ function build(){
     row.style.setProperty('--tc',col);
     if(!empty){
       const cv=document.createElement('canvas');row.appendChild(cv);
+      cv.style.left=((t.offsetSec||0)*pxPerSec)+'px';
       requestAnimationFrame(()=>drawWaveBuf(cv,t.buffer,pxPerSec,col,row.offsetHeight-12||50));
     }else{
       const el=document.createElement('div');el.className='empty-lbl';
       el.textContent=pro?'★ Laylo Pro':'ריק — בחר ⬤ והקלט';row.appendChild(el);
     }
     wi.appendChild(row);
-    row.addEventListener('click',e=>{
-      const rect=row.getBoundingClientRect();
-      const x=e.clientX-rect.left+wcEl.scrollLeft;seekTo(x/pxPerSec);});
+    attachRowInteraction(row,i);
   });
   drawRuler();updateZLbl();
+}
+/* ── ROW INTERACTION: tap = seek, long-press = enter drag-mode to shift clip L/R ── */
+function attachRowInteraction(row,i){
+  const wcEl=$('#wc');
+  let pressTimer=null, dragging=false, startX=0, startOffset=0, moved=false;
+
+  const onDown=(clientX)=>{
+    moved=false; dragging=false; startX=clientX; startOffset=tracks[i].offsetSec||0;
+    if(!tracks[i].buffer)return;                      // empty row: tap-to-seek only
+    pressTimer=setTimeout(()=>{
+      dragging=true;
+      row.style.outline='2px dashed '+COLORS[i];
+      row.style.outlineOffset='-2px';
+      if(navigator.vibrate)navigator.vibrate(20);
+      toast('מצב הזזה — גרור שמאלה/ימינה');
+    },380);
+  };
+  const onMove=(clientX)=>{
+    if(Math.abs(clientX-startX)>6)moved=true;
+    if(!dragging){ if(moved&&pressTimer){clearTimeout(pressTimer);pressTimer=null;} return; }
+    const dx=clientX-startX;
+    let newOff=startOffset + dx/pxPerSec;
+    newOff=Math.max(0,Math.min(TOTAL-1,newOff));      // clamp inside session
+    tracks[i].offsetSec=newOff;
+    const cv=row.querySelector('canvas');
+    if(cv)cv.style.left=(newOff*pxPerSec)+'px';
+  };
+  const onUp=(clientX)=>{
+    if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+    row.style.outline='';
+    if(dragging){
+      dragging=false;
+      const snapped=Math.round(tracks[i].offsetSec*1000)/1000;
+      tracks[i].offsetSec=snapped;
+      toast('ערוץ '+(i+1)+' הוזז ל-'+snapped.toFixed(2)+'s');
+      persist();
+      return;
+    }
+    if(!moved){                                       // pure tap → seek
+      const rect=row.getBoundingClientRect();
+      const x=(clientX!=null?clientX:startX)-rect.left+wcEl.scrollLeft;
+      seekTo(x/pxPerSec);
+    }
+  };
+
+  // touch
+  row.addEventListener('touchstart',e=>{onDown(e.touches[0].clientX);},{passive:true});
+  row.addEventListener('touchmove',e=>{onMove(e.touches[0].clientX); if(dragging)e.preventDefault();},{passive:false});
+  row.addEventListener('touchend',e=>{onUp(e.changedTouches[0]?e.changedTouches[0].clientX:null);});
+  row.addEventListener('touchcancel',()=>{if(pressTimer)clearTimeout(pressTimer);row.style.outline='';dragging=false;});
+  // mouse (desktop testing)
+  let mDown=false;
+  row.addEventListener('mousedown',e=>{mDown=true;onDown(e.clientX);});
+  window.addEventListener('mousemove',e=>{if(mDown)onMove(e.clientX);});
+  window.addEventListener('mouseup',e=>{if(mDown){mDown=false;onUp(e.clientX);}});
 }
 function syncCtrl(i){
   const s=state[i];
@@ -616,32 +772,35 @@ function stopAll(){
   playing=false;
   cancelAnimationFrame(rafId);
   stopSources();
+  stopClickScheduler();
   if(recording){recording=false;$('#kRec').classList.remove('on');stopRecording();}
   $('#kPlay').classList.remove('on');
 }
 $('#kPlay').addEventListener('click',()=>{
   if(recording)return;
   playing=!playing;$('#kPlay').classList.toggle('on',playing);
-  if(playing){startPlayback(posSec);rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
-  else{cancelAnimationFrame(rafId);stopSources();}
+  if(playing){startPlayback(posSec);startClickScheduler();rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
+  else{cancelAnimationFrame(rafId);stopSources();stopClickScheduler();}
 });
 $('#kStop').addEventListener('click',stopAll);
 $('#kRec').addEventListener('click',async()=>{
   if(recording){
     recording=false;$('#kRec').classList.remove('on');
     playing=false;$('#kPlay').classList.remove('on');cancelAnimationFrame(rafId);
+    stopClickScheduler();
     await stopRecording();
   }else{
     if(!leakFingerprint){ toast('כדאי לכייל קודם — לחץ ⚙ כיול זליגה'); }
     const ok=await startRecording();
     if(ok){recording=true;$('#kRec').classList.add('on');
       playing=true;$('#kPlay').classList.add('on');
+      startClickScheduler();
       posSec=0;rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
   }
 });
 $('#bup').addEventListener('click',()=>{bpm=Math.min(240,bpm+1);$('#bv').textContent=bpm;persist();});
 $('#bdn').addEventListener('click',()=>{bpm=Math.max(40,bpm-1);$('#bv').textContent=bpm;persist();});
-$('#ck').addEventListener('click',()=>{clickOn=!clickOn;$('#ck').classList.toggle('on',clickOn);persist();});
+$('#ck').addEventListener('click',()=>{clickOn=!clickOn;$('#ck').classList.toggle('on',clickOn);setClickAudible(clickOn);persist();});
 
 const ZL=[1,1.5,3,6,12,24,48,96];
 function fitToScreen(){pxPerSec=($('#wc').offsetWidth||300)/TOTAL;}
