@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  LAYLO · STUDIO — קובץ עובד מלא (לא מחליף deck.html)
+  ════════════════════════════════════════════════════════════════════════════
+  מאחד: UI של timeline-v3  +  מנוע הקלטה אמיתי  +  חיסור זליגה מוכח (−16.7dB)
+
+  עמוד שדרה (כללי ברזל — הוכחו בכאב):
+    1. getUserMedia ראשון — לפני כל output (Android routing lock)
+    2. backing (ערוצים + קליק) דרך <audio> element בלבד — לא WebAudio בזמן capture
+    3. ניתוח/חיסור = offline אחרי stop (decodeAudioData), אין output חי בזמן הקלטה
+    4. חיסור זליגה: כיול חד-פעמי לוכד טביעת-דליפה → חיסור per-click בכל הקלטה
+
+  TEMP / לבדיקה:
+    - DEV_RESET ב-init() — מאפס IndexedDB בכל טעינה. כבה ל-production.
+    - console.log בכיול ובחיסור (מסומנים // DBG)
+    - אין עדיין: M/S mix-down לקובץ master, ייצוא, Click Sync ויזואלי
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Laylo · Studio</title>
+<style>
+:root{
+  --bg:#f2ece2; --bg2:#e8e2d6; --bg3:#ddd6c8;
+  --line:#cdc6b8; --line2:#bbb4a6;
+  --ink:#2d2318; --ink2:#6b5f4e; --ink3:#a09282;
+  --amber:#d4820a; --red:#d63b28; --green:#2e8b57;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  --sans:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --hdr:50px; --zbar:34px; --ruler:24px;
+  --ctrl-w:80px; --ch-h:62px; --transport:72px;
+}
+.t0{--tc:#e8624a;}.t1{--tc:#4a9eca;}.t2{--tc:#5ab870;}
+.t3{--tc:#9b7fd4;}.t4{--tc:#e8a44a;}.t5{--tc:#4ac4b8;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  height:100%;overflow:hidden;}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100vh;}
+
+.hdr{height:var(--hdr);display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;background:var(--bg2);border-bottom:1.5px solid var(--line2);flex:none;}
+.logo{font:800 18px/1 var(--sans);color:var(--ink2);}
+.logo b{color:var(--amber);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.bpm-box{display:flex;align-items:center;background:var(--bg);
+  border:1.5px solid var(--line2);border-radius:8px;overflow:hidden;}
+.bpm-b{width:28px;height:28px;border:none;background:transparent;
+  color:var(--ink2);font:700 16px var(--mono);cursor:pointer;}
+.bpm-b:active{background:var(--line);}
+.bpm-v{font:700 14px/1 var(--mono);color:var(--amber);padding:0 4px;min-width:30px;text-align:center;}
+.bpm-lbl{font:600 8px var(--mono);color:var(--ink3);padding-left:3px;letter-spacing:1px;}
+.click-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink3);font:700 16px var(--mono);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.click-btn.on{border-color:var(--amber);color:var(--amber);background:#fff8ee;}
+
+.zbar{height:var(--zbar);display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line);flex:none;}
+.z-btns{display:flex;gap:5px;align-items:center;}
+.zbtn{width:32px;height:26px;border-radius:6px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink2);font:700 16px var(--mono);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.zbtn:active{background:var(--line);}
+.z-lbl{font:600 10px var(--mono);color:var(--ink3);}
+.cal-btn{font:600 10px var(--sans);color:var(--ink3);border:1.5px solid var(--line2);
+  background:var(--bg);border-radius:7px;padding:6px 9px;cursor:pointer;}
+.cal-btn.done{border-color:var(--green);color:var(--green);background:#eef6f0;}
+.cal-btn.need{border-color:var(--amber);color:var(--amber);background:#fff8ee;}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.ruler-wrap{display:flex;flex:none;border-bottom:1.5px solid var(--line2);}
+.ruler-ctrl{width:var(--ctrl-w);flex:none;height:var(--ruler);background:var(--bg3);
+  border-right:1.5px solid var(--line2);display:flex;align-items:center;padding:0 8px;
+  font:600 8px var(--mono);color:var(--ink3);}
+.ruler-scroll{flex:1;height:var(--ruler);overflow:hidden;}
+canvas.rcv{display:block;}
+.tracks-area{flex:1;display:flex;overflow:hidden;}
+.ctrl-col{width:var(--ctrl-w);flex:none;overflow:hidden;position:relative;
+  border-right:1.5px solid var(--line2);background:var(--bg2);}
+.ctrl-inner{position:absolute;top:0;left:0;right:0;}
+.ch-ctrl{height:var(--ch-h);display:flex;align-items:center;padding:0 6px;
+  border-bottom:1px solid var(--line);gap:5px;position:relative;cursor:pointer;}
+.ch-ctrl:active{background:var(--bg3);}
+.accent-bar{position:absolute;right:0;top:5px;bottom:5px;width:3px;border-radius:2px;background:var(--tc,#ccc);}
+.ch-num{width:20px;height:20px;border-radius:5px;flex:none;display:flex;align-items:center;
+  justify-content:center;font:800 11px var(--mono);background:var(--tc,#ccc);color:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.ch-meta{flex:1;min-width:0;}
+.ch-name-txt{font:600 11px var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
+.ch-ctrl.empty .ch-name-txt{color:var(--ink3);font-weight:400;}
+.ch-btns{display:flex;flex-direction:column;gap:4px;flex:none;}
+.rec-target{width:22px;height:22px;border-radius:50%;border:2px solid var(--line2);
+  background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.rec-target::after{content:'';width:10px;height:10px;border-radius:50%;background:transparent;transition:background .15s;}
+.rec-target.on{border-color:var(--red);}
+.rec-target.on::after{background:var(--red);box-shadow:0 0 6px rgba(214,59,40,.5);}
+.hear-btn{width:22px;height:22px;border-radius:5px;border:1.5px solid var(--line2);
+  background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font:600 11px var(--sans);color:var(--ink3);transition:all .15s;}
+.hear-btn.on{border-color:var(--tc,#888);background:var(--tc,#888);color:#fff;}
+.hear-btn.off{opacity:.5;}
+.lp-ring{position:absolute;inset:3px;border-radius:6px;border:2px solid var(--tc,#888);opacity:0;pointer-events:none;}
+.ch-ctrl.lp-active .lp-ring{opacity:.6;}
+.wave-col{flex:1;overflow-x:auto;overflow-y:hidden;position:relative;-webkit-overflow-scrolling:touch;}
+.wave-col::-webkit-scrollbar{height:3px;}
+.wave-col::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px;}
+.wave-inner{position:relative;}
+.ch-row{height:var(--ch-h);position:absolute;left:0;border-bottom:1px solid var(--line);
+  cursor:pointer;overflow:hidden;}
+.ch-row canvas{position:absolute;top:6px;left:0;bottom:6px;}
+.ch-row.muted-row canvas{opacity:.25;}
+.ch-row.rec-row{outline:2px solid var(--red);outline-offset:-2px;}
+.ch-row.empty-row{background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(0,0,0,.02) 10px,rgba(0,0,0,.02) 20px);}
+.empty-lbl{font:500 11px var(--sans);color:var(--ink3);padding:0 12px;line-height:var(--ch-h);}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--red);pointer-events:none;
+  z-index:10;left:0;box-shadow:0 0 6px rgba(214,59,40,.5);border-radius:1px;}
+
+.transport{height:var(--transport);display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;gap:8px;background:var(--bg2);border-top:1.5px solid var(--line2);flex:none;}
+.t-time{font:800 22px/1 var(--mono);color:var(--ink);letter-spacing:1px;min-width:62px;}
+.tkeys{display:flex;gap:6px;}
+.tkey{width:46px;height:46px;border-radius:10px;border:1.5px solid var(--line2);background:var(--bg);
+  color:var(--ink2);cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:all .1s;}
+.tkey:active{transform:scale(.92);}
+.tkey:disabled{opacity:.4;}
+.tkey svg{width:15px;height:15px;fill:currentColor;}
+.tkey span{font:600 7px var(--mono);letter-spacing:.8px;}
+.tkey.play-k{border-color:var(--green);color:var(--green);}
+.tkey.play-k.on{background:#e8f5e9;}
+.tkey.rec-k{border-color:var(--red);color:var(--red);}
+.tkey.rec-k.on{background:#fde8e6;animation:rp 1s infinite;}
+@keyframes rp{50%{box-shadow:0 0 14px rgba(214,59,40,.4);}}
+.ai-btn{width:46px;height:46px;border-radius:10px;border:1.5px solid #7baed4;background:#e8f2fb;
+  color:#3a7ab8;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:17px;gap:2px;}
+.ai-btn span{font:600 7px var(--mono);color:#3a7ab8;}
+
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-20px);
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font:500 13px var(--sans);
+  z-index:100;opacity:0;transition:all .3s;max-width:90%;text-align:center;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.cal-overlay{position:fixed;inset:0;z-index:90;background:rgba(20,16,11,.82);backdrop-filter:blur(6px);
+  max-width:430px;margin:0 auto;display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 30px;text-align:center;}
+.cal-overlay.open{display:flex;}
+.cal-overlay h2{font:700 22px var(--sans);color:#fff;margin:0 0 12px;}
+.cal-overlay p{font:400 14px/1.6 var(--sans);color:#e8e2d6;margin:0 0 24px;max-width:300px;}
+.cal-ring{width:120px;height:120px;border-radius:50%;border:3px solid rgba(245,166,35,.25);
+  display:flex;align-items:center;justify-content:center;margin-bottom:24px;position:relative;}
+.cal-ring .fill{position:absolute;inset:-3px;border-radius:50%;
+  background:conic-gradient(var(--amber) var(--p,0%),transparent 0);
+  -webkit-mask:radial-gradient(transparent 56px,#000 58px);mask:radial-gradient(transparent 56px,#000 58px);}
+.cal-ring .lbl{font:800 16px var(--mono);color:var(--amber);}
+.cal-go{background:var(--amber);color:#1a1206;border:none;border-radius:12px;padding:16px 32px;
+  font:800 16px var(--sans);cursor:pointer;}
+.cal-skip{background:transparent;color:#9e8f77;border:none;font:500 13px var(--sans);
+  margin-top:16px;cursor:pointer;text-decoration:underline;}
+.cal-result{font:600 13px var(--mono);color:var(--green);margin-top:14px;min-height:18px;}
+
+audio{display:none;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">layl<b>o</b></div>
+  <div class="hdr-r">
+    <div class="bpm-box">
+      <button class="bpm-b" id="bdn">−</button>
+      <div class="bpm-v" id="bv">80</div>
+      <div class="bpm-lbl">BPM</div>
+      <button class="bpm-b" id="bup">+</button>
+    </div>
+    <button class="click-btn on" id="ck">♩</button>
+  </div>
+</div>
+
+<div class="zbar">
+  <div class="z-btns">
+    <button class="zbtn" id="zin">+</button>
+    <div class="z-lbl" id="zlbl">כל הסשן</div>
+    <button class="zbtn" id="zout">−</button>
+  </div>
+  <button class="cal-btn need" id="calBtn">⚙ כיול זליגה</button>
+</div>
+
+<div class="main">
+  <div class="ruler-wrap">
+    <div class="ruler-ctrl">זמן</div>
+    <div class="ruler-scroll" id="rScroll"><canvas class="rcv" id="rCv"></canvas></div>
+  </div>
+  <div class="tracks-area">
+    <div class="ctrl-col"><div class="ctrl-inner" id="ci"></div></div>
+    <div class="wave-col" id="wc"><div class="wave-inner" id="wi"><div class="playhead" id="ph"></div></div></div>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="t-time" id="clk">0:00</div>
+  <div class="tkeys">
+    <button class="tkey" id="kStop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg><span>STOP</span></button>
+    <button class="tkey play-k" id="kPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
+    <button class="tkey rec-k" id="kRec"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>REC</span></button>
+  </div>
+  <button class="ai-btn" id="aiBtn">✦<span>AI</span></button>
+</div>
+
+<div class="cal-overlay" id="calOv">
+  <h2>כיול זליגת קליק</h2>
+  <p id="calDesc">פעם אחת בלבד. חבר אוזניות, שב בשקט 5 שניות — נלמד את טביעת הדליפה של הטלפון שלך ונחסר אותה מכל הקלטה.</p>
+  <div class="cal-ring"><div class="fill" id="calFill"></div><div class="lbl" id="calLbl">5</div></div>
+  <button class="cal-go" id="calGo">התחל כיול</button>
+  <div class="cal-result" id="calRes"></div>
+  <button class="cal-skip" id="calSkip">דלג (לא מומלץ)</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<audio id="backingEl" playsinline></audio>
+
+<script>
+"use strict";
+const TOTAL=300;
+const COLORS=['#e8624a','#4a9eca','#5ab870','#9b7fd4','#e8a44a','#4ac4b8'];
+const NAMES=['ערוץ 1','ערוץ 2','ערוץ 3','ערוץ 4','ערוץ 5','Pro ✦'];
+const CLICK_FREQS=[900,1200];
+const CLICK_INTERVAL=0.5, CLICK_BURST=0.040, TPL_LEN_S=0.090;
+const FREE_LIMIT=4;
+const DEV_RESET=true;  // TEMP — מאפס DB בכל טעינה. כבה ל-production.
+
+const tracks=[];
+const state=[];
+for(let i=0;i<6;i++){
+  tracks.push({id:i,name:NAMES[i],buffer:null,dur:0,seed:(i+1)*97});
+  state.push({recTarget:i===0,hear:true});
+}
+let bpm=80, clickOn=true;
+let playing=false, recording=false;
+let posSec=0, rafId=null, rafLast=0;
+let pxPerSec=1, zi=0;
+let leakFingerprint=null;
+let fpSampleRate=48000;
+let audioCtx=null;
+let activeSources=[];
+let mediaStream=null, mediaRec=null, recChunks=[], recStartPos=0;
+
+const $=s=>document.querySelector(s);
+
+function getCtx(){
+  if(!audioCtx||audioCtx.state==='closed')
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function clickSamples(sr,durSec){
+  const n=Math.floor(sr*durSec), buf=new Float32Array(n);
+  const period=60/bpm;
+  for(let c=0;c*period<durSec;c++){
+    const start=Math.floor(c*period*sr), len=Math.floor(CLICK_BURST*sr);
+    for(let i=0;i<len;i++){
+      const t=i/sr, env=Math.exp(-t*55);
+      let s=0; CLICK_FREQS.forEach(f=>s+=Math.sin(2*Math.PI*f*t));
+      if(start+i<n) buf[start+i]+=0.5*env*(s/CLICK_FREQS.length);
+    }
+  }
+  return buf;
+}
+function renderBacking(durSec, includeClick){
+  const sr=fpSampleRate;
+  const n=Math.floor(sr*durSec);
+  const mix=new Float32Array(n);
+  tracks.forEach((t,i)=>{
+    if(!t.buffer||!state[i].hear)return;
+    const ch=t.buffer.getChannelData(0);
+    const ratio=t.buffer.sampleRate/sr;
+    for(let j=0;j<n;j++){
+      const srcIdx=Math.floor(j*ratio);
+      if(srcIdx<ch.length) mix[j]+=ch[srcIdx]*0.9;
+    }
+  });
+  if(includeClick && clickOn){
+    const clk=clickSamples(sr,durSec);
+    for(let j=0;j<n;j++) mix[j]+=clk[j];
+  }
+  for(let j=0;j<n;j++) mix[j]=Math.max(-1,Math.min(1,mix[j]));
+  return encodeWav(mix,sr);
+}
+function encodeWav(samples,sr){
+  const n=samples.length,bytes=n*2,ab=new ArrayBuffer(44+bytes),v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+bytes,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,bytes,true);
+  let o=44;for(let i=0;i<n;i++){let x=samples[i];v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return new Blob([ab],{type:'audio/wav'});
+}
+
+function goertzel(x,sr,f){
+  const w=2*Math.PI*f/sr,c=2*Math.cos(w);let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s0=x[i]+c*s1-s2;s2=s1;s1=s0;}
+  return Math.max(s1*s1+s2*s2-c*s1*s2,0)/x.length;
+}
+function bleedDb(x,sr){
+  const b=CLICK_FREQS.reduce((a,f)=>a+goertzel(x,sr,f),0)/CLICK_FREQS.length;
+  const r=([700,1500]).reduce((a,f)=>a+goertzel(x,sr,f),0)/2;
+  return 10*Math.log10((b+1e-12)/(r+1e-12));
+}
+function syntheticTpl(sr){
+  const len=Math.floor(CLICK_BURST*sr),t=new Float32Array(len);
+  for(let i=0;i<len;i++){const tt=i/sr,e=Math.exp(-tt*55);
+    let s=0;CLICK_FREQS.forEach(f=>s+=Math.sin(2*Math.PI*f*tt));t[i]=e*(s/CLICK_FREQS.length);}
+  return t;
+}
+function refinePeak(x,tpl,center,radius){
+  let best=-Infinity,pos=center;
+  const lo=Math.max(0,center-radius),hi=Math.min(x.length-tpl.length,center+radius);
+  for(let p=lo;p<=hi;p++){let dot=0,en=0;
+    for(let i=0;i<tpl.length;i++){const xv=x[p+i];dot+=xv*tpl[i];en+=xv*xv;}
+    const sc=dot/Math.sqrt(en+1e-12);if(sc>best){best=sc;pos=p;}}
+  return pos;
+}
+function findClicks(x,sr,tpl){
+  const intS=Math.round(CLICK_INTERVAL*sr),rad=Math.round(0.060*sr);
+  let anchor=refinePeak(x,tpl,Math.round(0.4*sr),Math.round(0.4*sr));
+  const out=[];
+  for(let p=anchor;p<x.length-tpl.length;p+=intS){const r=refinePeak(x,tpl,p,rad);out.push(r);p=r;}
+  for(let p=anchor-intS;p>=0;p-=intS){const r=refinePeak(x,tpl,p,rad);out.unshift(r);p=r;}
+  return out;
+}
+function avgAt(x,positions,len){
+  const acc=new Float32Array(len);let n=0;
+  positions.forEach(p=>{if(p+len<=x.length){for(let i=0;i<len;i++)acc[i]+=x[p+i];n++;}});
+  if(n)for(let i=0;i<len;i++)acc[i]/=n;
+  return acc;
+}
+function subtractLeak(mono,sr){
+  if(!leakFingerprint)return mono;
+  const tpl=leakFingerprint;
+  const positions=findClicks(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)));
+  const out=mono.slice(0);
+  positions.forEach(p=>{
+    if(p+tpl.length>out.length)return;
+    let dot=0,en=0;
+    for(let i=0;i<tpl.length;i++){dot+=out[p+i]*tpl[i];en+=tpl[i]*tpl[i];}
+    const a=dot/(en+1e-12);
+    for(let i=0;i<tpl.length;i++)out[p+i]-=a*tpl[i];
+  });
+  console.log('// DBG חיסור:',positions.length,'קליקים נוקו'); // DBG
+  return out;
+}
+
+function pickMime(){
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;
+  return '';
+}
+async function startRecording(){
+  const ti=state.findIndex(s=>s.recTarget);
+  if(ti<0){toast('בחר ערוץ יעד (⬤)');return false;}
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,autoGainControl:true,noiseSuppression:true,channelCount:1}
+    });
+  }catch(e){ toast('מיקרופון נדחה — בדוק הרשאות'); return false; }
+  const backingBlob=renderBacking(TOTAL, true);
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(backingBlob);
+  el.currentTime=0;
+  try{ await el.play(); }catch(e){}
+  const mime=pickMime();
+  mediaRec=new MediaRecorder(mediaStream,mime?{mimeType:mime}:undefined);
+  recChunks=[];
+  mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data);};
+  mediaRec.onstop=()=>finalizeRecording(ti,mime);
+  recStartPos=0;
+  mediaRec.start();
+  return true;
+}
+async function stopRecording(){
+  if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop();
+  $('#backingEl').pause();
+  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+}
+async function finalizeRecording(ti,mime){
+  const blob=new Blob(recChunks,{type:mime||'audio/webm'});
+  const ctx=getCtx();
+  let audio;
+  try{ audio=await ctx.decodeAudioData(await blob.arrayBuffer()); }
+  catch(e){ toast('שגיאת פענוח הקלטה'); return; }
+  fpSampleRate=audio.sampleRate;
+  let mono=audio.getChannelData(0).slice(0);
+  const before=bleedDb(mono,audio.sampleRate);
+  if(leakFingerprint){
+    mono=subtractLeak(mono,audio.sampleRate);
+    const after=bleedDb(mono,audio.sampleRate);
+    console.log(`// DBG זליגה לפני ${before.toFixed(1)}dB → אחרי ${after.toFixed(1)}dB`); // DBG
+    toast(`ערוץ ${ti+1} נוקה · −${(before-after).toFixed(0)}dB זליגה`);
+  }else{
+    toast(`ערוץ ${ti+1} הוקלט · ⚠ ללא כיול`);
+  }
+  const clean=ctx.createBuffer(1,mono.length,audio.sampleRate);
+  clean.getChannelData(0).set(mono);
+  tracks[ti].buffer=clean;
+  tracks[ti].dur=Math.round(mono.length/audio.sampleRate);
+  await persist();
+  build();
+}
+
+async function runCalibration(){
+  $('#calRes').textContent='';
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,autoGainControl:true,noiseSuppression:true,channelCount:1}
+    });
+  }catch(e){ $('#calRes').textContent='מיקרופון נדחה'; return; }
+  const sr0=48000;
+  const clickBlob=encodeWav(clickSamples(sr0,5.0),sr0);
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(clickBlob); el.currentTime=0;
+  try{ await el.play(); }catch(e){}
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const done=new Promise(res=>rec.onstop=res);
+  rec.start();
+  for(let s=5;s>=1;s--){ setCalProgress((5-s)/5*100, s); await wait(1000); }
+  setCalProgress(100,'•');
+  rec.stop(); await done;
+  el.pause(); stream.getTracks().forEach(t=>t.stop());
+  const ctx=getCtx();
+  const audio=await ctx.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
+  fpSampleRate=audio.sampleRate;
+  const mono=audio.getChannelData(0);
+  const tplLen=Math.floor(TPL_LEN_S*audio.sampleRate);
+  let pos=findClicks(mono,audio.sampleRate,syntheticTpl(audio.sampleRate));
+  let tpl=avgAt(mono,pos,tplLen);
+  pos=findClicks(mono,audio.sampleRate,tpl.subarray(0,Math.floor(CLICK_BURST*audio.sampleRate)));
+  tpl=avgAt(mono,pos,tplLen);
+  leakFingerprint=tpl;
+  const db=bleedDb(mono,audio.sampleRate);
+  console.log('// DBG כיול:',pos.length,'מופעים, רמה',db.toFixed(1),'dB'); // DBG
+  await persist();
+  $('#calRes').textContent=`✓ נלכדו ${pos.length} מופעים · רמת זליגה ${db.toFixed(1)}dB`;
+  $('#calBtn').className='cal-btn done'; $('#calBtn').textContent='✓ מכויל';
+  setTimeout(()=>{ $('#calOv').classList.remove('open'); toast('כיול הושלם — הקלטות ינוקו אוטומטית'); },1400);
+}
+function setCalProgress(pct,lbl){
+  $('#calFill').style.setProperty('--p',pct+'%');
+  $('#calLbl').textContent=lbl;
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+let db=null;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('laylo-studio',1);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+    };
+    r.onsuccess=e=>{db=e.target.result;res();};
+    r.onerror=e=>rej(e);
+  });
+}
+function dbPut(k,v){return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);
+  tx.oncomplete=res;tx.onerror=rej;});}
+function dbGet(k){return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readonly');const r=tx.objectStore('kv').get(k);
+  r.onsuccess=()=>res(r.result);r.onerror=rej;});}
+async function persist(){
+  if(leakFingerprint) await dbPut('fp',{sr:fpSampleRate,data:Array.from(leakFingerprint)});
+  const tdata=tracks.map(t=>t.buffer?{
+    dur:t.dur,sr:t.buffer.sampleRate,data:Array.from(t.buffer.getChannelData(0))
+  }:null);
+  await dbPut('tracks',tdata);
+  await dbPut('meta',{bpm,clickOn,state});
+}
+async function restore(){
+  const fp=await dbGet('fp');
+  if(fp){leakFingerprint=Float32Array.from(fp.data);fpSampleRate=fp.sr;
+    $('#calBtn').className='cal-btn done';$('#calBtn').textContent='✓ מכויל';}
+  const meta=await dbGet('meta');
+  if(meta){bpm=meta.bpm||80;clickOn=meta.clickOn!==false;
+    if(meta.state)meta.state.forEach((s,i)=>{if(state[i])Object.assign(state[i],s);});
+    $('#bv').textContent=bpm;$('#ck').classList.toggle('on',clickOn);}
+  const td=await dbGet('tracks');
+  if(td){const ctx=getCtx();
+    td.forEach((t,i)=>{if(t){const b=ctx.createBuffer(1,t.data.length,t.sr);
+      b.getChannelData(0).set(Float32Array.from(t.data));
+      tracks[i].buffer=b;tracks[i].dur=t.dur;}});}
+}
+
+function startPlayback(fromSec){
+  const ctx=getCtx();
+  if(ctx.state==='suspended')ctx.resume();
+  stopSources();
+  const t0=ctx.currentTime+0.05;
+  tracks.forEach((t,i)=>{
+    if(!t.buffer||!state[i].hear)return;
+    const src=ctx.createBufferSource();src.buffer=t.buffer;
+    src.connect(ctx.destination);
+    src.start(t0, Math.min(fromSec,t.buffer.duration));
+    activeSources.push(src);
+  });
+  if(clickOn){
+    const clk=ctx.createBuffer(1,Math.floor(ctx.sampleRate*TOTAL),ctx.sampleRate);
+    clk.getChannelData(0).set(clickSamples(ctx.sampleRate,TOTAL));
+    const src=ctx.createBufferSource();src.buffer=clk;src.connect(ctx.destination);
+    src.start(t0,fromSec);activeSources.push(src);
+  }
+}
+function stopSources(){activeSources.forEach(s=>{try{s.stop();}catch(e){}});activeSources=[];}
+
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function drawWaveBuf(cv,buffer,px,col,H){
+  const dur=buffer.duration;
+  const W=Math.max(4,Math.floor(dur*px));
+  cv.width=W;cv.height=H||50;cv.style.width=W+'px';
+  const ctx=cv.getContext('2d'),data=buffer.getChannelData(0);
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;
+  const step=Math.max(1,Math.floor(data.length/W));
+  for(let x=0;x<W;x++){
+    let mn=1,mx=-1;const s0=x*step;
+    for(let k=0;k<step;k++){const v=data[s0+k]||0;if(v<mn)mn=v;if(v>mx)mx=v;}
+    ctx.beginPath();ctx.moveTo(x,cv.height/2-mx*cv.height*.45);
+    ctx.lineTo(x,cv.height/2-mn*cv.height*.45);ctx.stroke();
+  }
+}
+function drawRuler(){
+  const W=Math.ceil(TOTAL*pxPerSec),cv=$('#rCv');
+  cv.width=W;cv.height=24;cv.style.width=W+'px';
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,W,24);
+  const step=pxPerSec>40?5:pxPerSec>15?10:pxPerSec>6?30:60;
+  ctx.font='600 9px SF Mono,monospace';
+  for(let s=0;s<=TOTAL;s+=step){const x=s*pxPerSec;
+    ctx.fillStyle='#cdc6b8';ctx.fillRect(x,16,1,8);
+    const m=Math.floor(s/60),sc=s%60;ctx.fillStyle='#a09282';
+    ctx.fillText(m+':'+(sc<10?'0':'')+sc,x+2,13);}
+}
+function build(){
+  const wcEl=$('#wc');
+  const totalW=Math.max(wcEl.offsetWidth||300,Math.ceil(TOTAL*pxPerSec));
+  const totalH=tracks.length*62;
+  const wi=$('#wi');wi.style.width=totalW+'px';wi.style.height=totalH+'px';
+  $('#ph').style.height=totalH+'px';
+  const ci=$('#ci');ci.style.height=totalH+'px';ci.innerHTML='';
+  document.querySelectorAll('.ch-row').forEach(e=>e.remove());
+
+  tracks.forEach((t,i)=>{
+    const s=state[i],col=COLORS[i],empty=!t.buffer,pro=i>=FREE_LIMIT;
+    const ctrl=document.createElement('div');
+    ctrl.className='ch-ctrl t'+i+(empty?' empty':'');
+    ctrl.id='ctrl'+i;ctrl.style.setProperty('--tc',col);
+    ctrl.innerHTML=`<div class="lp-ring"></div><div class="accent-bar"></div>
+      <div class="ch-num" style="background:${col}">${i+1}</div>
+      <div class="ch-meta"><div class="ch-name-txt">${t.name}</div></div>
+      <div class="ch-btns">
+        <div class="rec-target${s.recTarget?' on':''}" id="rt${i}"></div>
+        <div class="hear-btn${s.hear?' on':' off'}" id="hb${i}">🔊</div>
+      </div>`;
+    ci.appendChild(ctrl);
+    ctrl.querySelector('.rec-target').addEventListener('click',e=>{
+      e.stopPropagation();state.forEach((ss,ii)=>{ss.recTarget=(ii===i);syncCtrl(ii);});persist();});
+    ctrl.querySelector('.hear-btn').addEventListener('click',e=>{
+      e.stopPropagation();s.hear=!s.hear;syncCtrl(i);persist();});
+
+    const row=document.createElement('div');
+    row.className='ch-row t'+i+(empty?' empty-row':'')+(s.recTarget?' rec-row':'')+(!s.hear?' muted-row':'');
+    row.id='row'+i;row.style.cssText=`top:${i*62}px;width:${totalW}px;`;
+    row.style.setProperty('--tc',col);
+    if(!empty){
+      const cv=document.createElement('canvas');row.appendChild(cv);
+      requestAnimationFrame(()=>drawWaveBuf(cv,t.buffer,pxPerSec,col,row.offsetHeight-12||50));
+    }else{
+      const el=document.createElement('div');el.className='empty-lbl';
+      el.textContent=pro?'★ Laylo Pro':'ריק — בחר ⬤ והקלט';row.appendChild(el);
+    }
+    wi.appendChild(row);
+    row.addEventListener('click',e=>{
+      const rect=row.getBoundingClientRect();
+      const x=e.clientX-rect.left+wcEl.scrollLeft;seekTo(x/pxPerSec);});
+  });
+  drawRuler();updateZLbl();
+}
+function syncCtrl(i){
+  const s=state[i];
+  const rt=$('#rt'+i);if(rt)rt.classList.toggle('on',s.recTarget);
+  const hb=$('#hb'+i);if(hb){hb.classList.toggle('on',s.hear);hb.classList.toggle('off',!s.hear);}
+  const row=$('#row'+i);if(row){row.classList.toggle('rec-row',s.recTarget);row.classList.toggle('muted-row',!s.hear);}
+}
+
+function seekTo(sec){posSec=Math.max(0,Math.min(TOTAL,sec));updatePH();}
+function updatePH(){
+  const x=posSec*pxPerSec;$('#ph').style.left=x+'px';
+  const m=Math.floor(posSec/60),s=Math.floor(posSec%60);
+  $('#clk').textContent=m+':'+String(s).padStart(2,'0');
+  const wcEl=$('#wc'),vw=wcEl.offsetWidth;
+  if(playing&&(x>wcEl.scrollLeft+vw-30||x<wcEl.scrollLeft)){
+    wcEl.scrollLeft=Math.max(0,x-vw*.2);$('#rScroll').scrollLeft=wcEl.scrollLeft;}
+}
+function playLoop(ts){
+  if(!playing)return;
+  const dt=(ts-rafLast)/1000;rafLast=ts;posSec=Math.min(TOTAL,posSec+dt);updatePH();
+  if(posSec>=TOTAL){stopAll();return;}
+  rafId=requestAnimationFrame(playLoop);
+}
+function stopAll(){
+  playing=false;
+  cancelAnimationFrame(rafId);
+  stopSources();
+  if(recording){recording=false;$('#kRec').classList.remove('on');stopRecording();}
+  $('#kPlay').classList.remove('on');
+}
+$('#kPlay').addEventListener('click',()=>{
+  if(recording)return;
+  playing=!playing;$('#kPlay').classList.toggle('on',playing);
+  if(playing){startPlayback(posSec);rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
+  else{cancelAnimationFrame(rafId);stopSources();}
+});
+$('#kStop').addEventListener('click',stopAll);
+$('#kRec').addEventListener('click',async()=>{
+  if(recording){
+    recording=false;$('#kRec').classList.remove('on');
+    playing=false;$('#kPlay').classList.remove('on');cancelAnimationFrame(rafId);
+    await stopRecording();
+  }else{
+    if(!leakFingerprint){ toast('כדאי לכייל קודם — לחץ ⚙ כיול זליגה'); }
+    const ok=await startRecording();
+    if(ok){recording=true;$('#kRec').classList.add('on');
+      playing=true;$('#kPlay').classList.add('on');
+      posSec=0;rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
+  }
+});
+$('#bup').addEventListener('click',()=>{bpm=Math.min(240,bpm+1);$('#bv').textContent=bpm;persist();});
+$('#bdn').addEventListener('click',()=>{bpm=Math.max(40,bpm-1);$('#bv').textContent=bpm;persist();});
+$('#ck').addEventListener('click',()=>{clickOn=!clickOn;$('#ck').classList.toggle('on',clickOn);persist();});
+
+const ZL=[1,1.5,3,6,12,24,48,96];
+function fitToScreen(){pxPerSec=($('#wc').offsetWidth||300)/TOTAL;}
+function applyZoom(){pxPerSec=ZL[zi];build();
+  const wcEl=$('#wc');wcEl.scrollLeft=Math.max(0,posSec*pxPerSec-wcEl.offsetWidth*.2);
+  $('#rScroll').scrollLeft=wcEl.scrollLeft;updateZLbl();}
+function updateZLbl(){const vw=$('#wc').offsetWidth||300,vis=vw/pxPerSec;
+  if(vis>=TOTAL-5)$('#zlbl').textContent='כל הסשן';
+  else{const m=Math.floor(vis/60),s=Math.floor(vis%60);$('#zlbl').textContent=(m>0?m+'m ':'')+s+'s';}}
+$('#zin').addEventListener('click',()=>{if(zi<ZL.length-1){zi++;applyZoom();}});
+$('#zout').addEventListener('click',()=>{if(zi>0){zi--;applyZoom();}else{fitToScreen();build();updateZLbl();}});
+
+$('#calBtn').addEventListener('click',()=>{$('#calOv').classList.add('open');});
+$('#calGo').addEventListener('click',()=>{ $('#calGo').disabled=true; runCalibration().finally(()=>$('#calGo').disabled=false); });
+$('#calSkip').addEventListener('click',()=>$('#calOv').classList.remove('open'));
+$('#aiBtn').addEventListener('click',()=>toast('טכנאי AI — בקרוב'));
+$('#wc').addEventListener('scroll',()=>{$('#rScroll').scrollLeft=$('#wc').scrollLeft;});
+
+let toastT=null;
+function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2600);}
+
+async function init(){
+  if(DEV_RESET){ try{ indexedDB.deleteDatabase('laylo-studio'); }catch(e){} } // TEMP
+  await openDB();
+  if(!DEV_RESET) await restore();
+  fitToScreen();build();
+  if(!leakFingerprint){ $('#calBtn').className='cal-btn need'; }
+  requestAnimationFrame(()=>{fitToScreen();build();});
+}
+window.addEventListener('load',init);
+window.addEventListener('resize',()=>{if(zi===0)fitToScreen();build();});
+</script>
+</body>
+</html>
