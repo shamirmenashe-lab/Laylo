@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!--
+  LAYLO · OVERDUB-PROOF — הוכחת מחיקת רקע ידוע  (קובץ נסיון, TEMP, /diag)
+  TEMP: כל הקובץ למחיקה אחרי הוכחה (כמו cancel-proof). לא נוגע ב-studio.
+-->
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Laylo · Overdub Proof</title>
+<style>
+:root{
+  --bg:#f2ece2;--bg2:#e8e2d6;--line:#cdc6b8;--line2:#bbb4a6;
+  --ink:#2d2318;--ink2:#6b5f4e;--ink3:#a09282;
+  --amber:#d4820a;--red:#d63b28;--green:#2e8b57;
+  --sans:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+body{max-width:430px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));}
+h1{font:800 20px var(--sans);margin:0 0 4px;}
+h1 b{color:var(--amber);}
+.sub{font:500 12px var(--sans);color:var(--ink2);margin:0 0 18px;line-height:1.5;}
+.card{background:var(--bg2);border:1.5px solid var(--line2);border-radius:14px;padding:16px;margin-bottom:14px;}
+.card h2{font:700 14px var(--sans);margin:0 0 10px;}
+.mode{display:flex;gap:8px;margin-bottom:14px;}
+.mode button{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink2);font:600 12px var(--sans);cursor:pointer;}
+.mode button.on{border-color:var(--amber);background:#fff8ee;color:var(--amber);}
+.go{width:100%;padding:16px;border:none;border-radius:12px;background:var(--amber);
+  color:#1a1206;font:800 16px var(--sans);cursor:pointer;}
+.go:disabled{opacity:.5;}
+.prog{font:600 13px var(--mono);color:var(--ink2);text-align:center;margin-top:12px;min-height:20px;}
+.verdict{text-align:center;padding:18px;border-radius:12px;margin-top:14px;display:none;}
+.verdict.show{display:block;}
+.verdict .big{font:800 34px var(--mono);line-height:1;}
+.verdict .lbl{font:600 12px var(--sans);margin-top:6px;}
+.verdict.pass{background:#eef6f0;border:1.5px solid var(--green);}
+.verdict.pass .big{color:var(--green);}
+.verdict.part{background:#fff8ee;border:1.5px solid var(--amber);}
+.verdict.part .big{color:var(--amber);}
+.verdict.fail{background:#fdecea;border:1.5px solid var(--red);}
+.verdict.fail .big{color:var(--red);}
+.row{display:flex;gap:8px;margin-top:12px;}
+.row button{flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink);font:600 12px var(--sans);cursor:pointer;}
+.row button:disabled{opacity:.4;}
+.wave-box{margin-top:14px;display:none;}
+.wave-box.show{display:block;}
+.wave-box .cap{font:600 10px var(--mono);color:var(--ink3);margin:8px 0 2px;}
+canvas{display:block;width:100%;height:54px;background:var(--bg);border:1px solid var(--line);border-radius:6px;}
+.note{font:500 11px var(--sans);color:var(--ink3);line-height:1.5;margin-top:14px;}
+.stat{font:600 11px var(--mono);color:var(--ink2);margin-top:8px;}
+audio{display:none;}
+</style>
+</head>
+<body>
+<h1>Overdub <b>Proof</b></h1>
+<p class="sub">הוכחה: מחיקת זליגת רקע ידוע מהקלטה. לא קליק — אודיו אמיתי (ביט). אם עובר, אוברדאב נפתר מהשורש.</p>
+
+<div class="card">
+  <div class="mode">
+    <button id="mA" class="on">מבחן A · שקט (מדידה)</button>
+    <button id="mB">מבחן B · נגן עליו</button>
+  </div>
+  <h2 id="instr">חבר אוזניות, שב בשקט. נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק.</h2>
+  <button class="go" id="go">▶ הפעל</button>
+  <div class="prog" id="prog"></div>
+
+  <div class="verdict" id="verdict">
+    <div class="big" id="vBig">—</div>
+    <div class="lbl" id="vLbl"></div>
+  </div>
+  <div class="stat" id="stat"></div>
+
+  <div class="row">
+    <button id="pRaw" disabled>🔊 גלם (עם זליגה)</button>
+    <button id="pClean" disabled>🔊 נקי (אחרי מחיקה)</button>
+  </div>
+
+  <div class="wave-box" id="waveBox">
+    <div class="cap">גלם — מה שהמיקרופון קלט</div>
+    <canvas id="cvRaw"></canvas>
+    <div class="cap">נקי — אחרי מחיקת הרקע</div>
+    <canvas id="cvClean"></canvas>
+  </div>
+</div>
+
+<p class="note" id="footNote">
+  מבחן A: שב בשקט — המספר מודד כמה מהרקע נמחק (מעל 12dB = הוכח).<br>
+  מבחן B: נגן/זמזם תוך כדי — ואז האזן ל"נקי": אמור להישמע רק מה שניגנת, בלי הביט ברקע.
+</p>
+
+<audio id="backingEl" playsinline></audio>
+
+<script>
+"use strict";
+const REF_SR=48000, DUR=5.0;
+const NFFT=262144;
+const N=8192;
+const MAX_LAG=0.6;
+const MIC={audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false,channelCount:1}};
+let mode='A';
+let refArr=null, recBuf=null, cleanBuf=null, ctx=null;
+const $=s=>document.querySelector(s);
+
+function makeReference(sr){
+  const n=Math.floor(sr*DUR), x=new Float32Array(n);
+  const note=[110,146.83,130.81,164.81];
+  for(let i=0;i<n;i++){
+    const t=i/sr, beat=Math.floor(t/0.5), tb=t-beat*0.5;
+    const kEnv=Math.exp(-tb*18);
+    const kick=Math.sin(2*Math.PI*(60+40*Math.exp(-tb*30))*t)*kEnv*0.6;
+    const bn=note[beat%note.length];
+    const bass=Math.sin(2*Math.PI*bn*t)*0.25*(0.6+0.4*Math.exp(-tb*4));
+    const q=t-Math.floor(t/0.25)*0.25;
+    const hat=(Math.random()*2-1)*Math.exp(-q*120)*0.12;
+    x[i]=kick+bass+hat;
+  }
+  let mx=0; for(let i=0;i<n;i++) mx=Math.max(mx,Math.abs(x[i]));
+  if(mx>0) for(let i=0;i<n;i++) x[i]=x[i]/mx*0.8;
+  return x;
+}
+function encodeWav(s,sr){
+  const n=s.length,b=n*2,ab=new ArrayBuffer(44+b),v=new DataView(ab);
+  const w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+  w(0,'RIFF');v.setUint32(4,36+b,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);
+  v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,b,true);
+  let o=44;for(let i=0;i<n;i++){let x=Math.max(-1,Math.min(1,s[i]));v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return new Blob([ab],{type:'audio/wav'});
+}
+function fft(re,im,inv){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1;
+    for(;j&bit;bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){const tr=re[i];re[i]=re[j];re[j]=tr;const ti=im[i];im[i]=im[j];im[j]=ti;}
+  }
+  for(let len=2;len<=n;len<<=1){
+    const ang=(inv?2:-2)*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let cwr=1,cwi=0;
+      for(let k=0;k<(len>>1);k++){
+        const a=i+k,bI=i+k+(len>>1);
+        const br=re[bI]*cwr-im[bI]*cwi, bi=re[bI]*cwi+im[bI]*cwr;
+        re[bI]=re[a]-br; im[bI]=im[a]-bi;
+        re[a]+=br; im[a]+=bi;
+        const t=cwr*wr-cwi*wi; cwi=cwr*wi+cwi*wr; cwr=t;
+      }
+    }
+  }
+  if(inv){for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;}}
+}
+function bigFFT(arr){
+  const re=new Float64Array(NFFT), im=new Float64Array(NFFT);
+  const L=Math.min(arr.length,NFFT);
+  for(let i=0;i<L;i++) re[i]=arr[i];
+  fft(re,im,false); return {re,im};
+}
+function findDelay(REF,REC,sr){
+  const re=new Float64Array(NFFT), im=new Float64Array(NFFT);
+  for(let k=0;k<NFFT;k++){
+    const ar=REF.re[k], ai=-REF.im[k];
+    re[k]=ar*REC.re[k]-ai*REC.im[k];
+    im[k]=ar*REC.im[k]+ai*REC.re[k];
+  }
+  fft(re,im,true);
+  const maxLag=Math.floor(MAX_LAG*sr);
+  let best=-1,bestMag=-1;
+  for(let d=0;d<=maxLag;d++){
+    const m=re[d]*re[d]+im[d]*im[d];
+    if(m>bestMag){bestMag=m;best=d;}
+  }
+  return best;
+}
+function estimateH(refd,rec){
+  const hop=N>>1, win=new Float64Array(N);
+  for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
+  const Sxx=new Float64Array(N), SxyR=new Float64Array(N), SxyI=new Float64Array(N);
+  const xr=new Float64Array(N),xi=new Float64Array(N),yr=new Float64Array(N),yi=new Float64Array(N);
+  const lim=Math.min(refd.length,rec.length);
+  for(let st=0; st+N<=lim; st+=hop){
+    for(let i=0;i<N;i++){xr[i]=refd[st+i]*win[i];xi[i]=0;yr[i]=rec[st+i]*win[i];yi[i]=0;}
+    fft(xr,xi,false); fft(yr,yi,false);
+    for(let k=0;k<N;k++){
+      Sxx[k]+=xr[k]*xr[k]+xi[k]*xi[k];
+      SxyR[k]+=xr[k]*yr[k]+xi[k]*yi[k];
+      SxyI[k]+=xr[k]*yi[k]-xi[k]*yr[k];
+    }
+  }
+  let mx=0; for(let k=0;k<N;k++) if(Sxx[k]>mx)mx=Sxx[k];
+  const eps=mx*1e-3;
+  const Hr=new Float64Array(N), Hi=new Float64Array(N);
+  for(let k=0;k<N;k++){const d=Sxx[k]+eps;Hr[k]=SxyR[k]/d;Hi[k]=SxyI[k]/d;}
+  return {Hr,Hi};
+}
+function expandH(H){
+  const R=NFFT/N;
+  const half=NFFT>>1;
+  const Hr=new Float64Array(NFFT), Hi=new Float64Array(NFFT);
+  for(let K=0;K<=half;K++){
+    const p=K/R, lo=Math.floor(p), frac=p-lo, hi=Math.min(lo+1,N-1);
+    Hr[K]=H.Hr[lo]*(1-frac)+H.Hr[hi]*frac;
+    Hi[K]=H.Hi[lo]*(1-frac)+H.Hi[hi]*frac;
+  }
+  for(let K=1;K<half;K++){Hr[NFFT-K]=Hr[K];Hi[NFFT-K]=-Hi[K];}
+  Hi[0]=0; Hi[half]=0;
+  return {Hr,Hi};
+}
+function cancel(refd,rec,sr){
+  const REFD=bigFFT(refd);
+  const Hb=expandH(estimateH(refd,rec));
+  const re=new Float64Array(NFFT), im=new Float64Array(NFFT);
+  for(let k=0;k<NFFT;k++){
+    re[k]=REFD.re[k]*Hb.Hr[k]-REFD.im[k]*Hb.Hi[k];
+    im[k]=REFD.re[k]*Hb.Hi[k]+REFD.im[k]*Hb.Hr[k];
+  }
+  fft(re,im,true);
+  const len=rec.length, clean=new Float32Array(len);
+  for(let i=0;i<len;i++) clean[i]=rec[i]-re[i];
+  return clean;
+}
+function rmsDb(x,sr){
+  const a=Math.floor(0.5*sr), b=Math.floor(x.length-0.1*sr);
+  let s=0,n=0; for(let i=a;i<b;i++){s+=x[i]*x[i];n++;}
+  return Math.sqrt(s/Math.max(1,n));
+}
+function pickMime(){for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+  if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;return '';}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function run(){
+  $('#go').disabled=true; $('#verdict').className='verdict'; $('#stat').textContent='';
+  $('#pRaw').disabled=$('#pClean').disabled=true; $('#waveBox').className='wave-box';
+  setProg('מבקש מיקרופון…');
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia(MIC); }
+  catch(e){ setProg('❌ מיקרופון נדחה'); $('#go').disabled=false; return; }
+  refArr=makeReference(REF_SR);
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(encodeWav(refArr,REF_SR)); el.currentTime=0;
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const done=new Promise(r=>rec.onstop=r);
+  rec.start();
+  try{ await el.play(); }catch(e){}
+  for(let s=5;s>=1;s--){ setProg((mode==='B'?'🎸 נגן עכשיו · ':'🤫 שקט · ')+s); await wait(1000); }
+  rec.stop(); await done; el.pause(); stream.getTracks().forEach(t=>t.stop());
+  setProg('⚙ מעבד… (יישור + אמידת דליפה + מחיקה)');
+  await wait(40);
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+  const audio=await ctx.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
+  const sr=audio.sampleRate;
+  let recM=audio.getChannelData(0).slice(0);
+  let ref=refArr;
+  if(sr!==REF_SR){
+    const m=Math.floor(refArr.length*sr/REF_SR), r2=new Float32Array(m), ratio=REF_SR/sr;
+    for(let i=0;i<m;i++){const p=i*ratio,i0=Math.floor(p),f=p-i0;
+      r2[i]=(refArr[i0]||0)*(1-f)+(refArr[Math.min(i0+1,refArr.length-1)]||0)*f;}
+    ref=r2;
+  }
+  const len=Math.min(ref.length,recM.length);
+  ref=ref.subarray(0,len); recM=recM.subarray(0,len);
+  const REF=bigFFT(ref), REC=bigFFT(recM);
+  const d=findDelay(REF,REC,sr);
+  console.log('// DBG delay',d,'samples =',(d/sr*1000).toFixed(1),'ms');
+  const refd=new Float32Array(len);
+  for(let i=d;i<len;i++) refd[i]=ref[i-d];
+  const clean=cancel(refd,recM,sr);
+  const rR=rmsDb(recM,sr), rC=rmsDb(clean,sr);
+  const redDb=20*Math.log10(rR/(rC+1e-12));
+  console.log('// DBG RMS rec',rR.toExponential(2),'clean',rC.toExponential(2),'→',redDb.toFixed(1),'dB');
+  recBuf=toBuf(recM,sr); cleanBuf=toBuf(clean,sr);
+  drawWave($('#cvRaw'),recM,'#d63b28'); drawWave($('#cvClean'),clean,'#2e8b57');
+  $('#waveBox').className='wave-box show';
+  $('#pRaw').disabled=$('#pClean').disabled=false;
+  showVerdict(redDb, d/sr*1000);
+  setProg('');
+  $('#go').disabled=false;
+}
+function showVerdict(db,delayMs){
+  const v=$('#verdict'), big=$('#vBig'), lbl=$('#vLbl');
+  big.textContent='−'+db.toFixed(1)+' dB';
+  if(mode==='B'){
+    v.className='verdict part show';
+    big.textContent='האזנה';
+    lbl.textContent='לחץ "נקי" — אמור להישמע רק מה שניגנת, בלי הביט ברקע';
+  }else if(db>=12){ v.className='verdict pass show'; lbl.textContent='✓ הוכח — אפשר למחוק רקע ידוע מלא. אוברדאב פתיר.'; }
+  else if(db>=6){ v.className='verdict part show'; lbl.textContent='חלקי — מחיקה מורגשת אך לא מספקת. נכוונן.'; }
+  else{ v.className='verdict fail show'; lbl.textContent='לא מספק — הדליפה כנראה לא ליניארית/יציבה. נחשוב מחדש.'; }
+  $('#stat').textContent=`השהיית טלפון שנמדדה: ${delayMs.toFixed(0)}ms · ref: ${DUR}s ביט רחב-פס`;
+}
+function toBuf(arr,sr){const b=ctx.createBuffer(1,arr.length,sr);b.getChannelData(0).set(arr);return b;}
+let playSrc=null;
+function play(buf){ if(!buf)return; try{if(playSrc)playSrc.stop();}catch(e){}
+  playSrc=ctx.createBufferSource();playSrc.buffer=buf;playSrc.connect(ctx.destination);playSrc.start(); }
+function drawWave(cv,data,col){
+  const W=cv.width=cv.clientWidth*2, H=cv.height=108;
+  const c=cv.getContext('2d');c.clearRect(0,0,W,H);c.strokeStyle=col;c.lineWidth=1;
+  const step=Math.max(1,Math.floor(data.length/W));
+  for(let x=0;x<W;x++){let mn=1,mx=-1;const s0=x*step;
+    for(let k=0;k<step;k++){const v=data[s0+k]||0;if(v<mn)mn=v;if(v>mx)mx=v;}
+    c.beginPath();c.moveTo(x,H/2-mx*H*.45);c.lineTo(x,H/2-mn*H*.45);c.stroke();}
+}
+function setProg(t){$('#prog').textContent=t;}
+$('#mA').addEventListener('click',()=>{mode='A';$('#mA').classList.add('on');$('#mB').classList.remove('on');
+  $('#instr').textContent='חבר אוזניות, שב בשקט. נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק.';});
+$('#mB').addEventListener('click',()=>{mode='B';$('#mB').classList.add('on');$('#mA').classList.remove('on');
+  $('#instr').textContent='חבר אוזניות, נגן/זמזם תוך כדי שהביט מתנגן. אחר כך האזן ל"נקי" — אמור להישאר רק מה שניגנת.';});
+$('#go').addEventListener('click',run);
+$('#pRaw').addEventListener('click',()=>play(recBuf));
+$('#pClean').addEventListener('click',()=>play(cleanBuf));
+</script>
+</body>
+</html>
