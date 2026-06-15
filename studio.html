@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-  LAYLO · STUDIO v2.1
-  [7] notch biquad 900+1200Hz after leak subtract. TPL_LEN_S=150ms.
+  LAYLO · STUDIO v2.2
+  [8] time-gated notch (Avid-style): notch only in ±12ms window around each click position
+      with Hann crossfade. Replaces global notch of v2.1 which distorted the instrument.
 -->
 <html lang="he">
 <head>
@@ -268,6 +269,7 @@ function avgAt(x,positions,len){
   if(n)for(let i=0;i<len;i++)acc[i]/=n;
   return acc;
 }
+/* [8] biquad notch — building block only */
 function biquadNotch(signal,sr,freq,Q){
   const w0=2*Math.PI*freq/sr,alpha=Math.sin(w0)/(2*Q),c=Math.cos(w0);
   const b0=1,b1=-2*c,b2=1,a0=1+alpha,a1=-2*c,a2=1-alpha;
@@ -283,8 +285,28 @@ function biquadNotch(signal,sr,freq,Q){
 function notchClickFreqs(signal,sr){
   let s=signal;CLICK_FREQS.forEach(f=>{s=biquadNotch(s,sr,f,30);});return s;
 }
+/* [8] v2.2 time-gated notch: apply notch ONLY in ±12ms window around each click
+   with Hann crossfade — instrument untouched outside click positions */
+function timeGatedNotch(mono,sr,positions){
+  if(!positions.length)return mono;
+  const notched=notchClickFreqs(mono,sr);
+  const out=mono.slice(0);
+  const clickLen=Math.floor(CLICK_BURST*sr);
+  const pad=Math.floor(0.012*sr);
+  positions.forEach(p=>{
+    const start=Math.max(0,p-pad),end=Math.min(out.length,p+clickLen+pad),L=end-start;
+    if(L<4)return;
+    for(let i=0;i<L;i++){
+      const w=0.5-0.5*Math.cos(2*Math.PI*i/(L-1));
+      const idx=start+i;
+      out[idx]=(1-w)*mono[idx]+w*notched[idx];
+    }
+  });
+  return out;
+}
+/* subtractLeak now returns {out, positions} */
 function subtractLeak(mono,sr,interval){
-  if(!leakFingerprint)return mono;
+  if(!leakFingerprint)return {out:mono,positions:[]};
   const tpl=leakFingerprint;
   const positions=findClicks(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)),interval);
   const out=mono.slice(0);
@@ -296,7 +318,7 @@ function subtractLeak(mono,sr,interval){
     for(let i=0;i<tpl.length;i++)out[p+i]-=a*tpl[i];
   });
   console.log('// DBG subtract:',positions.length,'clicks, interval',interval.toFixed(3)+'s');
-  return out;
+  return {out,positions};
 }
 function pickMime(){
   for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
@@ -338,8 +360,8 @@ async function finalizeRecording(ti,mime){
   let mono=audio.getChannelData(0).slice(0);
   const before=bleedDb(mono,audio.sampleRate);
   if(leakFingerprint){
-    mono=subtractLeak(mono,audio.sampleRate,recClickPeriod);
-    mono=notchClickFreqs(mono,audio.sampleRate);
+    const sub=subtractLeak(mono,audio.sampleRate,recClickPeriod);  // layer 1
+    mono=timeGatedNotch(sub.out,audio.sampleRate,sub.positions);   // layer 2 [8]
     const after=bleedDb(mono,audio.sampleRate);
     console.log(`// DBG leak ${before.toFixed(1)}dB -> ${after.toFixed(1)}dB`);
     toast(`ערוץ ${ti+1} נוקה · −${(before-after).toFixed(0)}dB זליגה`);
