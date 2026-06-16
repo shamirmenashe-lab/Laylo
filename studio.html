@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!--LAYLO STUDIO v2.5 - deterministic grid click detector, tok click, LIVE_WAVE=false-->
+<!--LAYLO STUDIO v2.6 - stronger click (decay 180, vol 0.60), cal 10s-->
 <html lang="he">
 <head>
 <meta charset="utf-8">
@@ -84,7 +84,7 @@ audio{display:none;}
 <div class="zbar"><div class="z-btns"><button class="zbtn" id="zin">+</button><div class="z-lbl" id="zlbl">כל הסשן</div><button class="zbtn" id="zout">−</button></div><button class="cal-btn need" id="calBtn">⚙ כיול זליגה</button></div>
 <div class="main"><div class="ruler-wrap"><div class="ruler-ctrl">זמן</div><div class="ruler-scroll" id="rScroll"><canvas class="rcv" id="rCv"></canvas></div></div><div class="tracks-area"><div class="ctrl-col"><div class="ctrl-inner" id="ci"></div></div><div class="wave-col" id="wc"><div class="wave-inner" id="wi"><div class="playhead" id="ph"></div></div></div></div></div>
 <div class="transport"><div class="t-time" id="clk">0:00</div><div class="tkeys"><button class="tkey" id="kStop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg><span>STOP</span></button><button class="tkey play-k" id="kPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button><button class="tkey rec-k" id="kRec"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>REC</span></button></div><button class="ai-btn" id="aiBtn">✦<span>AI</span></button></div>
-<div class="cal-overlay" id="calOv"><h2>כיול זליגת קליק</h2><p>פעם אחת בלבד. חבר אוזניות, שב בשקט 5 שניות — נלמד את טביעת הדליפה של הטלפון שלך ונחסר אותה מכל הקלטה.</p><div class="cal-ring"><div class="fill" id="calFill"></div><div class="lbl" id="calLbl">5</div></div><button class="cal-go" id="calGo">התחל כיול</button><div class="cal-result" id="calRes"></div><button class="cal-skip" id="calSkip">דלג (לא מומלץ)</button></div>
+<div class="cal-overlay" id="calOv"><h2>כיול זליגת קליק</h2><p>פעם אחת בלבד. חבר אוזניות, שב בשקט 10 שניות — נלמד את טביעת הדליפה של הטלפון שלך ונחסר אותה מכל הקלטה.</p><div class="cal-ring"><div class="fill" id="calFill"></div><div class="lbl" id="calLbl">10</div></div><button class="cal-go" id="calGo">התחל כיול</button><div class="cal-result" id="calRes"></div><button class="cal-skip" id="calSkip">דלג (לא מומלץ)</button></div>
 <div class="toast" id="toast"></div>
 <audio id="backingEl" playsinline></audio>
 <script>
@@ -95,6 +95,7 @@ const NAMES=['ערוץ 1','ערוץ 2','ערוץ 3','ערוץ 4','ערוץ 5','P
 const CLICK_FREQS=[900,1350];
 const CLICK_BURST=0.040, TPL_LEN_S=0.090;
 const CAL_INTERVAL=0.5;
+const CAL_SECS=10;
 const FREE_LIMIT=4;
 const DEV_RESET=false;
 const LIVE_WAVE=false;
@@ -111,10 +112,11 @@ let liveCtx=null,liveAnalyser=null,liveSrc=null,liveBuf=null,livePeaks=[],liveTa
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function getCtx(){if(!audioCtx||audioCtx.state==='closed')audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
-function tokWave(t){const env=Math.exp(-t*380);return env*(Math.sin(2*Math.PI*900*t)+0.5*Math.sin(2*Math.PI*1350*t))/1.5;}
+/* [12] decay 180 (was 380), vol 0.60 (was 0.40) — more energy above noise floor */
+function tokWave(t){const env=Math.exp(-t*180);return env*(Math.sin(2*Math.PI*900*t)+0.5*Math.sin(2*Math.PI*1350*t))/1.5;}
 function clickSamples(sr,durSec,periodSec){
   const n=Math.floor(sr*durSec),buf=new Float32Array(n),period=periodSec||(60/bpm);
-  for(let c=0;c*period<durSec;c++){const start=Math.floor(c*period*sr),len=Math.floor(CLICK_BURST*sr);for(let i=0;i<len;i++){if(start+i<n)buf[start+i]+=0.40*tokWave(i/sr);}}
+  for(let c=0;c*period<durSec;c++){const start=Math.floor(c*period*sr),len=Math.floor(CLICK_BURST*sr);for(let i=0;i<len;i++){if(start+i<n)buf[start+i]+=0.60*tokWave(i/sr);}}
   return buf;
 }
 function softClip(x){return Math.tanh(x);}
@@ -136,28 +138,19 @@ function goertzel(x,sr,f){const w=2*Math.PI*f/sr,c=2*Math.cos(w);let s1=0,s2=0;f
 function bleedDb(x,sr){const b=CLICK_FREQS.reduce((a,f)=>a+goertzel(x,sr,f),0)/CLICK_FREQS.length,r=([600,2000]).reduce((a,f)=>a+goertzel(x,sr,f),0)/2;return 10*Math.log10((b+1e-12)/(r+1e-12));}
 function syntheticTpl(sr){const len=Math.floor(CLICK_BURST*sr),t=new Float32Array(len);for(let i=0;i<len;i++)t[i]=tokWave(i/sr);return t;}
 function refinePeak(x,tpl,center,radius){
-  let best=-Infinity,pos=center;
-  const lo=Math.max(0,center-radius),hi=Math.min(x.length-tpl.length,center+radius);
+  let best=-Infinity,pos=center;const lo=Math.max(0,center-radius),hi=Math.min(x.length-tpl.length,center+radius);
   for(let p=lo;p<=hi;p++){let dot=0,en=0;for(let i=0;i<tpl.length;i++){const xv=x[p+i];dot+=xv*tpl[i];en+=xv*xv;}const sc=dot/Math.sqrt(en+1e-12);if(sc>best){best=sc;pos=p;}}
   return pos;
 }
-/* [11] v2.5 — deterministic grid detector: fixed grid + local ±6ms tune only */
 function findClicks(x,sr,tpl,interval){
-  const intS=interval*sr;
-  const wide=Math.round(Math.min(0.6,interval*1.1)*sr);
+  const intS=interval*sr,wide=Math.round(Math.min(0.6,interval*1.1)*sr);
   const anchor=refinePeak(x,tpl,Math.round(Math.min(0.3,interval*0.5)*sr),wide);
-  const localRad=Math.round(0.006*sr);
-  const out=[];
+  const localRad=Math.round(0.006*sr),out=[];
   for(let k=0;;k++){const grid=Math.round(anchor+k*intS);if(grid>x.length-tpl.length)break;out.push(refinePeak(x,tpl,grid,localRad));}
   for(let k=1;;k++){const grid=Math.round(anchor-k*intS);if(grid<0)break;out.unshift(refinePeak(x,tpl,grid,localRad));}
   return out;
 }
-function avgAt(x,positions,len){
-  const acc=new Float32Array(len);let n=0;
-  positions.forEach(p=>{if(p+len<=x.length){for(let i=0;i<len;i++)acc[i]+=x[p+i];n++;}});
-  if(n)for(let i=0;i<len;i++)acc[i]/=n;
-  return acc;
-}
+function avgAt(x,positions,len){const acc=new Float32Array(len);let n=0;positions.forEach(p=>{if(p+len<=x.length){for(let i=0;i<len;i++)acc[i]+=x[p+i];n++;}});if(n)for(let i=0;i<len;i++)acc[i]/=n;return acc;}
 function subtractLeak(mono,sr,interval){
   if(!leakFingerprint)return{out:mono,positions:[]};
   const tpl=leakFingerprint,positions=findClicks(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)),interval),out=mono.slice(0);
@@ -203,11 +196,12 @@ async function runCalibration(){
   $('#calRes').textContent='';let stream;
   try{stream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);}catch(e){$('#calRes').textContent='מיקרופון נדחה';return;}
   const sr0=48000,el=$('#backingEl');
-  el.src=URL.createObjectURL(encodeWav(clickSamples(sr0,5.0,CAL_INTERVAL),sr0));el.currentTime=0;try{await el.play();}catch(e){}
+  el.src=URL.createObjectURL(encodeWav(clickSamples(sr0,CAL_SECS,CAL_INTERVAL),sr0));
+  el.currentTime=0;try{await el.play();}catch(e){}
   const mime=pickMime(),rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined),chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   const done=new Promise(res=>rec.onstop=res);rec.start();
-  for(let s=5;s>=1;s--){setCalProgress((5-s)/5*100,s);await wait(1000);}
+  for(let s=CAL_SECS;s>=1;s--){setCalProgress((CAL_SECS-s)/CAL_SECS*100,s);await wait(1000);}
   setCalProgress(100,'•');rec.stop();await done;el.pause();stream.getTracks().forEach(t=>t.stop());
   const ctx=getCtx(),audio=await ctx.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
   fpSampleRate=audio.sampleRate;const mono=audio.getChannelData(0),tplLen=Math.floor(TPL_LEN_S*audio.sampleRate);
