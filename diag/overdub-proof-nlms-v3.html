@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laylo — Overdub-Proof NLMS v3 (Bleed Cancellation Test Harness)</title>
+<style>
+  :root{
+    --bg:#0e0f13; --panel:#161822; --panel2:#1d2030; --line:#2a2e42;
+    --text:#e8e9f2; --dim:#9096b0; --accent:#6ee7c9; --warn:#f2b155; --bad:#f26a6a; --ok:#6ee7c9;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:24px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    max-width:920px; margin-inline:auto; line-height:1.5;
+  }
+  h1{font-size:1.3rem; margin-bottom:4px}
+  .subtitle{color:var(--dim); font-size:.85rem; margin-bottom:24px}
+  .badge{
+    display:inline-block; font-size:.7rem; padding:2px 8px; border-radius:999px;
+    background:var(--panel2); border:1px solid var(--line); color:var(--warn); margin-left:8px;
+  }
+  section{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:18px 20px; margin-bottom:16px;
+  }
+  section h2{font-size:1rem; margin:0 0 4px}
+  section p.desc{color:var(--dim); font-size:.85rem; margin:0 0 14px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
+  button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:9px 14px; font-size:.85rem; cursor:pointer;
+  }
+  button:hover:not(:disabled){border-color:var(--accent)}
+  button:disabled{opacity:.4; cursor:not-allowed}
+  button.primary{background:var(--accent); color:#0e0f13; border-color:var(--accent); font-weight:600}
+  button.primary:hover:not(:disabled){filter:brightness(1.08)}
+  button.small{padding:5px 10px; font-size:.75rem}
+  label.field{font-size:.8rem; color:var(--dim); display:flex; flex-direction:column; gap:3px}
+  input[type=number]{
+    background:var(--bg); border:1px solid var(--line); color:var(--text);
+    padding:6px 8px; border-radius:6px; width:90px; font-size:.85rem;
+  }
+  input[type=checkbox]{accent-color:var(--accent)}
+  .chiprow{display:flex; gap:14px; flex-wrap:wrap; font-size:.82rem; color:var(--text)}
+  .chiprow label{display:flex; align-items:center; gap:5px}
+  .status{font-size:.8rem; color:var(--dim); margin-top:6px; white-space:pre-wrap}
+  .status.ok{color:var(--ok)}
+  .status.bad{color:var(--bad)}
+  .status.warn{color:var(--warn)}
+  .metric{
+    display:flex; justify-content:space-between; gap:12px; font-size:.85rem;
+    padding:6px 0; border-bottom:1px dashed var(--line);
+  }
+  .metric:last-child{border-bottom:none}
+  .metric b{color:var(--accent); text-align:right}
+  canvas{width:100%; height:90px; background:var(--bg); border:1px solid var(--line); border-radius:8px; display:block; margin-top:8px}
+  .canvaslabel{font-size:.72rem; color:var(--dim); margin-top:4px}
+  .step-num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:20px; height:20px; border-radius:50%; background:var(--panel2);
+    border:1px solid var(--line); font-size:.7rem; margin-right:6px; color:var(--accent);
+  }
+  .mode-a{color:var(--ok); font-weight:600}
+  .mode-b{color:var(--warn); font-weight:600}
+  .flag{
+    font-size:.72rem; color:var(--warn); background:rgba(242,177,85,.08);
+    border:1px solid rgba(242,177,85,.3); border-radius:6px; padding:8px 10px; margin-top:10px;
+  }
+  .flag.bad{color:var(--bad); background:rgba(242,106,106,.08); border-color:rgba(242,106,106,.3)}
+  .flag b{color:inherit}
+  table{width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px}
+  th,td{text-align:right; padding:6px 8px; border-bottom:1px solid var(--line)}
+  th:first-child, td:first-child{text-align:left}
+  th{color:var(--dim); font-weight:500}
+  td.good{color:var(--ok)}
+  td.collapsed{color:var(--bad); font-weight:600}
+  .downloads{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+</style>
+</head>
+<body>
+
+<h1>Overdub-Proof NLMS <span class="badge">v3 — TEST HARNESS</span></h1>
+<p class="subtitle">
+  Laylo click-track bleed diagnostic. Leaky-NLMS adaptive filter with live divergence
+  diagnostics, an L×μ sweep tool for finding the bleed-reduction ceiling, and a strict
+  Mode A / Mode B split so dB numbers never get silently contaminated by real performance
+  content again.
+</p>
+
+<div class="flag">
+  <b>⚠ TEMPORARY / TEST HARNESS — flagged per standing cleanup instruction.</b><br>
+  Diagnostic tool only, not shippable Laylo code. New file, parallel to
+  <code>diag/overdub-proof-nlms-v2.html</code> — nothing prior touched. See cleanup checklist
+  at the bottom.
+</div>
+
+<div class="flag">
+  <b>Known-unknown carried over from the previous session:</b> L=4096 caused the dB metric to
+  collapse to negative in one live run. 5+ numerical stress scenarios in simulation failed to
+  reproduce it — root cause is still unidentified. This build adds live maxW + NaN/Inf
+  diagnostics (§4) specifically to catch it in the act next time it happens on-device.
+</div>
+
+<!-- STEP 1: MIC PERMISSION -->
+<section>
+  <h2><span class="step-num">1</span>Microphone permission</h2>
+  <p class="desc">Iron rule: getUserMedia must be granted before any audio output happens on this page.</p>
+  <div class="row">
+    <button id="btnMic" class="primary">Grant microphone access</button>
+    <span id="micStatus" class="status">Not yet requested.</span>
+  </div>
+</section>
+
+<!-- STEP 2: CLICK TRACK CONFIG -->
+<section>
+  <h2><span class="step-num">2</span>Click track (reference)</h2>
+  <p class="desc">
+    Synthesized once, offline, so the exact reference sample array is known (x[n] for NLMS).
+    Played back only through a plain &lt;audio&gt; element during recording — never through the
+    WebAudio destination.
+  </p>
+  <div class="row">
+    <label class="field">Kick interval (sec)
+      <input type="number" id="kickInterval" value="0.5" min="0.1" max="4" step="0.1">
+    </label>
+    <label class="field">Duration (sec)
+      <input type="number" id="dur" value="12" min="4" max="60">
+    </label>
+    <button id="btnGenClick" disabled>Generate click track</button>
+    <span id="clickStatus" class="status">—</span>
+  </div>
+  <div class="flag">
+    <b>Alignment caveat (carried over):</b> a fixed-interval periodic reference makes
+    cross-correlation lag detection ambiguous at multiples of the interval (peaks are nearly
+    equal). This harness restricts the lag search to ±50ms specifically to stay inside one
+    period and avoid that ambiguity — it is <i>not</i> a fix for the periodicity itself, just a
+    way to route around it. A misaligned-by-one-period lag is harmless for the dB math (signal
+    is periodic), but don't trust the raw "Alignment lag" number as a literal latency
+    measurement beyond that caveat.
+  </div>
+</section>
+
+<!-- STEP 3: RECORDINGS -->
+<section>
+  <h2><span class="step-num">3</span>Recordings — Mode A (silent) vs Mode B (performance)</h2>
+  <p class="desc">
+    Each button gives you a 5-second countdown before the click track and recording actually
+    start, so there's time to get ready. All three play the identical click track via
+    &lt;audio&gt;; MediaRecorder captures the mic in parallel. No processing happens live —
+    capture only. <b>If you're only running the L×μ sweep (§5), you only need ① and ② —
+    ③ (Overdub) is not required for that.</b>
+  </p>
+
+  <div class="row">
+    <button id="btnCalib" disabled>① <span class="mode-a">Mode A</span> — Calibration take (stay silent)</button>
+    <span id="calibStatus" class="status">—</span>
+  </div>
+  <div class="row">
+    <button id="btnValid" disabled>② <span class="mode-a">Mode A</span> — Validation take (stay silent)</button>
+    <span id="validStatus" class="status">—</span>
+  </div>
+  <div class="row">
+    <button id="btnOverdub" disabled>③ <span class="mode-b">Mode B</span> — Overdub take (perform normally)</button>
+    <span id="overdubStatus" class="status">—</span>
+  </div>
+  <div class="flag bad">
+    <b>Mode B dB is not valid for L/μ comparison.</b> Take ③ contains real performance energy
+    on top of any bleed, so its residual level reflects the performance too, not just leftover
+    bleed. Only Mode A (① vs ②) numbers are trustworthy for tuning — this was the exact bug
+    found and fixed from v2. Mode B is used only to produce a cleaned file, never to judge
+    filter quality.
+  </div>
+</section>
+
+<!-- STEP 4: NLMS single run -->
+<section>
+  <h2><span class="step-num">4</span>NLMS training + live diagnostics</h2>
+  <p class="desc">All offline, after every MediaRecorder has fully stopped. Trains on ①, freezes, tests on ② (valid dB), applies to ③ (cleaned file, dB not valid).</p>
+  <div class="row">
+    <label class="field">Taps (L)
+      <input type="number" id="taps" value="1536" min="8" max="8192" step="8">
+    </label>
+    <label class="field">μ (step size)
+      <input type="number" id="mu" value="0.5" min="0.01" max="2" step="0.01">
+    </label>
+    <label class="field">Leak
+      <input type="number" id="leak" value="0" min="0" max="0.001" step="0.0000001">
+    </label>
+    <label class="field">Epochs
+      <input type="number" id="epochs" value="1" min="1" max="50" step="1">
+    </label>
+    <button id="btnRun" class="primary" disabled>Run NLMS analysis</button>
+  </div>
+  <div class="flag">
+    <b>Leak safety range:</b> 0 = off (default). Safe tested range is <b>1e-7 to 1e-5</b>.
+    <b>Do not use 1e-4</b> — confirmed destructive, accumulates to weight blowup over a
+    ~240k-sample buffer (this was caught and fixed mid-session; the bug never shipped, but the
+    number is dangerous enough to warn against explicitly in the UI).
+  </div>
+  <div class="flag">
+    <b>Epochs</b> re-passes the same calibration take through the filter multiple times
+    (weights carry over) so a large L gets more update iterations to converge — without
+    recording a longer take. This is the second, independent way (besides leak) to test
+    whether L=4096 collapses from a real instability or just from not enough updates yet.
+  </div>
+  <div id="runStatus" class="status">Waiting for all three takes.</div>
+  <div id="diagStatus" class="status"></div>
+
+  <div id="results" style="display:none; margin-top:14px">
+    <div class="metric"><span>Alignment lag (calibration)</span><b id="mLag">—</b></div>
+    <div class="metric"><span>Max |weight| reached during training</span><b id="mMaxW">—</b></div>
+    <div class="metric"><span>Drift (weight stability, first-half vs second-half of ①)</span><b id="mDrift">—</b></div>
+    <div class="metric"><span>Calibration self-residual reduction (Mode A)</span><b id="mCalibDb">—</b></div>
+    <div class="metric"><span>Validation generalization reduction (Mode A, the number that matters)</span><b id="mValidDb">—</b></div>
+    <div class="metric"><span>Validation residual↔click correlation</span><b id="mValidCorr">—</b></div>
+    <div class="metric"><span>Overdub residual reduction (Mode B — proxy only, not comparable)</span><b id="mOverdubDb">—</b></div>
+
+    <div class="canvaslabel">Calibration take — raw vs NLMS residual</div>
+    <canvas id="cCalib"></canvas>
+    <div class="canvaslabel">Overdub take — raw vs cleaned</div>
+    <canvas id="cOverdub"></canvas>
+
+    <div class="canvaslabel">Downloads (raw + cleaned, for offline FFT / spectral analysis)</div>
+    <div class="downloads">
+      <button class="small" id="dlCalibRaw">Calib raw</button>
+      <button class="small" id="dlCalibClean">Calib residual</button>
+      <button class="small" id="dlValidRaw">Valid raw</button>
+      <button class="small" id="dlValidClean">Valid residual</button>
+      <button class="small" id="dlOverdubRaw">Overdub raw</button>
+      <button class="small" id="dlOverdubClean">Overdub cleaned</button>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 5: L x mu sweep -->
+<section>
+  <h2><span class="step-num">5</span>L × μ sweep (Mode A only — finds the dB ceiling)</h2>
+  <p class="desc">
+    Trains on ①, tests frozen on ② for every combination below. This is how the
+    14.4–16.1dB ceiling and the L=4096 collapse were originally found — use it to confirm the
+    ceiling is still stable, or catch a collapse in the act (watch the maxW column).
+  </p>
+  <div class="row">
+    <div class="chiprow" id="sweepL">
+      <label><input type="checkbox" value="512" checked> L=512</label>
+      <label><input type="checkbox" value="1024" checked> L=1024</label>
+      <label><input type="checkbox" value="2048" checked> L=2048</label>
+      <label><input type="checkbox" value="4096" checked> L=4096</label>
+      <label><input type="checkbox" value="8192"> L=8192</label>
+    </div>
+  </div>
+  <div class="row">
+    <div class="chiprow" id="sweepMu">
+      <label><input type="checkbox" value="0.3" checked> μ=0.3</label>
+      <label><input type="checkbox" value="0.5" checked> μ=0.5</label>
+      <label><input type="checkbox" value="0.7" checked> μ=0.7</label>
+      <label><input type="checkbox" value="0.9" checked> μ=0.9</label>
+    </div>
+  </div>
+  <div class="row">
+    <label class="field">Leak (applied to every cell)
+      <input type="number" id="sweepLeak" value="0" min="0" max="0.001" step="0.0000001">
+    </label>
+    <label class="field">Epochs (applied to every cell)
+      <input type="number" id="sweepEpochs" value="1" min="1" max="50" step="1">
+    </label>
+    <button id="btnSweep" disabled>Run sweep</button>
+  </div>
+  <div id="sweepStatus" class="status">Requires ① and ② recorded first.</div>
+  <table id="sweepTable" style="display:none">
+    <thead><tr><th>L</th><th>μ</th><th>Validation dB</th><th>max|w|</th><th>status</th></tr></thead>
+    <tbody id="sweepBody"></tbody>
+  </table>
+</section>
+
+<!-- STEP 6: spectrum check -->
+<section>
+  <h2><span class="step-num">6</span>Spectrum check — the cheap linearity/nonlinearity test</h2>
+  <p class="desc">
+    Runs on the ② validation residual from the last §4 run. Compares its spectrum against the
+    reference click track's spectrum. If the residual has real energy at frequencies the
+    reference doesn't contain at all, that's a direct nonlinearity signature (new harmonics /
+    saturation) — no more L/μ runs needed to make that case. If the residual spectrum is just a
+    quieter version of the reference's own frequencies, that points back to insufficient filter
+    length, not nonlinearity.
+  </p>
+  <div class="row">
+    <button id="btnSpectrum" disabled>Analyze validation spectrum</button>
+  </div>
+  <div id="spectrumStatus" class="status">Run §4 first.</div>
+  <div id="spectrumResults" style="display:none">
+    <div class="canvaslabel">Reference (red) vs residual (green) — magnitude spectrum, dB, 0–Nyquist</div>
+    <canvas id="cSpectrum" style="height:160px"></canvas>
+    <div class="metric"><span>Residual energy inside reference's frequency support</span><b id="mEnergyIn">—</b></div>
+    <div class="metric"><span>Residual energy outside reference's frequency support</span><b id="mEnergyOut">—</b></div>
+    <div class="flag" id="spectrumVerdict"></div>
+  </div>
+</section>
+
+<div class="flag">
+  <b>Cleanup / rollback checklist:</b><br>
+  • DEV_RESET is hard-set to <code>false</code> below — verify before any deploy.<br>
+  • Default taps=1536 / μ=0.5 / leak=0 reflect last session's findings, not a final product config.<br>
+  • No recordings, weights, or sweep results are persisted anywhere — everything lives in page
+  memory and is lost on refresh; nothing to purge server-side.<br>
+  • Parallel file — <code>diag/overdub-proof-nlms-v2.html</code> and everything else in the repo
+  untouched, per the "never replace, always add parallel files" rule.<br>
+  • Once this reproduces (or fails to reproduce) the L=4096 collapse on-device, that result is
+  the thing to relay to the other Claude chat before deciding between partial Volterra and
+  soft-clip inversion — this file doesn't implement either yet.
+</div>
+
+<script>
+'use strict';
+
+// ---- TEMP TEST FLAG — must stay false, verify before any deploy ----
+const DEV_RESET = false;
+
+const SR = 44100; // fixed project sample rate for all synthesis/analysis in this harness
+
+let audioCtx = null;
+let micStream = null;
+let clickBuffer = null;      // Float32Array, the known reference x[n]
+let clickBlobUrl = null;
+
+const takes = { calib: null, valid: null, overdub: null }; // each: {samples: Float32Array, sr:number}
+let lastResult = null; // {calibResidual, validResidual, overdubResidual} for downloads
+
+const $ = (id) => document.getElementById(id);
+
+function setStatus(el, msg, cls){
+  el.textContent = msg;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+// ---------- STEP 1: mic ----------
+$('btnMic').addEventListener('click', async () => {
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false
+    }});
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+    setStatus($('micStatus'), 'Microphone granted.', 'ok');
+    $('btnGenClick').disabled = false;
+  }catch(err){
+    setStatus($('micStatus'), 'Mic permission denied: ' + err.message, 'bad');
+  }
+});
+
+// ---------- STEP 2: click track synthesis ----------
+function synthesizeClickTrack(kickIntervalSec, durationSec){
+  const n = Math.floor(durationSec * SR);
+  const buf = new Float32Array(n);
+  const beatSamples = Math.floor(SR * kickIntervalSec);
+  const clickLen = Math.floor(SR * 0.006); // 6ms burst
+  for(let start = 0; start < n; start += beatSamples){
+    for(let i = 0; i < clickLen && start + i < n; i++){
+      const env = 1 - (i / clickLen); // linear decay envelope
+      buf[start + i] = Math.sin(2 * Math.PI * 1500 * (i / SR)) * env * 0.9;
+    }
+  }
+  return buf;
+}
+
+function floatToWavBlob(samples, sampleRate){
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (o, s) => { for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + samples.length*2, true);
+  writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate*2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, samples.length*2, true);
+  let off = 44;
+  for(let i=0;i<samples.length;i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s < 0 ? s*0x8000 : s*0x7FFF, true);
+    off += 2;
+  }
+  return new Blob([view], { type:'audio/wav' });
+}
+
+function triggerDownload(samples, filename){
+  const blob = floatToWavBlob(Float32Array.from(samples), SR);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+$('btnGenClick').addEventListener('click', () => {
+  const interval = parseFloat($('kickInterval').value);
+  const dur = parseFloat($('dur').value);
+  clickBuffer = synthesizeClickTrack(interval, dur);
+  const blob = floatToWavBlob(clickBuffer, SR);
+  if(clickBlobUrl) URL.revokeObjectURL(clickBlobUrl);
+  clickBlobUrl = URL.createObjectURL(blob);
+  setStatus($('clickStatus'), `Generated ${dur}s, kick every ${interval}s (${clickBuffer.length} samples).`, 'ok');
+  ['btnCalib','btnValid','btnOverdub'].forEach(id => $(id).disabled = false);
+});
+
+// ---------- STEP 3: recording (audio element playback + MediaRecorder capture) ----------
+async function recordTakeAgainstClick(){
+  return new Promise((resolve, reject) => {
+    if(!clickBlobUrl) return reject(new Error('no click track'));
+    const audioEl = new Audio(clickBlobUrl); // backing track ONLY via <audio> element, never WebAudio output
+    const recorder = new MediaRecorder(micStream);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if(e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+      const arrayBuf = await blob.arrayBuffer();
+      const decoded = await audioCtx.decodeAudioData(arrayBuf);
+      const samples = decoded.getChannelData(0).slice(); // mono, offline decode — no live DSP
+      resolve({ samples, sr: decoded.sampleRate });
+    };
+    recorder.onerror = reject;
+
+    audioEl.addEventListener('ended', () => {
+      setTimeout(() => recorder.stop(), 300); // tail for last click's decay
+    });
+
+    recorder.start();
+    audioEl.play().catch(reject);
+  });
+}
+
+function countdown(statusEl, fromN){
+  return new Promise((resolve) => {
+    let n = fromN;
+    setStatus(statusEl, `Starting in ${n}...`, 'warn');
+    const iv = setInterval(() => {
+      n -= 1;
+      if(n <= 0){
+        clearInterval(iv);
+        resolve();
+      } else {
+        setStatus(statusEl, `Starting in ${n}...`, 'warn');
+      }
+    }, 1000);
+  });
+}
+
+function wireRecordButton(btnId, statusId, key, label){
+  $(btnId).addEventListener('click', async () => {
+    $(btnId).disabled = true;
+    await countdown($(statusId), 5); // 5s to get ready before click track + recording actually start
+    setStatus($(statusId), `Recording ${label}... play/perform now.`, null);
+    try{
+      const take = await recordTakeAgainstClick();
+      takes[key] = take;
+      setStatus($(statusId), `Captured (${take.samples.length} samples @ ${take.sr}Hz).`, 'ok');
+    }catch(err){
+      setStatus($(statusId), 'Recording failed: ' + err.message, 'bad');
+    }
+    $(btnId).disabled = false;
+    checkReady();
+  });
+}
+wireRecordButton('btnCalib', 'calibStatus', 'calib', 'Calibration take (Mode A)');
+wireRecordButton('btnValid', 'validStatus', 'valid', 'Validation take (Mode A)');
+wireRecordButton('btnOverdub', 'overdubStatus', 'overdub', 'Overdub take (Mode B)');
+
+function checkReady(){
+  const modeAReady = takes.calib && takes.valid;
+  const allReady = modeAReady && takes.overdub;
+  $('btnRun').disabled = !allReady;
+  $('btnSweep').disabled = !modeAReady;
+  setStatus($('runStatus'), allReady ? 'All three takes captured — ready to run NLMS.' : 'Waiting for all three takes.');
+  setStatus($('sweepStatus'), modeAReady ? 'Ready to sweep (Mode A takes present).' : 'Requires ① and ② recorded first.');
+}
+
+// ---------- offline DSP ----------
+
+function resample(samples, fromSr, toSr){
+  if(fromSr === toSr) return samples;
+  const ratio = toSr / fromSr;
+  const outLen = Math.floor(samples.length * ratio);
+  const out = new Float32Array(outLen);
+  for(let i=0;i<outLen;i++){
+    const srcPos = i / ratio;
+    const i0 = Math.floor(srcPos), i1 = Math.min(i0+1, samples.length-1);
+    const frac = srcPos - i0;
+    out[i] = samples[i0]*(1-frac) + samples[i1]*frac;
+  }
+  return out;
+}
+
+// bounded ±maxLag search — deliberately stays inside one click-interval period
+// to sidestep the periodicity ambiguity (see caveat in §2).
+function findLag(ref, mic, maxLagSamples){
+  const searchLen = Math.min(ref.length, mic.length, SR*3);
+  let bestLag = 0, bestScore = -Infinity;
+  for(let lag = -maxLagSamples; lag <= maxLagSamples; lag += 4){
+    let sum = 0;
+    for(let i=0;i<searchLen;i++){
+      const j = i + lag;
+      if(j < 0 || j >= mic.length) continue;
+      sum += ref[i]*mic[j];
+    }
+    if(sum > bestScore){ bestScore = sum; bestLag = lag; }
+  }
+  let refined = bestLag, refinedScore = bestScore;
+  for(let lag = bestLag-4; lag <= bestLag+4; lag++){
+    let sum = 0;
+    for(let i=0;i<searchLen;i++){
+      const j = i + lag;
+      if(j < 0 || j >= mic.length) continue;
+      sum += ref[i]*mic[j];
+    }
+    if(sum > refinedScore){ refinedScore = sum; refined = lag; }
+  }
+  return refined;
+}
+
+function alignedPair(ref, mic, lag){
+  const len = Math.min(ref.length, mic.length - lag > 0 ? mic.length - lag : 0);
+  const x = new Float32Array(len);
+  const d = new Float32Array(len);
+  for(let i=0;i<len;i++){
+    x[i] = ref[i];
+    const j = i + lag;
+    d[i] = (j>=0 && j<mic.length) ? mic[j] : 0;
+  }
+  return { x, d };
+}
+
+// Leaky NLMS with live divergence diagnostics.
+// leak=0 reproduces plain NLMS. Returns residual, final weights, maxAbsWeight reached,
+// and a diverged flag+index if NaN/Inf was hit (training stops early in that case).
+// epochs > 1 re-passes the SAME buffer through the filter multiple times (weights carry over
+// between passes) so the filter gets more update iterations to converge without needing a
+// longer physical recording. Residual is only kept from the final epoch (used for dB/plotting);
+// divergence is checked on every sample of every epoch.
+function nlmsTrain(x, d, taps, mu, leak, epsilon, epochs){
+  epochs = epochs || 1;
+  const N = d.length;
+  const w = new Float64Array(taps);
+  const ring = new Float64Array(taps);
+  let ringPos = 0;
+  let residual = new Float64Array(N);
+  let energy = epsilon;
+  let maxAbsW = 0;
+  let diverged = false, divergedAt = -1, divergedEpoch = -1;
+
+  outer:
+  for(let ep = 0; ep < epochs; ep++){
+    const isLast = ep === epochs - 1;
+    for(let n = 0; n < N; n++){
+      const newest = x[n] || 0;
+      const oldest = ring[ringPos];
+      energy += newest*newest - oldest*oldest;
+      ring[ringPos] = newest;
+
+      let y = 0;
+      let idx = ringPos;
+      for(let i = 0; i < taps; i++){
+        y += w[i] * ring[idx];
+        idx = (idx - 1 + taps) % taps;
+      }
+      const e = d[n] - y;
+      if(isLast) residual[n] = e;
+
+      if(!isFinite(e) || !isFinite(y)){
+        diverged = true; divergedAt = n; divergedEpoch = ep; break outer;
+      }
+
+      const muN = mu / Math.max(energy, epsilon);
+      idx = ringPos;
+      for(let i = 0; i < taps; i++){
+        w[i] = (1 - leak) * w[i] + muN * e * ring[idx];
+        const aw = Math.abs(w[i]);
+        if(aw > maxAbsW) maxAbsW = aw;
+        idx = (idx - 1 + taps) % taps;
+      }
+      if(!isFinite(maxAbsW)){ diverged = true; divergedAt = n; divergedEpoch = ep; break outer; }
+      ringPos = (ringPos + 1) % taps;
+    }
+  }
+  const cutLen = diverged ? divergedAt : N;
+  return {
+    residual: residual.subarray(0, cutLen), weights: w, maxAbsW, diverged, divergedAt,
+    divergedEpoch, epochsRun: diverged ? divergedEpoch + 1 : epochs
+  };
+}
+
+function applyFrozenFilter(x, d, weights){
+  const taps = weights.length;
+  const N = d.length;
+  const ring = new Float64Array(taps);
+  let ringPos = 0;
+  const residual = new Float64Array(N);
+  for(let n = 0; n < N; n++){
+    ring[ringPos] = x[n] || 0;
+    let y = 0, idx = ringPos;
+    for(let i = 0; i < taps; i++){ y += weights[i]*ring[idx]; idx = (idx-1+taps)%taps; }
+    residual[n] = d[n] - y;
+    ringPos = (ringPos + 1) % taps;
+  }
+  return residual;
+}
+
+function rms(arr){
+  let s = 0;
+  for(let i=0;i<arr.length;i++) s += arr[i]*arr[i];
+  return Math.sqrt(s / arr.length);
+}
+
+function dbReduction(before, after){
+  const rb = rms(before), ra = rms(after);
+  if(ra <= 1e-9) return Infinity;
+  return 20*Math.log10(rb/ra);
+}
+
+function normCorrelation(a, b){
+  const len = Math.min(a.length, b.length);
+  let num=0, da=0, db_=0;
+  for(let i=0;i<len;i++){ num += a[i]*b[i]; da += a[i]*a[i]; db_ += b[i]*b[i]; }
+  const denom = Math.sqrt(da*db_);
+  return denom > 1e-12 ? num/denom : 0;
+}
+
+// Weight-vector cosine similarity between filters trained independently on two halves of the
+// same take. 1.0 = the filter converges to the same solution regardless of which half it saw
+// (bleed transfer function is stable/fixed). Closer to 0 = the filter "moved" between halves
+// (bleed characteristics changed over time — variable, not a fixed template).
+function cosineSim(a, b){
+  let dot=0, na=0, nb=0;
+  for(let i=0;i<a.length;i++){ dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  const denom = Math.sqrt(na*nb);
+  return denom > 1e-12 ? dot/denom : 0;
+}
+
+function drawWave(canvas, before, after){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0,0,w,h);
+  const mid = h/2;
+  function plot(arr, color, alpha){
+    ctx.beginPath();
+    ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 1;
+    const step = Math.max(1, Math.floor(arr.length / w));
+    for(let px=0; px<w; px++){
+      const idx = px*step;
+      let mx = 0;
+      for(let k=0;k<step && idx+k<arr.length;k++) mx = Math.max(mx, Math.abs(arr[idx+k]));
+      ctx.moveTo(px, mid - mx*mid*0.9);
+      ctx.lineTo(px, mid + mx*mid*0.9);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  plot(before, '#f26a6a', 0.55);
+  plot(after, '#6ee7c9', 0.9);
+}
+
+// ---------- STEP 4: single-run NLMS ----------
+$('btnRun').addEventListener('click', () => {
+  $('btnRun').disabled = true;
+  setStatus($('runStatus'), 'Running NLMS analysis...');
+  setStatus($('diagStatus'), '');
+
+  setTimeout(() => {
+    try{
+      const taps = parseInt($('taps').value, 10);
+      const mu = parseFloat($('mu').value);
+      const leak = parseFloat($('leak').value);
+      const epochs = parseInt($('epochs').value, 10) || 1;
+      const epsilon = 1e-6;
+
+      const calibMic = resample(takes.calib.samples, takes.calib.sr, SR);
+      const validMic = resample(takes.valid.samples, takes.valid.sr, SR);
+      const overdubMic = resample(takes.overdub.samples, takes.overdub.sr, SR);
+
+      const maxLag = Math.floor(SR * 0.05);
+      const lag = findLag(clickBuffer, calibMic, maxLag);
+      $('mLag').textContent = `${lag} samples (${(lag/SR*1000).toFixed(1)} ms)`;
+
+      const calibPair = alignedPair(clickBuffer, calibMic, lag);
+      const calibResult = nlmsTrain(calibPair.x, calibPair.d, taps, mu, leak, epsilon, epochs);
+
+      $('mMaxW').textContent = calibResult.maxAbsW.toFixed(4) + (calibResult.diverged ? '  ⚠ DIVERGED' : '');
+
+      // drift/stability: train independently on first half vs second half of calibration,
+      // compare weight vectors. Uses epochs=1 regardless of the main epochs setting, since each
+      // half already has less data and we just want a same-conditions comparison.
+      const half = Math.floor(calibPair.x.length / 2);
+      const r1 = nlmsTrain(calibPair.x.subarray(0, half), calibPair.d.subarray(0, half), taps, mu, leak, epsilon, 1);
+      const r2 = nlmsTrain(calibPair.x.subarray(half), calibPair.d.subarray(half), taps, mu, leak, epsilon, 1);
+      if(r1.diverged || r2.diverged){
+        $('mDrift').textContent = 'n/a (half-training diverged)';
+      } else {
+        const stability = cosineSim(r1.weights, r2.weights);
+        $('mDrift').textContent = stability.toFixed(3) +
+          (stability > 0.9 ? '  (stable — looks like a fixed transfer function)' :
+           stability > 0.6 ? '  (mostly stable, some movement)' :
+                              '  (unstable — bleed characteristics changed between halves)');
+      }
+
+      if(calibResult.diverged){
+        setStatus($('diagStatus'),
+          `⚠ Training diverged at sample ${calibResult.divergedAt} of epoch ${calibResult.divergedEpoch+1}/${epochs} ` +
+          `(${(calibResult.divergedAt/SR).toFixed(2)}s into that epoch). ` +
+          `This is the collapse we're hunting — note the taps/μ/leak/epochs values above exactly as configured.`,
+          'bad');
+      } else {
+        setStatus($('diagStatus'), `Training completed without NaN/Inf across ${epochs} epoch(s).`, 'ok');
+      }
+
+      const calibDb = dbReduction(calibPair.d.subarray(0, calibResult.residual.length), calibResult.residual);
+      $('mCalibDb').textContent = isFinite(calibDb) ? calibDb.toFixed(1) + ' dB' : '∞';
+
+      const validLag = findLag(clickBuffer, validMic, maxLag);
+      const validPair = alignedPair(clickBuffer, validMic, validLag);
+      const validResidual = applyFrozenFilter(validPair.x, validPair.d, calibResult.weights);
+      const validDb = dbReduction(validPair.d, validResidual);
+      $('mValidDb').textContent = isFinite(validDb) ? validDb.toFixed(1) + ' dB' : '∞';
+      const corr = normCorrelation(validPair.x, validResidual);
+      $('mValidCorr').textContent = corr.toFixed(3) +
+        (Math.abs(corr) < 0.15 ? '  (deterministic — template generalizes)' :
+                                  '  (residual still tracks click)');
+
+      const overdubLag = findLag(clickBuffer, overdubMic, maxLag);
+      const overdubPair = alignedPair(clickBuffer, overdubMic, overdubLag);
+      const overdubResidual = applyFrozenFilter(overdubPair.x, overdubPair.d, calibResult.weights);
+      const overdubDb = dbReduction(overdubPair.d, overdubResidual);
+      $('mOverdubDb').textContent = (isFinite(overdubDb) ? overdubDb.toFixed(1) + ' dB' : '∞') +
+        '  (Mode B — contains real performance energy, not a clean bleed metric)';
+
+      drawWave($('cCalib'), calibPair.d, calibResult.residual);
+      drawWave($('cOverdub'), overdubPair.d, overdubResidual);
+
+      lastResult = {
+        calibRaw: calibPair.d, calibResidual: calibResult.residual,
+        validRaw: validPair.d, validResidual: validResidual, validRef: validPair.x,
+        overdubRaw: overdubPair.d, overdubResidual: overdubResidual
+      };
+      $('results').style.display = 'block';
+      $('btnSpectrum').disabled = false;
+      setStatus($('runStatus'), 'Done.', 'ok');
+    }catch(err){
+      setStatus($('runStatus'), 'Analysis failed: ' + err.message, 'bad');
+    }
+    $('btnRun').disabled = false;
+  }, 30);
+});
+
+$('dlCalibRaw').addEventListener('click', () => lastResult && triggerDownload(lastResult.calibRaw, 'calib_raw.wav'));
+$('dlCalibClean').addEventListener('click', () => lastResult && triggerDownload(lastResult.calibResidual, 'calib_residual.wav'));
+$('dlValidRaw').addEventListener('click', () => lastResult && triggerDownload(lastResult.validRaw, 'valid_raw.wav'));
+$('dlValidClean').addEventListener('click', () => lastResult && triggerDownload(lastResult.validResidual, 'valid_residual.wav'));
+$('dlOverdubRaw').addEventListener('click', () => lastResult && triggerDownload(lastResult.overdubRaw, 'overdub_raw.wav'));
+$('dlOverdubClean').addEventListener('click', () => lastResult && triggerDownload(lastResult.overdubResidual, 'overdub_cleaned_nlms_v3.wav'));
+
+// ---------- STEP 5: L x mu sweep ----------
+$('btnSweep').addEventListener('click', () => {
+  $('btnSweep').disabled = true;
+  setStatus($('sweepStatus'), 'Running sweep...');
+
+  setTimeout(() => {
+    try{
+      const Ls = Array.from(document.querySelectorAll('#sweepL input:checked')).map(el => parseInt(el.value,10));
+      const Mus = Array.from(document.querySelectorAll('#sweepMu input:checked')).map(el => parseFloat(el.value));
+      const leak = parseFloat($('sweepLeak').value);
+      const epochs = parseInt($('sweepEpochs').value, 10) || 1;
+      const epsilon = 1e-6;
+
+      if(Ls.length === 0 || Mus.length === 0){
+        setStatus($('sweepStatus'), 'Select at least one L and one μ.', 'bad');
+        $('btnSweep').disabled = false;
+        return;
+      }
+
+      const calibMic = resample(takes.calib.samples, takes.calib.sr, SR);
+      const validMic = resample(takes.valid.samples, takes.valid.sr, SR);
+      const maxLag = Math.floor(SR * 0.05);
+      const calibLag = findLag(clickBuffer, calibMic, maxLag);
+      const validLag = findLag(clickBuffer, validMic, maxLag);
+      const calibPair = alignedPair(clickBuffer, calibMic, calibLag);
+      const validPair = alignedPair(clickBuffer, validMic, validLag);
+
+      const rows = [];
+      for(const L of Ls){
+        for(const mu of Mus){
+          const trained = nlmsTrain(calibPair.x, calibPair.d, L, mu, leak, epsilon, epochs);
+          let validDb = null, collapsed = trained.diverged;
+          if(!trained.diverged){
+            const validResidual = applyFrozenFilter(validPair.x, validPair.d, trained.weights);
+            validDb = dbReduction(validPair.d, validResidual);
+            if(!isFinite(validDb) || validDb < 0) collapsed = true;
+          }
+          rows.push({ L, mu, validDb, maxAbsW: trained.maxAbsW, collapsed, divergedAt: trained.divergedAt });
+        }
+      }
+
+      const tbody = $('sweepBody');
+      tbody.innerHTML = '';
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        const dbCell = r.collapsed
+          ? (r.divergedAt >= 0 ? `diverged @${r.divergedAt}` : (r.validDb !== null ? r.validDb.toFixed(1) : '—'))
+          : r.validDb.toFixed(1);
+        tr.innerHTML = `
+          <td>${r.L}</td>
+          <td>${r.mu}</td>
+          <td class="${r.collapsed ? 'collapsed' : 'good'}">${dbCell}</td>
+          <td>${r.maxAbsW.toFixed(4)}</td>
+          <td class="${r.collapsed ? 'collapsed' : 'good'}">${r.collapsed ? 'COLLAPSED' : 'stable'}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      $('sweepTable').style.display = 'table';
+      setStatus($('sweepStatus'), `Sweep complete: ${rows.length} combinations.`, 'ok');
+    }catch(err){
+      setStatus($('sweepStatus'), 'Sweep failed: ' + err.message, 'bad');
+    }
+    $('btnSweep').disabled = false;
+  }, 30);
+});
+
+// ---------- STEP 6: spectrum check (radix-2 FFT, real input) ----------
+
+// in-place iterative radix-2 Cooley-Tukey. re/im are Float64Array of length = power of 2.
+function fftInPlace(re, im){
+  const n = re.length;
+  for(let i=1, j=0; i<n; i++){
+    let bit = n >> 1;
+    for(; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if(i < j){ let t=re[i]; re[i]=re[j]; re[j]=t; t=im[i]; im[i]=im[j]; im[j]=t; }
+  }
+  for(let len=2; len<=n; len<<=1){
+    const ang = -2*Math.PI/len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    for(let i=0; i<n; i+=len){
+      let curWr=1, curWi=0;
+      for(let k=0;k<len/2;k++){
+        const ur=re[i+k], ui=im[i+k];
+        const vr=re[i+k+len/2]*curWr - im[i+k+len/2]*curWi;
+        const vi=re[i+k+len/2]*curWi + im[i+k+len/2]*curWr;
+        re[i+k]=ur+vr; im[i+k]=ui+vi;
+        re[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi;
+        const nWr = curWr*wr - curWi*wi;
+        curWi = curWr*wi + curWi*wr;
+        curWr = nWr;
+      }
+    }
+  }
+}
+
+// returns magnitude spectrum (linear, length n/2) of a windowed segment taken from the
+// middle of `samples`, zero-padded/truncated to n.
+function magnitudeSpectrum(samples, n){
+  const start = Math.max(0, Math.floor((samples.length - n) / 2));
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  for(let i=0;i<n;i++){
+    const s = (start+i < samples.length) ? samples[start+i] : 0;
+    const w = 0.5 - 0.5*Math.cos(2*Math.PI*i/(n-1)); // Hann window
+    re[i] = s * w;
+  }
+  fftInPlace(re, im);
+  const mag = new Float64Array(n/2);
+  for(let k=0;k<n/2;k++) mag[k] = Math.sqrt(re[k]*re[k] + im[k]*im[k]);
+  return mag;
+}
+
+function drawSpectrum(canvas, refMag, resMag, sr){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0,0,w,h);
+  const n = refMag.length;
+  const toDb = (v) => 20*Math.log10(v + 1e-8);
+  let maxDb = -Infinity;
+  for(let i=0;i<n;i++){ maxDb = Math.max(maxDb, toDb(refMag[i]), toDb(resMag[i])); }
+  const minDb = maxDb - 80;
+  function plot(mag, color){
+    ctx.beginPath();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+    for(let px=0; px<w; px++){
+      const k = Math.floor(px/w * n);
+      const db = Math.max(minDb, toDb(mag[k]));
+      const y = h - ((db - minDb) / (maxDb - minDb)) * h;
+      if(px===0) ctx.moveTo(px,y); else ctx.lineTo(px,y);
+    }
+    ctx.stroke();
+  }
+  plot(refMag, '#f26a6a');
+  plot(resMag, '#6ee7c9');
+}
+
+$('btnSpectrum').addEventListener('click', () => {
+  if(!lastResult || !lastResult.validRef || !lastResult.validResidual) return;
+  setStatus($('spectrumStatus'), 'Computing spectra...');
+  setTimeout(() => {
+    try{
+      const N = 8192; // ~186ms window @ 44.1kHz, ~5.4Hz/bin resolution
+      const refMag = magnitudeSpectrum(lastResult.validRef, N);
+      const resMag = magnitudeSpectrum(lastResult.validResidual, N);
+
+      drawSpectrum($('cSpectrum'), refMag, resMag, SR);
+
+      // reference's frequency support = bins within 40dB of its own peak
+      let refPeak = 0;
+      for(let k=0;k<refMag.length;k++) refPeak = Math.max(refPeak, refMag[k]);
+      const threshold = refPeak * Math.pow(10, -40/20); // -40dB relative to ref peak
+
+      let energyIn = 0, energyOut = 0;
+      for(let k=0;k<resMag.length;k++){
+        const e = resMag[k]*resMag[k];
+        if(refMag[k] >= threshold) energyIn += e; else energyOut += e;
+      }
+      const total = energyIn + energyOut || 1e-12;
+      const pctIn = 100*energyIn/total, pctOut = 100*energyOut/total;
+      $('mEnergyIn').textContent = pctIn.toFixed(1) + '%';
+      $('mEnergyOut').textContent = pctOut.toFixed(1) + '%';
+
+      const verdictEl = $('spectrumVerdict');
+      if(pctOut > 15){
+        verdictEl.className = 'flag bad';
+        verdictEl.innerHTML = `<b>Nonlinearity signature:</b> ${pctOut.toFixed(1)}% of residual energy sits ` +
+          `at frequencies the reference click track doesn't occupy at all. This is not explained by ` +
+          `filter length — it's new spectral content, consistent with saturation/harmonics. Direction: ` +
+          `partial second-order Volterra or soft-clip inversion, not a longer/leakier NLMS.`;
+      } else {
+        verdictEl.className = 'flag';
+        verdictEl.innerHTML = `<b>Looks like insufficient filter length, not nonlinearity:</b> only ` +
+          `${pctOut.toFixed(1)}% of residual energy is outside the reference's own frequency support — ` +
+          `the residual is mostly a quieter version of the reference's existing frequencies. Before concluding ` +
+          `nonlinear, retest with a longer converged L (use epochs and/or leak in §4/§5 to get L=4096+ to converge ` +
+          `without collapsing) and see if this ratio drops further.`;
+      }
+      $('spectrumResults').style.display = 'block';
+      setStatus($('spectrumStatus'), 'Done.', 'ok');
+    }catch(err){
+      setStatus($('spectrumStatus'), 'Spectrum analysis failed: ' + err.message, 'bad');
+    }
+  }, 30);
+});
+
+if(DEV_RESET){
+  console.warn('DEV_RESET is true — this must be false before any deploy.');
+}
+</script>
+</body>
+</html>
