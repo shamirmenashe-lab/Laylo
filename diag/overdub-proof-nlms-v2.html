@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  LAYLO · OVERDUB-PROOF-NLMS-V2 — L/μ מכוונים + תיקון תצוגת dB במבחן B
+  ════════════════════════════════════════════════════════════════════════════
+  שינויים מול overdub-proof-nlms.html (v1):
+    1. FILT_LEN ו-MU נבחרים מהממשק (selects) בכל ריצה — לא קבועים בקוד.
+       תוצאה בפועל (מכשיר, מבחן B, 50% מדיה): L=512/μ=0.5 → ~19-20dB,
+       דריפט 0.952 (גבוה). לא ידוע אם L קצר מדי או שזו לא-ליניארות אמיתית —
+       זו בדיוק השאלה שהבדיקה הזו אמורה להכריע.
+    2. תוקן באג: במבחן B (נגן עליו), v1 החליף את מספר ה-dB בטקסט "האזנה"
+       ולא הציג אותו בכלל. עכשיו ה-dB מוצג תמיד, בשני המצבים.
+  ════════════════════════════════════════════════════════════════════════════
+  שאלה מכריעה: האם הזליגה היא transfer-function *קבועה בתוך הקלטה* (→ פילטר
+  אדפטיבי לא יעזור מעל Wiener), או שהיא *זזה לאורך ההקלטה* (→ NLMS ינצח)?
+  ואם NLMS גם נתקע סביב 12dB → הזליגה לא-ליניארית, וסוגרים את מסלול
+  הפילטרים הליניאריים לגמרי (הצעד הבא: Volterra/AI).
+
+  שינוי מהותי מול overdub-proof.html המקורי:
+    - המקורי: Welch/Wiener — H = Sxy/Sxx, ממוצע *חד-פעמי* על כל ההקלטה (סטטי).
+    - כאן:    NLMS — פילטר FIR שמקדמיו מתעדכנים *דגימה-אחר-דגימה* (adaptive).
+      אם ה-transfer-function זזה, NLMS עוקב אחריה; Wiener לא יכל.
+
+  שיטה (offline, אחרי stop — כלל ברזל, זהה למקורי):
+    1. ref = ביט סינתטי רחב-פס (בס+קיק+הייהט) — "אודיו אמיתי", לא קליק.
+    2. getUserMedia (בלי EC/AGC/NS) → נגן ref דרך <audio> → הקלט 5ש.
+    3. יישור: cross-correlation למצוא השהיית הטלפון.
+    4. NLMS: e[n] = rec[n] − w·ref_window ; w += μ·e·ref/(‖ref‖²+δ).
+       שתי מעברות (two-pass) כדי לתת לפילטר להתכנס לפני מדידת השארית.
+    5. clean = e (השארית אחרי התכנסות).
+    6. מדד: ירידת RMS רחבת-פס ב-dB.
+       ≥25dB → הבעיה הייתה חוסר-אדפטיביות, יש מוצר.
+       ~12-14dB (כמו Wiener) → הבעיה לא-ליניארית, מסלול ליניארי סגור.
+
+  מבחן A (שקט): המספר הקובע — כמה מהרקע נמחק.
+  מבחן B (נגן עליו): האזנה — אמור להישאר רק מה שניגנת, בלי רקע.
+
+  ⚠ NLMS מודל ליניארי. אם הזליגה משנה *צורת-גל* (טימבר, סנר) — לא-ליניארית
+     בהגדרה, ו-NLMS ייתקע כמו Wiener. זו תוצאה חשובה, לא כישלון.
+
+  פרמטרי NLMS לכיוונון: FILT_LEN, MU, TWO_PASS (ראה CONFIG).
+  TEMP: קובץ נסיון למחיקה אחרי הכרעה. לא נוגע ב-studio / במקורי.
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Laylo · Overdub Proof · NLMS</title>
+<style>
+:root{
+  --bg:#f2ece2;--bg2:#e8e2d6;--line:#cdc6b8;--line2:#bbb4a6;
+  --ink:#2d2318;--ink2:#6b5f4e;--ink3:#a09282;
+  --amber:#d4820a;--red:#d63b28;--green:#2e8b57;
+  --sans:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+body{max-width:430px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));}
+h1{font:800 20px var(--sans);margin:0 0 4px;}
+h1 b{color:var(--amber);}
+.sub{font:500 12px var(--sans);color:var(--ink2);margin:0 0 18px;line-height:1.5;}
+.card{background:var(--bg2);border:1.5px solid var(--line2);border-radius:14px;padding:16px;margin-bottom:14px;}
+.card h2{font:700 14px var(--sans);margin:0 0 10px;}
+.mode{display:flex;gap:8px;margin-bottom:14px;}
+.mode button{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink2);font:600 12px var(--sans);cursor:pointer;}
+.mode button.on{border-color:var(--amber);background:#fff8ee;color:var(--amber);}
+.params{display:flex;gap:8px;margin-bottom:14px;}
+.params label{flex:1;font:600 10px var(--mono);color:var(--ink2);}
+.params select{width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink);font:700 13px var(--mono);}
+.go{width:100%;padding:16px;border:none;border-radius:12px;background:var(--amber);
+  color:#1a1206;font:800 16px var(--sans);cursor:pointer;}
+.go:disabled{opacity:.5;}
+.prog{font:600 13px var(--mono);color:var(--ink2);text-align:center;margin-top:12px;min-height:20px;}
+.verdict{text-align:center;padding:18px;border-radius:12px;margin-top:14px;display:none;}
+.verdict.show{display:block;}
+.verdict .big{font:800 34px var(--mono);line-height:1;}
+.verdict .lbl{font:600 12px var(--sans);margin-top:6px;}
+.verdict.pass{background:#eef6f0;border:1.5px solid var(--green);}
+.verdict.pass .big{color:var(--green);}
+.verdict.part{background:#fff8ee;border:1.5px solid var(--amber);}
+.verdict.part .big{color:var(--amber);}
+.verdict.fail{background:#fdecea;border:1.5px solid var(--red);}
+.verdict.fail .big{color:var(--red);}
+.row{display:flex;gap:8px;margin-top:12px;}
+.row button{flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink);font:600 12px var(--sans);cursor:pointer;}
+.row button:disabled{opacity:.4;}
+.wave-box{margin-top:14px;display:none;}
+.wave-box.show{display:block;}
+.wave-box .cap{font:600 10px var(--mono);color:var(--ink3);margin:8px 0 2px;}
+canvas{display:block;width:100%;height:54px;background:var(--bg);border:1px solid var(--line);border-radius:6px;}
+.note{font:500 11px var(--sans);color:var(--ink3);line-height:1.5;margin-top:14px;}
+.stat{font:600 11px var(--mono);color:var(--ink2);margin-top:8px;}
+audio{display:none;}
+</style>
+</head>
+<body>
+<h1>Overdub <b>Proof · NLMS</b></h1>
+<p class="sub">חיסור אדפטיבי (NLMS) במקום Wiener סטטי. השאלה המכריעה: transfer קבוע או משתנה? ואם נתקע כמו Wiener → לא-ליניארי.</p>
+
+<div class="card">
+  <div class="mode">
+    <button id="mA" class="on">מבחן A · שקט (מדידה)</button>
+    <button id="mB">מבחן B · נגן עליו</button>
+  </div>
+  <div class="params">
+    <label>אורך פילטר (L)
+      <select id="pFiltLen">
+        <option value="512">512 · ~11ms</option>
+        <option value="1024">1024 · ~21ms</option>
+        <option value="2048" selected>2048 · ~43ms</option>
+        <option value="4096">4096 · ~85ms</option>
+      </select>
+    </label>
+    <label>קצב התכנסות (μ)
+      <select id="pMu">
+        <option value="0.1">0.1 · איטי-יציב</option>
+        <option value="0.3">0.3</option>
+        <option value="0.5" selected>0.5 · ברירת מחדל</option>
+        <option value="0.9">0.9 · מהיר</option>
+      </select>
+    </label>
+  </div>
+  <h2 id="instr">חבר אוזניות, שב בשקט. נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק.</h2>
+  <button class="go" id="go">▶ הפעל</button>
+  <div class="prog" id="prog"></div>
+
+  <div class="verdict" id="verdict">
+    <div class="big" id="vBig">—</div>
+    <div class="lbl" id="vLbl"></div>
+  </div>
+  <div class="stat" id="stat"></div>
+
+  <div class="row">
+    <button id="pRaw" disabled>🔊 גלם (עם זליגה)</button>
+    <button id="pClean" disabled>🔊 נקי (אחרי מחיקה)</button>
+  </div>
+
+  <div class="wave-box" id="waveBox">
+    <div class="cap">גלם — מה שהמיקרופון קלט</div>
+    <canvas id="cvRaw"></canvas>
+    <div class="cap">נקי — אחרי מחיקת הרקע</div>
+    <canvas id="cvClean"></canvas>
+  </div>
+</div>
+
+<p class="note" id="footNote">
+  מבחן A: שב בשקט — המספר מודד כמה מהרקע נמחק. ≥25dB = NLMS ניצח · ~12dB = כמו Wiener → לא-ליניארי.<br>
+  מבחן B: נגן/זמזם תוך כדי — ואז האזן ל"נקי": אמור להישמע רק מה שניגנת, בלי הביט ברקע.<br>
+  <b>דריפט</b> בשורת הסטטוס: 0=פילטר קבוע (transfer יציב בהקלטה) · גבוה=זז (transfer משתנה בזמן).
+</p>
+
+<audio id="backingEl" playsinline></audio>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   CONFIG / STATE
+   ════════════════════════════════════════════════════════════════ */
+const REF_SR=48000, DUR=5.0;
+const NFFT=262144;            // 2^18 ≥ 5s@48k. משמש רק ליישור (findDelay)
+const MAX_LAG=0.6;            // השהיית טלפון מקסימלית לחיפוש יישור
+/* ── NLMS config ─────────────────────────────────────────────────
+   FILT_LEN, MU — עכשיו נקראים מהממשק (selects) בכל ריצה, לא קבועים.
+   מאפשר להשוות כיוונונים בלי deploy נוסף. DELTA/TWO_PASS עדיין קבועים. */
+const DELTA=1e-3, TWO_PASS=true;
+function getFiltLen(){ return parseInt($('#pFiltLen').value,10); }
+function getMu(){ return parseFloat($('#pMu').value); }
+const MIC={audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false,channelCount:1}};
+let mode='A';
+let refArr=null, recBuf=null, cleanBuf=null, ctx=null;
+const $=s=>document.querySelector(s);
+
+/* ════════════════════════════════════════════════════════════════
+   REFERENCE — ביט סינתטי רחב-פס (קיק + בס + הייהט). "אודיו אמיתי".
+   ════════════════════════════════════════════════════════════════ */
+function makeReference(sr){
+  const n=Math.floor(sr*DUR), x=new Float32Array(n);
+  const note=[110,146.83,130.81,164.81];
+  for(let i=0;i<n;i++){
+    const t=i/sr, beat=Math.floor(t/0.5), tb=t-beat*0.5;
+    const kEnv=Math.exp(-tb*18);
+    const kick=Math.sin(2*Math.PI*(60+40*Math.exp(-tb*30))*t)*kEnv*0.6;     // low
+    const bn=note[beat%note.length];
+    const bass=Math.sin(2*Math.PI*bn*t)*0.25*(0.6+0.4*Math.exp(-tb*4));     // mid
+    const q=t-Math.floor(t/0.25)*0.25;
+    const hat=(Math.random()*2-1)*Math.exp(-q*120)*0.12;                    // high
+    x[i]=kick+bass+hat;
+  }
+  let mx=0; for(let i=0;i<n;i++) mx=Math.max(mx,Math.abs(x[i]));
+  if(mx>0) for(let i=0;i<n;i++) x[i]=x[i]/mx*0.8;
+  return x;
+}
+function encodeWav(s,sr){
+  const n=s.length,b=n*2,ab=new ArrayBuffer(44+b),v=new DataView(ab);
+  const w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+  w(0,'RIFF');v.setUint32(4,36+b,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);
+  v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,b,true);
+  let o=44;for(let i=0;i<n;i++){let x=Math.max(-1,Math.min(1,s[i]));v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return new Blob([ab],{type:'audio/wav'});
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FFT — radix-2 in-place (Float64 re/im)
+   ════════════════════════════════════════════════════════════════ */
+function fft(re,im,inv){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1;
+    for(;j&bit;bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){const tr=re[i];re[i]=re[j];re[j]=tr;const ti=im[i];im[i]=im[j];im[j]=ti;}
+  }
+  for(let len=2;len<=n;len<<=1){
+    const ang=(inv?2:-2)*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let cwr=1,cwi=0;
+      for(let k=0;k<(len>>1);k++){
+        const a=i+k,bI=i+k+(len>>1);
+        const br=re[bI]*cwr-im[bI]*cwi, bi=re[bI]*cwi+im[bI]*cwr;
+        re[bI]=re[a]-br; im[bI]=im[a]-bi;
+        re[a]+=br; im[a]+=bi;
+        const t=cwr*wr-cwi*wi; cwi=cwr*wi+cwi*wr; cwr=t;
+      }
+    }
+  }
+  if(inv){for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;}}
+}
+function bigFFT(arr){ // returns {re,im} of length NFFT, zero-padded
+  const re=new Float64Array(NFFT), im=new Float64Array(NFFT);
+  const L=Math.min(arr.length,NFFT);
+  for(let i=0;i<L;i++) re[i]=arr[i];
+  fft(re,im,false); return {re,im};
+}
+
+/* ════════════════════════════════════════════════════════════════
+   1) ALIGN — cross-correlation למציאת השהיה d
+   ════════════════════════════════════════════════════════════════ */
+function findDelay(REF,REC,sr){
+  // corr = IFFT( conj(REF) · REC )
+  const re=new Float64Array(NFFT), im=new Float64Array(NFFT);
+  for(let k=0;k<NFFT;k++){
+    const ar=REF.re[k], ai=-REF.im[k]; // conj
+    re[k]=ar*REC.re[k]-ai*REC.im[k];
+    im[k]=ar*REC.im[k]+ai*REC.re[k];
+  }
+  fft(re,im,true);
+  const maxLag=Math.floor(MAX_LAG*sr);
+  let best=-1,bestMag=-1;
+  for(let d=0;d<=maxLag;d++){
+    const m=re[d]*re[d]+im[d]*im[d];
+    if(m>bestMag){bestMag=m;best=d;}
+  }
+  return best;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   2+3) NLMS — פילטר FIR אדפטיבי (מחליף את Wiener הסטטי)
+   ════════════════════════════════════════════════════════════════
+   מודל: bleed[n] = Σ_{j=0..L-1} w[j]·ref[n-j]   (קונבולוציה עם נתיב הדליפה)
+   שגיאה: e[n] = rec[n] − bleed[n]   (= clean)
+   עדכון: w[j] += μ·e[n]·ref[n-j] / (‖ref_window‖² + δ)
+   ה-normalization (‖ref‖²) הוא מה שהופך LMS ל-NLMS: יציב מול עוצמת-אות
+   משתנה (בס חזק מול הייהט חלש) — קריטי לביט רחב-פס.
+
+   two-pass: מעבר 1 נותן ל-w להתכנס (השארית שלו עוד "מלוכלכת" בהתחלה);
+   מעבר 2 מריץ עם ה-w שהתכנס ומודד שארית *נקייה* לאורך כל ההקלטה.
+   מחזיר את e של המעבר האחרון + אבחון: כמה ה-w "זז" לאורך הזמן. */
+function nlmsCancel(refd,rec,L,mu){
+  const len=Math.min(refd.length,rec.length);
+  const w=new Float64Array(L);          // מקדמי הפילטר
+  const clean=new Float32Array(len);
+  // מעקב אחר תזוזת הפילטר: נשמור snapshot של w כל רבע, נמדוד שינוי.
+  const snaps=[]; const snapAt=[Math.floor(len*0.25),Math.floor(len*0.5),Math.floor(len*0.75),len-1];
+  let snapIdx=0;
+
+  const passes=TWO_PASS?2:1;
+  for(let pass=0;pass<passes;pass++){
+    // אנרגיה רצה של חלון ה-ref (עבור ה-normalization), בעדכון O(1)
+    let energy=0;
+    snapIdx=0;
+    for(let n=0;n<len;n++){
+      // הוסף דגימה נכנסת, הסר יוצאת מהחלון → אנרגיה רצה
+      const inS=refd[n]||0;
+      energy+=inS*inS;
+      const outIdx=n-L;
+      if(outIdx>=0){const o=refd[outIdx]||0; energy-=o*o;}
+      if(energy<0)energy=0; // שמירה נומרית
+
+      // חיזוי הזליגה: bleed = w · ref[n .. n-L+1]
+      let bleed=0;
+      const jmax=Math.min(L,n+1);
+      for(let j=0;j<jmax;j++) bleed+=w[j]*(refd[n-j]||0);
+
+      const e=(rec[n]||0)-bleed;   // שגיאה = clean
+      if(pass===passes-1) clean[n]=e;
+
+      // עדכון NLMS (רק אם לא במעבר-מדידה-בלבד; כאן תמיד מעדכן — two-pass
+      // פשוט נותן פעמיים הזדמנות להתכנס. אפשר לקפוא במעבר אחרון, אבל
+      // השארת העדכון פעיל מאפשרת מעקב-דריפט אמיתי.)
+      const norm=energy+DELTA;
+      const step=mu*e/norm;
+      for(let j=0;j<jmax;j++) w[j]+=step*(refd[n-j]||0);
+
+      // snapshot לאבחון דריפט (רק במעבר האחרון)
+      if(pass===passes-1 && snapIdx<snapAt.length && n===snapAt[snapIdx]){
+        snaps.push(Float64Array.from(w)); snapIdx++;
+      }
+    }
+  }
+
+  // אבחון דריפט: נורמת ההפרש בין snapshot ראשון לאחרון, יחסית לנורמת w.
+  let drift=0;
+  if(snaps.length>=2){
+    const a=snaps[0], b=snaps[snaps.length-1];
+    let dn=0, wn=0;
+    for(let j=0;j<L;j++){const dd=b[j]-a[j]; dn+=dd*dd; wn+=b[j]*b[j];}
+    drift=Math.sqrt(dn/((wn||1e-12)));  // 0 = פילטר קבוע, גבוה = זז הרבה
+  }
+  return {clean, drift};
+}
+function rmsDb(x,sr){ // RMS over settled region 0.5s..end-0.1s
+  const a=Math.floor(0.5*sr), b=Math.floor(x.length-0.1*sr);
+  let s=0,n=0; for(let i=a;i<b;i++){s+=x[i]*x[i];n++;}
+  return Math.sqrt(s/Math.max(1,n));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RECORD FLOW (כלל ברזל: getUserMedia ראשון → <audio> → offline)
+   ════════════════════════════════════════════════════════════════ */
+function pickMime(){for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+  if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;return '';}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function run(){
+  $('#go').disabled=true; $('#verdict').className='verdict'; $('#stat').textContent='';
+  $('#pRaw').disabled=$('#pClean').disabled=true; $('#waveBox').className='wave-box';
+  setProg('מבקש מיקרופון…');
+
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia(MIC); }
+  catch(e){ setProg('❌ מיקרופון נדחה'); $('#go').disabled=false; return; }
+
+  refArr=makeReference(REF_SR);
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(encodeWav(refArr,REF_SR)); el.currentTime=0;
+
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const done=new Promise(r=>rec.onstop=r);
+  rec.start();
+  try{ await el.play(); }catch(e){}
+  for(let s=5;s>=1;s--){ setProg((mode==='B'?'🎸 נגן עכשיו · ':'🤫 שקט · ')+s); await wait(1000); }
+  rec.stop(); await done; el.pause(); stream.getTracks().forEach(t=>t.stop());
+
+  setProg('⚙ מעבד… (יישור + אמידת דליפה + מחיקה)');
+  await wait(40);
+
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+  const audio=await ctx.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
+  const sr=audio.sampleRate;
+  let recM=audio.getChannelData(0).slice(0);
+
+  // resample ref → sr אם צריך
+  let ref=refArr;
+  if(sr!==REF_SR){
+    const m=Math.floor(refArr.length*sr/REF_SR), r2=new Float32Array(m), ratio=REF_SR/sr;
+    for(let i=0;i<m;i++){const p=i*ratio,i0=Math.floor(p),f=p-i0;
+      r2[i]=(refArr[i0]||0)*(1-f)+(refArr[Math.min(i0+1,refArr.length-1)]||0)*f;}
+    ref=r2;
+  }
+  const len=Math.min(ref.length,recM.length);
+  ref=ref.subarray(0,len); recM=recM.subarray(0,len);
+
+  // 1) יישור
+  const REF=bigFFT(ref), REC=bigFFT(recM);
+  const d=findDelay(REF,REC,sr);
+  console.log('// DBG delay',d,'samples =',(d/sr*1000).toFixed(1),'ms'); // DBG
+  const refd=new Float32Array(len);
+  for(let i=d;i<len;i++) refd[i]=ref[i-d];
+
+  // 2+3) מחיקה אדפטיבית (NLMS)
+  const L=getFiltLen(), mu=getMu();
+  const {clean,drift}=nlmsCancel(refd,recM,L,mu);
+
+  // מדד
+  const rR=rmsDb(recM,sr), rC=rmsDb(clean,sr);
+  const redDb=20*Math.log10(rR/(rC+1e-12));
+  console.log('// DBG RMS rec',rR.toExponential(2),'clean',rC.toExponential(2),'→',redDb.toFixed(1),'dB · drift',drift.toFixed(3)); // DBG
+
+  recBuf=toBuf(recM,sr); cleanBuf=toBuf(clean,sr);
+  drawWave($('#cvRaw'),recM,'#d63b28'); drawWave($('#cvClean'),clean,'#2e8b57');
+  $('#waveBox').className='wave-box show';
+  $('#pRaw').disabled=$('#pClean').disabled=false;
+
+  showVerdict(redDb, d/sr*1000, drift, L, mu);
+  setProg('');
+  $('#go').disabled=false;
+}
+
+function showVerdict(db,delayMs,drift,L,mu){
+  const v=$('#verdict'), big=$('#vBig'), lbl=$('#vLbl');
+  big.textContent='−'+db.toFixed(1)+' dB';
+  // פענוח דריפט: כמה הפילטר "זז" לאורך ההקלטה. מפריד קבוע מול משתנה.
+  const driftTxt = drift<0.15 ? 'פילטר יציב (transfer קבוע בתוך ההקלטה)'
+                 : drift<0.5  ? 'פילטר זז מעט'
+                 :              'פילטר זז הרבה (transfer משתנה בזמן)';
+  // תיוג לפי סף ה-dB — משותף לשני המצבים, כך שהמספר לא "נעלם" במצב B
+  // (זה היה באג ב-v1: big הוחלף ל"האזנה" בלי להציג את ה-dB בכלל).
+  let cls, tag;
+  if(db>=25){ cls='pass'; tag='✓✓ NLMS ניצח — הבעיה הייתה חוסר-אדפטיביות.'; }
+  else if(db>=15){ cls='part'; tag='שיפור מעל Wiener (−12dB) אך לא מלא — נסה L/μ אחר.'; }
+  else if(db>=6){ cls='part'; tag='דומה ל-Wiener — יתכן לא-ליניארי, או L קצר מדי.'; }
+  else{ cls='fail'; tag='לא מספק — בדוק L גדול יותר לפני שקובעים לא-ליניארי.'; }
+  if(mode==='B'){
+    v.className='verdict '+cls+' show';
+    lbl.textContent=tag+' · לחץ "נקי" ובדוק אם עדיין שומעים רקע.';
+  }else{
+    v.className='verdict '+cls+' show';
+    lbl.textContent=tag;
+  }
+  $('#stat').textContent=`השהיה: ${delayMs.toFixed(0)}ms · דריפט: ${drift.toFixed(3)} — ${driftTxt} · L=${L} μ=${mu}`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PLAYBACK + WAVE
+   ════════════════════════════════════════════════════════════════ */
+function toBuf(arr,sr){const b=ctx.createBuffer(1,arr.length,sr);b.getChannelData(0).set(arr);return b;}
+let playSrc=null;
+function play(buf){ if(!buf)return; try{if(playSrc)playSrc.stop();}catch(e){}
+  playSrc=ctx.createBufferSource();playSrc.buffer=buf;playSrc.connect(ctx.destination);playSrc.start(); }
+function drawWave(cv,data,col){
+  const W=cv.width=cv.clientWidth*2, H=cv.height=108;
+  const c=cv.getContext('2d');c.clearRect(0,0,W,H);c.strokeStyle=col;c.lineWidth=1;
+  const step=Math.max(1,Math.floor(data.length/W));
+  for(let x=0;x<W;x++){let mn=1,mx=-1;const s0=x*step;
+    for(let k=0;k<step;k++){const v=data[s0+k]||0;if(v<mn)mn=v;if(v>mx)mx=v;}
+    c.beginPath();c.moveTo(x,H/2-mx*H*.45);c.lineTo(x,H/2-mn*H*.45);c.stroke();}
+}
+function setProg(t){$('#prog').textContent=t;}
+
+/* ════════════════════════════════════════════════════════════════
+   UI
+   ════════════════════════════════════════════════════════════════ */
+$('#mA').addEventListener('click',()=>{mode='A';$('#mA').classList.add('on');$('#mB').classList.remove('on');
+  $('#instr').textContent='חבר אוזניות, שב בשקט. נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק.';});
+$('#mB').addEventListener('click',()=>{mode='B';$('#mB').classList.add('on');$('#mA').classList.remove('on');
+  $('#instr').textContent='חבר אוזניות, נגן/זמזם תוך כדי שהביט מתנגן. אחר כך האזן ל"נקי" — אמור להישאר רק מה שניגנת.';});
+$('#go').addEventListener('click',run);
+$('#pRaw').addEventListener('click',()=>play(recBuf));
+$('#pClean').addEventListener('click',()=>play(cleanBuf));
+</script>
+</body>
+</html>
