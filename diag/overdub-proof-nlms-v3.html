@@ -236,15 +236,16 @@ function recordTakeAgainstClick(){
 
 // ---------- DSP ----------
 function findLag(ref, mic, maxLagSamples){
-  const searchLen = Math.min(ref.length, mic.length, SR*3);
+  const searchLen = Math.min(ref.length, mic.length, SR*1); // 1s is plenty (2 kicks at 0.5s interval)
+  const coarseStep = 16;
   let bestLag = 0, bestScore = -Infinity;
-  for(let lag = -maxLagSamples; lag <= maxLagSamples; lag += 4){
+  for(let lag = -maxLagSamples; lag <= maxLagSamples; lag += coarseStep){
     let sum = 0;
     for(let i=0;i<searchLen;i++){ const j=i+lag; if(j<0||j>=mic.length) continue; sum += ref[i]*mic[j]; }
     if(sum > bestScore){ bestScore = sum; bestLag = lag; }
   }
-  let refined = bestLag, refinedScore = bestScore;
-  for(let lag = bestLag-4; lag <= bestLag+4; lag++){
+  let refined = bestLag, refinedScore = -Infinity;
+  for(let lag = bestLag-coarseStep; lag <= bestLag+coarseStep; lag++){
     let sum = 0;
     for(let i=0;i<searchLen;i++){ const j=i+lag; if(j<0||j>=mic.length) continue; sum += ref[i]*mic[j]; }
     if(sum > refinedScore){ refinedScore = sum; refined = lag; }
@@ -345,7 +346,7 @@ $('btnRun').addEventListener('click', async () => {
                             // normalized step size to spike to ~5e5 during silent windows and
                             // chase ordinary background noise into instability. Verified in
                             // simulation: 1e-2 fixes it without hurting real bleed removal.
-    const maxLag = Math.floor(SR * 0.05);
+    const maxLag = Math.floor(SR * 0.6); // was 0.05 — real device delays observed up to ~480ms
 
     const lag = findLag(clickBuffer, micRaw, maxLag);
     const pair = alignedPair(clickBuffer, micRaw, lag);
