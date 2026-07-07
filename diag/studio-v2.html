@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  LAYLO · STUDIO v2.6 — קובץ עובד מלא (לא מחליף studio.html / deck.html)
+  ════════════════════════════════════════════════════════════════════════════
+  ── v2.6: העמקת החיסור (יישור היה נכון, טביעה הייתה רועשת) ──
+    [12] −2dB עם יישור-מדויק = הטביעה רועשת, לא בעיית יישור (הטק-טק על
+         הקליק בדיוק → פוגע נכון אך חלש). שני שינויים:
+         • קליק חזק יותר: דעיכה 380→180, עוצמה 0.40→0.60 → זליגה מעל הרעש.
+         • כיול 5→10ש (~20 קליקים) → ממוצע טביעה נקי פי-√2 → חיסור עמוק.
+         ⚠ חובה כיול מחדש (קליק שונה = טביעה חדשה).
+  ════════════════════════════════════════════════════════════════════════════
+  ── v2.5: תיקון הבאג שנתן אפס מחיקה ──
+    [11] findClicks הישן סחף מקליק לקליק (p=refined) עם rad=60ms → עם הטוק
+         הקצר נעל על פסגות שווא, ספר 23 מופעים במקום ~10 → טביעת-זבל →
+         אפס חיסור. הוחלף במאתר דטרמיניסטי: רשת קבועה + כיוונון ±6ms.
+         אמור להחזיר ~10 מופעים בכיול, ולחסר באמת. אם הזליגה חשמלית-יציבה,
+         צפוי הרבה יותר מ-16dB.
+  ════════════════════════════════════════════════════════════════════════════
+  ── v2.4: קליק "טוק-עץ" במקום הביפ החד ──
+    [10] הקליק הישן (900+1200Hz, דעיכה איטית) היה חד, צורם, וזולג הכי גרוע.
+         הוחלף ב"טוק": 900Hz + פרטיאל 1350Hz, דעיכה מהירה (~10ms), עוצמה
+         נמוכה יותר. רך לאוזן, נבדל מהבס, וקל יותר ל-cancel. tokWave() משמש
+         גם בכיול וגם בנגינה (עקביות = תנאי ל-cancel). bleedDb מודד מול
+         600/2000Hz (רחוק מתדרי הקליק). ⚠ חובה כיול מחדש — קליק חדש = טביעה חדשה.
+  ════════════════════════════════════════════════════════════════════════════
+  ── v2.3: STRIP-BACK לבסיס נקי (אחרי שהפילטרים יצרו ארטיפקטים) ──
+    • LIVE_WAVE כובה — חשוד עיקרי לקרכצים (WebAudio בזמן capture).
+    • notch הוסר לגמרי — הוא זה שיצר את ה-bass-dum (מחק את גוף הקליק
+      והשאיר את ה"בום" הנמוך). חזרה ל-cancel בלבד.
+    • TPL_LEN_S חזרה ל-90ms המוכח (cancel-proof).
+    • [9] דעיכת זנב הטביעה ל-0 → החיסור לא יוצר "מדרגה" → סיבה שנייה
+      לקרכצים מסולקת.
+    מטרה: לשמוע את ה-cancel הנקי (−16dB) בלי שום ארטיפקט. אם השארית
+    עדיין מורגשת — הצעד הבא הוא קליק יבש+שקט יותר (מניעה), לא עוד פילטר.
+  ════════════════════════════════════════════════════════════════════════════
+  בסיס: studio.html (timeline-v3 + מנוע הקלטה + חיסור זליגה מוכח −16.7dB)
+
+  ── v2.2: תיקון הדפיקות (notch ממוקד-בזמן) ──
+    [8] ה-notch הגלובלי של v2.1 עיוות את הכלי (bass-dum + pk-pk). הוחלף
+        ב-notch ממוקד-בזמן: מסנן 900/1200Hz רק בחלון ±12ms סביב כל קליק,
+        עם crossfade חלק. הכלי נגוע *רק* בנקודות הקליק, שאר ההקלטה נקייה.
+        זו הטכניקה המקצועית (Avid automated notch on click positions).
+        ה-cancel (−16dB) נשמר כפי שהיה.
+
+  ── v2.1: תיקון דפיקות ──
+    [7] שתי שכבות מחיקה: (א) חיסור טביעה קיים (−16dB); (ב) notch biquad צר
+        ב-900Hz + 1200Hz אחרי החיסור. הדפיקות הן שארית 900+1200Hz לאחר חיסור
+        חלקי — הנוצ' מוחק אותן בדיוק. Q=30 → רוחב 30Hz בלבד, לא פוגע במוזיקה.
+        TPL_LEN_S הוארך מ-90ms ל-150ms לתפיסת זנבות ארוכים יותר.
+
+  ── מה תוקן ב-v2 (6 באגים) ──
+    [1] BPM ↔ זיהוי קליק: findClicks היה נעול ל-0.5s (=120BPM) בעוד שהקליק
+        נוצר ב-60/bpm. ב-80BPM (ברירת מחדל) הגלאי חיפש במקום הלא נכון →
+        כיול+חיסור נכשלו. עכשיו: כיול בקצב קבוע CAL_INTERVAL, וחיסור בקצב
+        ההקלטה (recClickPeriod). זו הסיבה האמיתית שהמנוע לא היה אמין.
+    [2] EC/AGC/NS כובו (MIC_CONSTRAINTS). AGC במיוחד שינה gain דינמית →
+        עוצמת הזליגה השתנתה בין הקלטות → חיסור בעוצמה קבועה נכשל. כיבוי =
+        תנאי הכרחי לאמינות, לא רק איכות. ⚠ זה משנה את חתימת הזליגה →
+        חובה כיול מחדש (ה-DB החדש מאלץ את זה אוטומטית, ראה [3]).
+    [3] DEV_RESET=false + DB חדש 'laylo-studio-v2'. הטביעה נשמרת ושורדת
+        reload. שם DB חדש מבטיח שלא נטען fingerprint ישן (EC-on, פסול).
+    [4] קרצ'ים: שני גורמים נפרדים — (א) AGC (נפתר ב-[2]); (ב) קליפינג
+        בסכימת מיקס. נוסף soft-limiter: tanh ב-backing + DynamicsCompressor
+        בנגינה. אין יותר hard-clip.
+    [5] טרנספורט נחתך ב-safe-area של אנדרואיד: viewport-fit=cover + 100dvh
+        + env(safe-area-inset-*) ב-hdr/transport.
+    [6] גל חי בהקלטה: AnalyserNode על הקלט בלבד (לא מחובר ל-destination).
+        ⚠⚠ זה הפריט היחיד שמכניס WebAudio בזמן capture — מנוגד לרוח כלל
+        הברזל. מאחורי דגל LIVE_WAVE. אם הזליגה חוזרת אחרי v2 — כבה אותו
+        ראשון ובדוק שוב. חובה בדיקת רגרסיה ייעודית לזליגה.
+    [+] גרירת טראק על ציר הזמן (offset): long-press על הגל → גרירה אופקית.
+
+  עמוד שדרה (כללי ברזל — לא נשברו):
+    1. getUserMedia ראשון — לפני כל output
+    2. backing דרך <audio> בלבד (ה-AnalyserNode של [6] רק קורא, לא מנגן)
+    3. ניתוח/חיסור = offline אחרי stop
+    4. חיסור: כיול חד-פעמי → טביעת-דליפה → חיסור per-click
+
+  פרוטוקול: Claude בונה → Dude דוחף לגיטהאב → שמיר בודק.
+
+  ═══ TEMP / לניקוי לפני production (ראה רשימה מלאה בתחתית הקובץ) ═══
+    - DEV_RESET (כבר false). אם מדליקים לבדיקה — לכבות חזרה.
+    - LIVE_WAVE=true — נסיוני, לבדוק רגרסיית זליגה. דגל kill קל.
+    - console.log מסומנים // DBG
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Laylo · Studio v2</title>
+<style>
+:root{
+  --bg:#f2ece2; --bg2:#e8e2d6; --bg3:#ddd6c8;
+  --line:#cdc6b8; --line2:#bbb4a6;
+  --ink:#2d2318; --ink2:#6b5f4e; --ink3:#a09282;
+  --amber:#d4820a; --red:#d63b28; --green:#2e8b57;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  --sans:system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --hdr:50px; --zbar:34px; --ruler:24px;
+  --ctrl-w:80px; --ch-h:62px; --transport:72px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+.t0{--tc:#e8624a;}.t1{--tc:#4a9eca;}.t2{--tc:#5ab870;}
+.t3{--tc:#9b7fd4;}.t4{--tc:#e8a44a;}.t5{--tc:#4ac4b8;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  height:100%;overflow:hidden;}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;
+  height:100vh;height:100dvh;}                /* [5] dvh */
+
+.hdr{height:calc(var(--hdr) + var(--safe-t));padding-top:var(--safe-t); /* [5] */
+  display:flex;align-items:center;justify-content:space-between;
+  padding-left:14px;padding-right:14px;background:var(--bg2);
+  border-bottom:1.5px solid var(--line2);flex:none;}
+.logo{font:800 18px/1 var(--sans);color:var(--ink2);}
+.logo b{color:var(--amber);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.bpm-box{display:flex;align-items:center;background:var(--bg);
+  border:1.5px solid var(--line2);border-radius:8px;overflow:hidden;}
+.bpm-b{width:28px;height:28px;border:none;background:transparent;
+  color:var(--ink2);font:700 16px var(--mono);cursor:pointer;}
+.bpm-b:active{background:var(--line);}
+.bpm-v{font:700 14px/1 var(--mono);color:var(--amber);padding:0 4px;min-width:30px;text-align:center;}
+.bpm-lbl{font:600 8px var(--mono);color:var(--ink3);padding-left:3px;letter-spacing:1px;}
+.click-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink3);font:700 16px var(--mono);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.click-btn.on{border-color:var(--amber);color:var(--amber);background:#fff8ee;}
+
+.zbar{height:var(--zbar);display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line);flex:none;}
+.z-btns{display:flex;gap:5px;align-items:center;}
+.zbtn{width:32px;height:26px;border-radius:6px;border:1.5px solid var(--line2);
+  background:var(--bg);color:var(--ink2);font:700 16px var(--mono);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.zbtn:active{background:var(--line);}
+.z-lbl{font:600 10px var(--mono);color:var(--ink3);}
+.cal-btn{font:600 10px var(--sans);color:var(--ink3);border:1.5px solid var(--line2);
+  background:var(--bg);border-radius:7px;padding:6px 9px;cursor:pointer;}
+.cal-btn.done{border-color:var(--green);color:var(--green);background:#eef6f0;}
+.cal-btn.need{border-color:var(--amber);color:var(--amber);background:#fff8ee;}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.ruler-wrap{display:flex;flex:none;border-bottom:1.5px solid var(--line2);}
+.ruler-ctrl{width:var(--ctrl-w);flex:none;height:var(--ruler);background:var(--bg3);
+  border-right:1.5px solid var(--line2);display:flex;align-items:center;padding:0 8px;
+  font:600 8px var(--mono);color:var(--ink3);}
+.ruler-scroll{flex:1;height:var(--ruler);overflow:hidden;}
+canvas.rcv{display:block;}
+.tracks-area{flex:1;display:flex;overflow:hidden;}
+.ctrl-col{width:var(--ctrl-w);flex:none;overflow:hidden;position:relative;
+  border-right:1.5px solid var(--line2);background:var(--bg2);}
+.ctrl-inner{position:absolute;top:0;left:0;right:0;}
+.ch-ctrl{height:var(--ch-h);display:flex;align-items:center;padding:0 6px;
+  border-bottom:1px solid var(--line);gap:5px;position:relative;cursor:pointer;}
+.ch-ctrl:active{background:var(--bg3);}
+.accent-bar{position:absolute;right:0;top:5px;bottom:5px;width:3px;border-radius:2px;background:var(--tc,#ccc);}
+.ch-num{width:20px;height:20px;border-radius:5px;flex:none;display:flex;align-items:center;
+  justify-content:center;font:800 11px var(--mono);background:var(--tc,#ccc);color:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.ch-meta{flex:1;min-width:0;}
+.ch-name-txt{font:600 11px var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
+.ch-ctrl.empty .ch-name-txt{color:var(--ink3);font-weight:400;}
+.ch-btns{display:flex;flex-direction:column;gap:4px;flex:none;}
+.rec-target{width:22px;height:22px;border-radius:50%;border:2px solid var(--line2);
+  background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.rec-target::after{content:'';width:10px;height:10px;border-radius:50%;background:transparent;transition:background .15s;}
+.rec-target.on{border-color:var(--red);}
+.rec-target.on::after{background:var(--red);box-shadow:0 0 6px rgba(214,59,40,.5);}
+.hear-btn{width:22px;height:22px;border-radius:5px;border:1.5px solid var(--line2);
+  background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font:600 11px var(--sans);color:var(--ink3);transition:all .15s;}
+.hear-btn.on{border-color:var(--tc,#888);background:var(--tc,#888);color:#fff;}
+.hear-btn.off{opacity:.5;}
+.wave-col{flex:1;overflow-x:auto;overflow-y:hidden;position:relative;-webkit-overflow-scrolling:touch;}
+.wave-col::-webkit-scrollbar{height:3px;}
+.wave-col::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px;}
+.wave-inner{position:relative;}
+.ch-row{height:var(--ch-h);position:absolute;left:0;border-bottom:1px solid var(--line);
+  cursor:pointer;overflow:hidden;}
+/* [+] גרירה: הגל יושב ב-.clip ממוקם ב-offset */
+.clip{position:absolute;top:6px;bottom:6px;left:0;touch-action:pan-x;}
+.clip canvas{position:absolute;top:0;left:0;bottom:0;}
+.clip.picked{box-shadow:0 3px 10px rgba(0,0,0,.25);border-radius:4px;
+  outline:2px solid var(--tc,#888);outline-offset:0;z-index:6;opacity:.92;}
+.ch-row.muted-row .clip canvas{opacity:.25;}
+.ch-row.rec-row{outline:2px solid var(--red);outline-offset:-2px;}
+.ch-row.empty-row{background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(0,0,0,.02) 10px,rgba(0,0,0,.02) 20px);}
+.empty-lbl{font:500 11px var(--sans);color:var(--ink3);padding:0 12px;line-height:var(--ch-h);}
+.live-cv{position:absolute;left:0;pointer-events:none;z-index:4;} /* [6] גל חי */
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--red);pointer-events:none;
+  z-index:10;left:0;box-shadow:0 0 6px rgba(214,59,40,.5);border-radius:1px;}
+
+.transport{height:calc(var(--transport) + var(--safe-b));padding-bottom:var(--safe-b); /* [5] */
+  display:flex;align-items:center;justify-content:space-between;
+  padding-left:14px;padding-right:14px;gap:8px;background:var(--bg2);
+  border-top:1.5px solid var(--line2);flex:none;}
+.t-time{font:800 22px/1 var(--mono);color:var(--ink);letter-spacing:1px;min-width:62px;}
+.tkeys{display:flex;gap:6px;}
+.tkey{width:46px;height:46px;border-radius:10px;border:1.5px solid var(--line2);background:var(--bg);
+  color:var(--ink2);cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:all .1s;}
+.tkey:active{transform:scale(.92);}
+.tkey:disabled{opacity:.4;}
+.tkey svg{width:15px;height:15px;fill:currentColor;}
+.tkey span{font:600 7px var(--mono);letter-spacing:.8px;}
+.tkey.play-k{border-color:var(--green);color:var(--green);}
+.tkey.play-k.on{background:#e8f5e9;}
+.tkey.rec-k{border-color:var(--red);color:var(--red);}
+.tkey.rec-k.on{background:#fde8e6;animation:rp 1s infinite;}
+@keyframes rp{50%{box-shadow:0 0 14px rgba(214,59,40,.4);}}
+.ai-btn{width:46px;height:46px;border-radius:10px;border:1.5px solid #7baed4;background:#e8f2fb;
+  color:#3a7ab8;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:17px;gap:2px;}
+.ai-btn span{font:600 7px var(--mono);color:#3a7ab8;}
+
+.toast{position:fixed;top:calc(60px + var(--safe-t));left:50%;transform:translateX(-50%) translateY(-20px);
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font:500 13px var(--sans);
+  z-index:100;opacity:0;transition:all .3s;max-width:90%;text-align:center;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.cal-overlay{position:fixed;inset:0;z-index:90;background:rgba(20,16,11,.82);backdrop-filter:blur(6px);
+  max-width:430px;margin:0 auto;display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 30px;text-align:center;}
+.cal-overlay.open{display:flex;}
+.cal-overlay h2{font:700 22px var(--sans);color:#fff;margin:0 0 12px;}
+.cal-overlay p{font:400 14px/1.6 var(--sans);color:#e8e2d6;margin:0 0 24px;max-width:300px;}
+.cal-ring{width:120px;height:120px;border-radius:50%;border:3px solid rgba(245,166,35,.25);
+  display:flex;align-items:center;justify-content:center;margin-bottom:24px;position:relative;}
+.cal-ring .fill{position:absolute;inset:-3px;border-radius:50%;
+  background:conic-gradient(var(--amber) var(--p,0%),transparent 0);
+  -webkit-mask:radial-gradient(transparent 56px,#000 58px);mask:radial-gradient(transparent 56px,#000 58px);}
+.cal-ring .lbl{font:800 16px var(--mono);color:var(--amber);}
+.cal-go{background:var(--amber);color:#1a1206;border:none;border-radius:12px;padding:16px 32px;
+  font:800 16px var(--sans);cursor:pointer;}
+.cal-skip{background:transparent;color:#9e8f77;border:none;font:500 13px var(--sans);
+  margin-top:16px;cursor:pointer;text-decoration:underline;}
+.cal-result{font:600 13px var(--mono);color:var(--green);margin-top:14px;min-height:18px;}
+
+audio{display:none;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">layl<b>o</b></div>
+  <div class="hdr-r">
+    <div class="bpm-box">
+      <button class="bpm-b" id="bdn">−</button>
+      <div class="bpm-v" id="bv">80</div>
+      <div class="bpm-lbl">BPM</div>
+      <button class="bpm-b" id="bup">+</button>
+    </div>
+    <button class="click-btn on" id="ck">♩</button>
+  </div>
+</div>
+
+<div class="zbar">
+  <div class="z-btns">
+    <button class="zbtn" id="zin">+</button>
+    <div class="z-lbl" id="zlbl">כל הסשן</div>
+    <button class="zbtn" id="zout">−</button>
+  </div>
+  <button class="cal-btn need" id="calBtn">⚙ כיול זליגה</button>
+</div>
+
+<div class="main">
+  <div class="ruler-wrap">
+    <div class="ruler-ctrl">זמן</div>
+    <div class="ruler-scroll" id="rScroll"><canvas class="rcv" id="rCv"></canvas></div>
+  </div>
+  <div class="tracks-area">
+    <div class="ctrl-col"><div class="ctrl-inner" id="ci"></div></div>
+    <div class="wave-col" id="wc"><div class="wave-inner" id="wi"><div class="playhead" id="ph"></div></div></div>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="t-time" id="clk">0:00</div>
+  <div class="tkeys">
+    <button class="tkey" id="kStop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg><span>STOP</span></button>
+    <button class="tkey play-k" id="kPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
+    <button class="tkey rec-k" id="kRec"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>REC</span></button>
+  </div>
+  <button class="ai-btn" id="aiBtn">✦<span>AI</span></button>
+</div>
+
+<!-- CALIBRATION -->
+<div class="cal-overlay" id="calOv">
+  <h2>כיול זליגת קליק</h2>
+  <p id="calDesc">פעם אחת בלבד. חבר אוזניות, שב בשקט 10 שניות — נלמד את טביעת הדליפה של הטלפון שלך ונחסר אותה מכל הקלטה.</p>
+  <div class="cal-ring"><div class="fill" id="calFill"></div><div class="lbl" id="calLbl">10</div></div>
+  <button class="cal-go" id="calGo">התחל כיול</button>
+  <div class="cal-result" id="calRes"></div>
+  <button class="cal-skip" id="calSkip">דלג (לא מומלץ)</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<audio id="backingEl" playsinline></audio>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════════ */
+const TOTAL=300;
+const COLORS=['#e8624a','#4a9eca','#5ab870','#9b7fd4','#e8a44a','#4ac4b8'];
+const NAMES=['ערוץ 1','ערוץ 2','ערוץ 3','ערוץ 4','ערוץ 5','Pro ✦'];
+const CLICK_FREQS=[900,1350];   // [10] v2.4 — "טוק-עץ": אמצע-תדר, לא חד
+const CLICK_BURST=0.040, TPL_LEN_S=0.090;   // [7] v2.3 — חזרה ל-90ms המוכח (cancel-proof)
+const CAL_INTERVAL=0.5;        // [1] קצב קבוע לכיול (=120BPM). הטביעה תלוית-קליק לא תלוית-קצב.
+const FREE_LIMIT=4;
+
+/* ── TEMP flags ── */
+const DEV_RESET=false;         // [3] TEMP — אם מדליקים לבדיקה, להחזיר ל-false ל-production
+const LIVE_WAVE=false;         // [6] v2.3 — כובה: חשוד עיקרי לקרכצים (WebAudio בזמן capture)
+const DB_NAME='laylo-studio-v2'; // [3] שם חדש = לא נטענת טביעה ישנה (EC-on, פסולה תחת EC-off)
+
+/* [2] כיבוי עיבוד מיק — קריטי לאמינות החיסור (AGC ישנה gain → זליגה לא קבועה) */
+const MIC_CONSTRAINTS={audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false,channelCount:1}};
+
+/* ════════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════════ */
+const tracks=[];   // {id,name,buffer:AudioBuffer|null,dur,offset,seed}
+const state=[];    // {recTarget,hear}
+for(let i=0;i<6;i++){
+  tracks.push({id:i,name:NAMES[i],buffer:null,dur:0,offset:0,seed:(i+1)*97});
+  state.push({recTarget:i===0,hear:true});
+}
+let bpm=80, clickOn=true;
+let playing=false, recording=false;
+let posSec=0, rafId=null, rafLast=0;
+let pxPerSec=1, zi=0;
+let leakFingerprint=null;       // Float32Array — טביעת דליפה מהכיול
+let fpSampleRate=48000;
+let audioCtx=null;              // לדה-קוד + נגינה בלבד (לא בזמן capture)
+let activeSources=[];           // מקורות נגינה פעילים
+let playMaster=null, playLimiter=null; // [4] שרשרת מאסטר לנגינה (soft-limiter)
+let mediaStream=null, mediaRec=null, recChunks=[];
+let recClickPeriod=60/80;       // [1] קצב הקליק בזמן ההקלטה — לחיסור מדויק
+
+/* [6] גל חי */
+let liveCtx=null, liveAnalyser=null, liveSrc=null, liveBuf=null, livePeaks=[], liveTarget=-1;
+
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ════════════════════════════════════════════════════════════════
+   AUDIO CTX
+   ════════════════════════════════════════════════════════════════ */
+function getCtx(){
+  if(!audioCtx||audioCtx.state==='closed')
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CLICK + BACKING WAV
+   ════════════════════════════════════════════════════════════════ */
+/* [1] periodSec אופציונלי — אם לא ניתן, ברירת מחדל = קצב הסשן 60/bpm */
+/* [10] v2.4 — קליק "טוק-עץ": פונדמנטל 900Hz + פרטיאל 1350Hz, דעיכה מהירה
+   (~10ms) → רך לאוזן, נבדל מהבס, וקל ל-cancel. שמש גם בכיול וגם בנגינה. */
+function tokWave(t){
+  const env=Math.exp(-t*180);   // [12] v2.6 — דעיכה 380→180 (~20ms): יותר אנרגיה לטביעה נקייה, עדיין "טוק"
+  return env*(Math.sin(2*Math.PI*900*t)+0.5*Math.sin(2*Math.PI*1350*t))/1.5;
+}
+function clickSamples(sr,durSec,periodSec){
+  const n=Math.floor(sr*durSec), buf=new Float32Array(n);
+  const period=periodSec||(60/bpm);
+  for(let c=0;c*period<durSec;c++){
+    const start=Math.floor(c*period*sr), len=Math.floor(CLICK_BURST*sr);
+    for(let i=0;i<len;i++){
+      if(start+i<n) buf[start+i]+=0.60*tokWave(i/sr);   // [12] 0.40→0.60: זליגה מעל הרעש → טביעה נקייה
+    }
+  }
+  return buf;
+}
+/* [4] soft-clip במקום hard-clip — מונע קרצ'ים בסכימה */
+function softClip(x){ return Math.tanh(x); }
+/* רנדור backing = ערוצים שנשמעים (hear, לפי offset) + קליק */
+function renderBacking(durSec, includeClick){
+  const sr=fpSampleRate;
+  const n=Math.floor(sr*durSec);
+  const mix=new Float32Array(n);
+  // ערוצים — מכבדים offset [+]
+  tracks.forEach((t,i)=>{
+    if(!t.buffer||!state[i].hear)return;
+    const ch=t.buffer.getChannelData(0);
+    const ratio=t.buffer.sampleRate/sr;
+    const off=Math.floor((t.offset||0)*sr);
+    const clipLen=Math.floor(t.buffer.duration*sr);
+    for(let j=0;j<clipLen;j++){
+      const dst=off+j; if(dst<0)continue; if(dst>=n)break;
+      const srcIdx=Math.floor(j*ratio);
+      if(srcIdx<ch.length) mix[dst]+=ch[srcIdx]*0.8; // [4] gain-stage
+    }
+  });
+  // קליק (קצב הסשן)
+  if(includeClick && clickOn){
+    const clk=clickSamples(sr,durSec);
+    for(let j=0;j<n;j++) mix[j]+=clk[j];
+  }
+  // [4] soft limiter
+  for(let j=0;j<n;j++) mix[j]=softClip(mix[j]);
+  return encodeWav(mix,sr);
+}
+function encodeWav(samples,sr){
+  const n=samples.length,bytes=n*2,ab=new ArrayBuffer(44+bytes),v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+bytes,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+  v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,bytes,true);
+  let o=44;for(let i=0;i<n;i++){let x=clamp(samples[i],-1,1);v.setInt16(o,x<0?x*0x8000:x*0x7fff,true);o+=2;}
+  return new Blob([ab],{type:'audio/wav'});
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DSP — Goertzel + חיסור טביעה (כמו cancel-proof שהוכח)
+   ════════════════════════════════════════════════════════════════ */
+function goertzel(x,sr,f){
+  const w=2*Math.PI*f/sr,c=2*Math.cos(w);let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s0=x[i]+c*s1-s2;s2=s1;s1=s0;}
+  return Math.max(s1*s1+s2*s2-c*s1*s2,0)/x.length;
+}
+function bleedDb(x,sr){
+  const b=CLICK_FREQS.reduce((a,f)=>a+goertzel(x,sr,f),0)/CLICK_FREQS.length;
+  const r=([600,2000]).reduce((a,f)=>a+goertzel(x,sr,f),0)/2;  // [10] רחוק מ-900/1350
+  return 10*Math.log10((b+1e-12)/(r+1e-12));
+}
+function syntheticTpl(sr){
+  const len=Math.floor(CLICK_BURST*sr),t=new Float32Array(len);
+  for(let i=0;i<len;i++) t[i]=tokWave(i/sr);   // [10] תואם בדיוק לקליק שמתנגן
+  return t;
+}
+function refinePeak(x,tpl,center,radius){
+  let best=-Infinity,pos=center;
+  const lo=Math.max(0,center-radius),hi=Math.min(x.length-tpl.length,center+radius);
+  for(let p=lo;p<=hi;p++){let dot=0,en=0;
+    for(let i=0;i<tpl.length;i++){const xv=x[p+i];dot+=xv*tpl[i];en+=xv*xv;}
+    const sc=dot/Math.sqrt(en+1e-12);if(sc>best){best=sc;pos=p;}}
+  return pos;
+}
+/* [1][11] v2.5 — מאתר-קליקים דטרמיניסטי על רשת קבועה.
+   הקליקים יושבים על רשת ידועה (כל 'interval'). מוצאים היסט גלובלי פעם אחת,
+   ואז כל קליק = רשת + כיוונון מקומי ±6ms בלבד. לא סוחף, לא סופר כפול
+   (הבאג שנתן 23 מופעים → טביעת-זבל → אפס מחיקה). */
+function findClicks(x,sr,tpl,interval){
+  const intS=interval*sr;
+  // היסט גלובלי: חיפוש רחב לקליק החזק ביותר בתוך ~interval הראשון
+  const wide=Math.round(Math.min(0.6,interval*1.1)*sr);
+  const anchor=refinePeak(x,tpl,Math.round(Math.min(0.3,interval*0.5)*sr),wide);
+  const localRad=Math.round(0.006*sr); // ±6ms סביב הרשת — מספיק לסחיפה, לא מספיק לקפוץ
+  const out=[];
+  for(let k=0;;k++){
+    const grid=Math.round(anchor+k*intS);
+    if(grid>x.length-tpl.length)break;
+    out.push(refinePeak(x,tpl,grid,localRad));
+  }
+  for(let k=1;;k++){
+    const grid=Math.round(anchor-k*intS);
+    if(grid<0)break;
+    out.unshift(refinePeak(x,tpl,grid,localRad));
+  }
+  return out;
+}
+function avgAt(x,positions,len){
+  const acc=new Float32Array(len);let n=0;
+  positions.forEach(p=>{if(p+len<=x.length){for(let i=0;i<len;i++)acc[i]+=x[p+i];n++;}});
+  if(n)for(let i=0;i<len;i++)acc[i]/=n;
+  return acc;
+}
+/* [7] Biquad notch — בלוק בנייה. */
+function biquadNotch(signal,sr,freq,Q){
+  const w0=2*Math.PI*freq/sr,alpha=Math.sin(w0)/(2*Q),c=Math.cos(w0);
+  const b0=1,b1=-2*c,b2=1,a0=1+alpha,a1=-2*c,a2=1-alpha;
+  const nb0=b0/a0,nb1=b1/a0,nb2=b2/a0,na1=a1/a0,na2=a2/a0;
+  const out=new Float32Array(signal.length);
+  let x1=0,x2=0,y1=0,y2=0;
+  for(let i=0;i<signal.length;i++){
+    const x0=signal[i],y0=nb0*x0+nb1*x1+nb2*x2-na1*y1-na2*y2;
+    out[i]=y0;x2=x1;x1=x0;y2=y1;y1=y0;
+  }
+  return out;
+}
+function notchClickFreqs(signal,sr){
+  let s=signal;
+  CLICK_FREQS.forEach(f=>{s=biquadNotch(s,sr,f,30);});
+  return s;
+}
+/* [8] v2.2 — notch ממוקד-בזמן (טכניקת Avid): מסנן רק בחלון ±12ms סביב כל
+   קליק, עם crossfade חלק (Hann). הכלי נשאר נגוע *רק* בנקודות הקליק, ובלי
+   ה-pk-pk שה-notch הגלובלי יצר. שאר ההקלטה = מקור נקי, לא נגוע. */
+function timeGatedNotch(mono,sr,positions){
+  if(!positions.length) return mono;
+  const notched=notchClickFreqs(mono,sr);      // אות מסונן רציף (בלי דיסקונטינואיות)
+  const out=mono.slice(0);
+  const clickLen=Math.floor(CLICK_BURST*sr);
+  const pad=Math.floor(0.012*sr);
+  positions.forEach(p=>{
+    const start=Math.max(0,p-pad), end=Math.min(out.length,p+clickLen+pad), L=end-start;
+    if(L<4)return;
+    for(let i=0;i<L;i++){
+      const w=0.5-0.5*Math.cos(2*Math.PI*i/(L-1)); // 0 בקצוות, 1 באמצע
+      const idx=start+i;
+      out[idx]=(1-w)*mono[idx]+w*notched[idx];
+    }
+  });
+  return out;
+}
+/* חיסור טביעה — מחזיר {out, positions}. interval = קצב ההקלטה */
+function subtractLeak(mono,sr,interval){
+  if(!leakFingerprint)return {out:mono,positions:[]};
+  const tpl=leakFingerprint;
+  const positions=findClicks(mono,sr,tpl.subarray(0,Math.floor(CLICK_BURST*sr)),interval);
+  const out=mono.slice(0);
+  positions.forEach(p=>{
+    if(p+tpl.length>out.length)return;
+    let dot=0,en=0;
+    for(let i=0;i<tpl.length;i++){dot+=out[p+i]*tpl[i];en+=tpl[i]*tpl[i];}
+    const a=dot/(en+1e-12);
+    for(let i=0;i<tpl.length;i++)out[p+i]-=a*tpl[i];
+  });
+  console.log('// DBG חיסור:',positions.length,'קליקים נוקו (interval',interval.toFixed(3)+'s)'); // DBG
+  return {out,positions};
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RECORD CORE
+   ════════════════════════════════════════════════════════════════ */
+function pickMime(){
+  for(const m of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'])
+    if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;
+  return '';
+}
+async function startRecording(){
+  const ti=state.findIndex(s=>s.recTarget);
+  if(ti<0){toast('בחר ערוץ יעד (⬤)');return false;}
+
+  recClickPeriod=60/bpm;   // [1] נשמר לחיסור מדויק בקצב ההקלטה
+
+  // 1) getUserMedia ראשון — לפני כל output. [2] בלי EC/AGC/NS
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+  }catch(e){ toast('מיקרופון נדחה — בדוק הרשאות'); return false; }
+
+  // 2) backing דרך <audio> בלבד
+  const backingBlob=renderBacking(TOTAL, true);
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(backingBlob);
+  el.currentTime=0;
+  try{ await el.play(); }catch(e){}
+
+  // 3) הקלטה
+  const mime=pickMime();
+  mediaRec=new MediaRecorder(mediaStream,mime?{mimeType:mime}:undefined);
+  recChunks=[];
+  mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data);};
+  mediaRec.onstop=()=>finalizeRecording(ti,mime);
+  mediaRec.start();
+
+  // [6] גל חי — AnalyserNode על הקלט בלבד (לא מחובר ל-destination → לא מנגן)
+  if(LIVE_WAVE) startLiveWave(ti);
+  return true;
+}
+async function stopRecording(){
+  if(LIVE_WAVE) stopLiveWave();           // [6] לפני stop כדי לשחרר את הזרם נקי
+  if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop();
+  $('#backingEl').pause();
+  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+}
+async function finalizeRecording(ti,mime){
+  const blob=new Blob(recChunks,{type:mime||'audio/webm'});
+  const ctx=getCtx();
+  let audio;
+  try{ audio=await ctx.decodeAudioData(await blob.arrayBuffer()); }
+  catch(e){ toast('שגיאת פענוח הקלטה'); return; }
+  fpSampleRate=audio.sampleRate;
+  let mono=audio.getChannelData(0).slice(0);
+
+  // ── חיסור הזליגה (cancel בלבד, ללא notch) — interval = קצב ההקלטה [1] ──
+  const before=bleedDb(mono,audio.sampleRate);
+  if(leakFingerprint){
+    const sub=subtractLeak(mono,audio.sampleRate,recClickPeriod); // [8 v2.3] notch הוסר — הוא יצר את ה-bass-dum
+    mono=sub.out;
+    const after=bleedDb(mono,audio.sampleRate);
+    console.log(`// DBG זליגה לפני ${before.toFixed(1)}dB → אחרי ${after.toFixed(1)}dB`); // DBG
+    toast(`ערוץ ${ti+1} נוקה · −${(before-after).toFixed(0)}dB זליגה`);
+  }else{
+    toast(`ערוץ ${ti+1} הוקלט · ⚠ ללא כיול`);
+  }
+
+  const clean=ctx.createBuffer(1,mono.length,audio.sampleRate);
+  clean.getChannelData(0).set(mono);
+  tracks[ti].buffer=clean;
+  tracks[ti].dur=Math.round(mono.length/audio.sampleRate);
+  tracks[ti].offset=tracks[ti].offset||0;
+  await persist();
+  build();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   [6] LIVE WAVE — input-only analyser. ⚠ WebAudio בזמן capture.
+   ════════════════════════════════════════════════════════════════ */
+function startLiveWave(ti){
+  try{
+    liveCtx=new (window.AudioContext||window.webkitAudioContext)();
+    liveSrc=liveCtx.createMediaStreamSource(mediaStream);
+    liveAnalyser=liveCtx.createAnalyser(); liveAnalyser.fftSize=1024;
+    liveSrc.connect(liveAnalyser);          // ← לא מחובר ל-destination בכוונה
+    liveBuf=new Float32Array(liveAnalyser.fftSize);
+    livePeaks=[]; liveTarget=ti;
+    let cv=$('#liveCv');
+    if(!cv){cv=document.createElement('canvas');cv.id='liveCv';cv.className='live-cv';$('#wi').appendChild(cv);}
+    const H=Math.max(20,( $('#row'+ti)? $('#row'+ti).offsetHeight:62)-12);
+    cv.height=H; cv.style.height=H+'px';
+    cv.style.top=(ti*62+6)+'px';
+    cv.width=Math.max(2,Math.ceil(TOTAL*pxPerSec)); cv.style.width=cv.width+'px';
+  }catch(e){ console.log('// DBG live wave off',e); liveAnalyser=null; }
+}
+function drawLiveWave(){
+  if(!liveAnalyser)return;
+  liveAnalyser.getFloatTimeDomainData(liveBuf);
+  let peak=0; for(let k=0;k<liveBuf.length;k++){const a=Math.abs(liveBuf[k]); if(a>peak)peak=a;}
+  livePeaks.push(peak);
+  const cv=$('#liveCv'); if(!cv)return;
+  const c=cv.getContext('2d'), H=cv.height;
+  const x=Math.max(1,Math.floor(posSec*pxPerSec));
+  c.clearRect(0,0,cv.width,H);
+  c.strokeStyle=COLORS[liveTarget]; c.lineWidth=1.5;
+  for(let p=0;p<livePeaks.length;p++){
+    const px=Math.floor(p/livePeaks.length*x);
+    const h=clamp(livePeaks[p],0,1)*H*0.45;
+    c.beginPath(); c.moveTo(px,H/2-h); c.lineTo(px,H/2+h); c.stroke();
+  }
+}
+function stopLiveWave(){
+  try{ if(liveSrc)liveSrc.disconnect(); if(liveAnalyser)liveAnalyser.disconnect();
+       if(liveCtx&&liveCtx.state!=='closed')liveCtx.close(); }catch(e){}
+  liveCtx=liveAnalyser=liveSrc=liveBuf=null; livePeaks=[]; liveTarget=-1;
+  const cv=$('#liveCv'); if(cv)cv.remove();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CALIBRATION — [1] קצב קבוע CAL_INTERVAL, [2] בלי EC/AGC/NS
+   ════════════════════════════════════════════════════════════════ */
+async function runCalibration(){
+  $('#calRes').textContent='';
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS); // [2]
+  }catch(e){ $('#calRes').textContent='מיקרופון נדחה'; return; }
+
+  const sr0=48000;
+  const CAL_SECS=10;   // [12] v2.6 — 5→10ש (~20 קליקים) → ממוצע טביעה נקי יותר → חיסור עמוק יותר
+  const clickBlob=encodeWav(clickSamples(sr0,CAL_SECS,CAL_INTERVAL),sr0); // [1] קצב קבוע
+  const el=$('#backingEl');
+  el.src=URL.createObjectURL(clickBlob); el.currentTime=0;
+  try{ await el.play(); }catch(e){}
+
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+  const chunks=[]; rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const done=new Promise(res=>rec.onstop=res);
+  rec.start();
+  for(let s=CAL_SECS;s>=1;s--){ setCalProgress((CAL_SECS-s)/CAL_SECS*100, s); await wait(1000); }
+  setCalProgress(100,'•');
+  rec.stop(); await done;
+  el.pause(); stream.getTracks().forEach(t=>t.stop());
+
+  const ctx=getCtx();
+  const audio=await ctx.decodeAudioData(await new Blob(chunks,{type:mime||'audio/webm'}).arrayBuffer());
+  fpSampleRate=audio.sampleRate;
+  const mono=audio.getChannelData(0);
+  const tplLen=Math.floor(TPL_LEN_S*audio.sampleRate);
+  // [1] כל החיפושים בקצב CAL_INTERVAL
+  let pos=findClicks(mono,audio.sampleRate,syntheticTpl(audio.sampleRate),CAL_INTERVAL);
+  let tpl=avgAt(mono,pos,tplLen);
+  pos=findClicks(mono,audio.sampleRate,tpl.subarray(0,Math.floor(CLICK_BURST*audio.sampleRate)),CAL_INTERVAL);
+  tpl=avgAt(mono,pos,tplLen);
+  // [9] v2.3 — דעיכת זנב הטביעה ל-0 (Hann על 40% האחרונים). מונע "מדרגה"
+  //   בחיסור → סיבה שנייה לקרכצים. החיסור עכשיו לא יוצר קצה חד.
+  const fade=Math.floor(tpl.length*0.4);
+  for(let i=0;i<fade;i++){const w=0.5+0.5*Math.cos(Math.PI*i/fade);tpl[tpl.length-fade+i]*=w;}
+  leakFingerprint=tpl;
+  const db=bleedDb(mono,audio.sampleRate);
+  console.log('// DBG כיול:',pos.length,'מופעים, רמה',db.toFixed(1),'dB'); // DBG
+
+  await persist();
+  $('#calRes').textContent=`✓ נלכדו ${pos.length} מופעים · רמת זליגה ${db.toFixed(1)}dB`;
+  $('#calBtn').className='cal-btn done'; $('#calBtn').textContent='✓ מכויל';
+  setTimeout(()=>{ $('#calOv').classList.remove('open'); toast('כיול הושלם — הקלטות ינוקו אוטומטית'); },1400);
+}
+function setCalProgress(pct,lbl){
+  $('#calFill').style.setProperty('--p',pct+'%');
+  $('#calLbl').textContent=lbl;
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ════════════════════════════════════════════════════════════════
+   PERSISTENCE — IndexedDB
+   ════════════════════════════════════════════════════════════════ */
+let db=null;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+    };
+    r.onsuccess=e=>{db=e.target.result;res();};
+    r.onerror=e=>rej(e);
+  });
+}
+function dbPut(k,v){return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);
+  tx.oncomplete=res;tx.onerror=rej;});}
+function dbGet(k){return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readonly');const r=tx.objectStore('kv').get(k);
+  r.onsuccess=()=>res(r.result);r.onerror=rej;});}
+async function persist(){
+  if(leakFingerprint) await dbPut('fp',{sr:fpSampleRate,data:Array.from(leakFingerprint)});
+  const tdata=tracks.map(t=>t.buffer?{
+    dur:t.dur,sr:t.buffer.sampleRate,offset:t.offset||0,data:Array.from(t.buffer.getChannelData(0))
+  }:null);
+  await dbPut('tracks',tdata);
+  await dbPut('meta',{bpm,clickOn,state});
+}
+async function restore(){
+  const fp=await dbGet('fp');
+  if(fp){leakFingerprint=Float32Array.from(fp.data);fpSampleRate=fp.sr;
+    $('#calBtn').className='cal-btn done';$('#calBtn').textContent='✓ מכויל';}
+  const meta=await dbGet('meta');
+  if(meta){bpm=meta.bpm||80;clickOn=meta.clickOn!==false;
+    if(meta.state)meta.state.forEach((s,i)=>{if(state[i])Object.assign(state[i],s);});
+    $('#bv').textContent=bpm;$('#ck').classList.toggle('on',clickOn);}
+  const td=await dbGet('tracks');
+  if(td){const ctx=getCtx();
+    td.forEach((t,i)=>{if(t){const b=ctx.createBuffer(1,t.data.length,t.sr);
+      b.getChannelData(0).set(Float32Array.from(t.data));
+      tracks[i].buffer=b;tracks[i].dur=t.dur;tracks[i].offset=t.offset||0;}});}
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PLAYBACK — WebAudio (רק בנגינה). [4] master+limiter, [+] offset
+   ════════════════════════════════════════════════════════════════ */
+function startPlayback(fromSec){
+  const ctx=getCtx();
+  if(ctx.state==='suspended')ctx.resume();
+  stopSources();
+  // [4] שרשרת מאסטר: gain → compressor(limiter) → destination
+  playMaster=ctx.createGain(); playMaster.gain.value=0.85;
+  playLimiter=ctx.createDynamicsCompressor();
+  playLimiter.threshold.value=-6; playLimiter.knee.value=6; playLimiter.ratio.value=12;
+  playLimiter.attack.value=0.003; playLimiter.release.value=0.25;
+  playMaster.connect(playLimiter); playLimiter.connect(ctx.destination);
+
+  const t0=ctx.currentTime+0.05;
+  tracks.forEach((t,i)=>{
+    if(!t.buffer||!state[i].hear)return;
+    const off=t.offset||0, dur=t.buffer.duration;
+    let when=t0, bufStart=0;
+    if(fromSec<off){ when=t0+(off-fromSec); bufStart=0; }       // [+] עוד לא הגענו לקליפ
+    else { bufStart=fromSec-off; if(bufStart>=dur)return; }     // [+] באמצע הקליפ
+    const src=ctx.createBufferSource();src.buffer=t.buffer;
+    src.connect(playMaster);
+    src.start(when, Math.min(bufStart,dur));
+    activeSources.push(src);
+  });
+  if(clickOn){
+    const clk=ctx.createBuffer(1,Math.floor(ctx.sampleRate*TOTAL),ctx.sampleRate);
+    clk.getChannelData(0).set(clickSamples(ctx.sampleRate,TOTAL)); // קצב הסשן
+    const src=ctx.createBufferSource();src.buffer=clk;src.connect(playMaster);
+    src.start(t0,fromSec);activeSources.push(src);
+  }
+}
+function stopSources(){
+  activeSources.forEach(s=>{try{s.stop();}catch(e){}});activeSources=[];
+  try{ if(playMaster)playMaster.disconnect(); if(playLimiter)playLimiter.disconnect(); }catch(e){}
+  playMaster=playLimiter=null;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI BUILD (timeline-v3) — [+] clip wrapper לגרירה
+   ════════════════════════════════════════════════════════════════ */
+function drawWaveBuf(cv,buffer,px,col,H){
+  const dur=buffer.duration;
+  const W=Math.max(4,Math.floor(dur*px));
+  cv.width=W;cv.height=H||50;cv.style.width=W+'px';
+  const ctx=cv.getContext('2d'),data=buffer.getChannelData(0);
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;
+  const step=Math.max(1,Math.floor(data.length/W));
+  for(let x=0;x<W;x++){
+    let mn=1,mx=-1;const s0=x*step;
+    for(let k=0;k<step;k++){const v=data[s0+k]||0;if(v<mn)mn=v;if(v>mx)mx=v;}
+    ctx.beginPath();ctx.moveTo(x,cv.height/2-mx*cv.height*.45);
+    ctx.lineTo(x,cv.height/2-mn*cv.height*.45);ctx.stroke();
+  }
+}
+function drawRuler(){
+  const W=Math.ceil(TOTAL*pxPerSec),cv=$('#rCv');
+  cv.width=W;cv.height=24;cv.style.width=W+'px';
+  const ctx=cv.getContext('2d');ctx.clearRect(0,0,W,24);
+  const step=pxPerSec>40?5:pxPerSec>15?10:pxPerSec>6?30:60;
+  ctx.font='600 9px SF Mono,monospace';
+  for(let s=0;s<=TOTAL;s+=step){const x=s*pxPerSec;
+    ctx.fillStyle='#cdc6b8';ctx.fillRect(x,16,1,8);
+    const m=Math.floor(s/60),sc=s%60;ctx.fillStyle='#a09282';
+    ctx.fillText(m+':'+(sc<10?'0':'')+sc,x+2,13);}
+}
+function build(){
+  const wcEl=$('#wc');
+  const totalW=Math.max(wcEl.offsetWidth||300,Math.ceil(TOTAL*pxPerSec));
+  const totalH=tracks.length*62;
+  const wi=$('#wi');wi.style.width=totalW+'px';wi.style.height=totalH+'px';
+  $('#ph').style.height=totalH+'px';
+  const ci=$('#ci');ci.style.height=totalH+'px';ci.innerHTML='';
+  document.querySelectorAll('.ch-row').forEach(e=>e.remove());
+  const lcv=$('#liveCv'); if(lcv&&!recording)lcv.remove();
+
+  tracks.forEach((t,i)=>{
+    const s=state[i],col=COLORS[i],empty=!t.buffer,pro=i>=FREE_LIMIT;
+    const ctrl=document.createElement('div');
+    ctrl.className='ch-ctrl t'+i+(empty?' empty':'');
+    ctrl.id='ctrl'+i;ctrl.style.setProperty('--tc',col);
+    ctrl.innerHTML=`<div class="accent-bar"></div>
+      <div class="ch-num" style="background:${col}">${i+1}</div>
+      <div class="ch-meta"><div class="ch-name-txt">${t.name}</div></div>
+      <div class="ch-btns">
+        <div class="rec-target${s.recTarget?' on':''}" id="rt${i}"></div>
+        <div class="hear-btn${s.hear?' on':' off'}" id="hb${i}">🔊</div>
+      </div>`;
+    ci.appendChild(ctrl);
+    ctrl.querySelector('.rec-target').addEventListener('click',e=>{
+      e.stopPropagation();state.forEach((ss,ii)=>{ss.recTarget=(ii===i);syncCtrl(ii);});persist();});
+    ctrl.querySelector('.hear-btn').addEventListener('click',e=>{
+      e.stopPropagation();s.hear=!s.hear;syncCtrl(i);persist();});
+
+    const row=document.createElement('div');
+    row.className='ch-row t'+i+(empty?' empty-row':'')+(s.recTarget?' rec-row':'')+(!s.hear?' muted-row':'');
+    row.id='row'+i;row.style.cssText=`top:${i*62}px;width:${totalW}px;`;
+    row.style.setProperty('--tc',col);
+    if(!empty){
+      const clip=document.createElement('div');clip.className='clip';
+      clip.style.left=((t.offset||0)*pxPerSec)+'px';
+      clip.style.width=Math.max(4,t.buffer.duration*pxPerSec)+'px';
+      const cv=document.createElement('canvas');clip.appendChild(cv);
+      row.appendChild(clip);
+      requestAnimationFrame(()=>drawWaveBuf(cv,t.buffer,pxPerSec,col,row.offsetHeight-12||50));
+      attachClipDrag(clip,row,i); // [+]
+    }else{
+      const el=document.createElement('div');el.className='empty-lbl';
+      el.textContent=pro?'★ Laylo Pro':'ריק — בחר ⬤ והקלט';row.appendChild(el);
+    }
+    wi.appendChild(row);
+    // tap על אזור ריק/רקע = seek (גרירה מטופלת בנפרד ב-clip)
+    row.addEventListener('click',e=>{
+      if(e.target.closest('.clip'))return; // קליק על קליפ מטופל ב-attachClipDrag
+      const rect=row.getBoundingClientRect();
+      const x=e.clientX-rect.left+wcEl.scrollLeft;seekTo(x/pxPerSec);});
+  });
+  drawRuler();updateZLbl();
+}
+function syncCtrl(i){
+  const s=state[i];
+  const rt=$('#rt'+i);if(rt)rt.classList.toggle('on',s.recTarget);
+  const hb=$('#hb'+i);if(hb){hb.classList.toggle('on',s.hear);hb.classList.toggle('off',!s.hear);}
+  const row=$('#row'+i);if(row){row.classList.toggle('rec-row',s.recTarget);row.classList.toggle('muted-row',!s.hear);}
+}
+
+/* ════════════════════════════════════════════════════════════════
+   [+] CLIP DRAG — long-press (250ms) להרים → גרירה אופקית → snap
+   לפני ה-long-press: tap = seek, גרירה אופקית = scroll רגיל של ה-timeline
+   ════════════════════════════════════════════════════════════════ */
+function attachClipDrag(clip,row,i){
+  let holdT=null, picked=false, startX=0, startOffset=0, moved=0, pid=null;
+  const PX=()=>pxPerSec;
+  clip.addEventListener('pointerdown',e=>{
+    if(recording)return;
+    pid=e.pointerId; startX=e.clientX; startOffset=tracks[i].offset||0; moved=0; picked=false;
+    holdT=setTimeout(()=>{ picked=true; clip.classList.add('picked');
+      try{clip.setPointerCapture(pid);}catch(_){}}, 250);
+  });
+  clip.addEventListener('pointermove',e=>{
+    if(pid!==e.pointerId)return;
+    const dx=e.clientX-startX; moved=Math.max(moved,Math.abs(dx));
+    if(!picked){ if(moved>8){clearTimeout(holdT);} return; } // לפני הרמה — תן ל-scroll/seek
+    e.preventDefault();
+    const dur=tracks[i].buffer?tracks[i].buffer.duration:0;
+    let off=clamp(startOffset+dx/PX(),0,TOTAL-dur);
+    tracks[i].offset=off;
+    clip.style.left=(off*PX())+'px';
+  });
+  const endDrag=e=>{
+    if(pid!==e.pointerId)return; clearTimeout(holdT);
+    if(picked){
+      picked=false; clip.classList.remove('picked');
+      // snap ל-0.05s
+      tracks[i].offset=Math.round((tracks[i].offset||0)/0.05)*0.05;
+      clip.style.left=((tracks[i].offset)*PX())+'px';
+      persist();
+      toast(`ערוץ ${i+1} · ${tracks[i].offset.toFixed(2)}s`);
+    } else if(moved<6){
+      // tap על הקליפ = seek
+      const wcEl=$('#wc'),rect=row.getBoundingClientRect();
+      const x=e.clientX-rect.left+wcEl.scrollLeft; seekTo(x/PX());
+    }
+    pid=null;
+  };
+  clip.addEventListener('pointerup',endDrag);
+  clip.addEventListener('pointercancel',endDrag);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PLAYHEAD + TRANSPORT
+   ════════════════════════════════════════════════════════════════ */
+function seekTo(sec){posSec=clamp(sec,0,TOTAL);updatePH();}
+function updatePH(){
+  const x=posSec*pxPerSec;$('#ph').style.left=x+'px';
+  const m=Math.floor(posSec/60),s=Math.floor(posSec%60);
+  $('#clk').textContent=m+':'+String(s).padStart(2,'0');
+  const wcEl=$('#wc'),vw=wcEl.offsetWidth;
+  if(playing&&(x>wcEl.scrollLeft+vw-30||x<wcEl.scrollLeft)){
+    wcEl.scrollLeft=Math.max(0,x-vw*.2);$('#rScroll').scrollLeft=wcEl.scrollLeft;}
+}
+function playLoop(ts){
+  if(!playing)return;
+  const dt=(ts-rafLast)/1000;rafLast=ts;posSec=Math.min(TOTAL,posSec+dt);updatePH();
+  if(recording&&LIVE_WAVE) drawLiveWave();   // [6]
+  if(posSec>=TOTAL){stopAll();return;}
+  rafId=requestAnimationFrame(playLoop);
+}
+function stopAll(){
+  playing=false;
+  cancelAnimationFrame(rafId);
+  stopSources();
+  if(recording){recording=false;$('#kRec').classList.remove('on');stopRecording();}
+  $('#kPlay').classList.remove('on');
+}
+$('#kPlay').addEventListener('click',()=>{
+  if(recording)return;
+  playing=!playing;$('#kPlay').classList.toggle('on',playing);
+  if(playing){startPlayback(posSec);rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
+  else{cancelAnimationFrame(rafId);stopSources();}
+});
+$('#kStop').addEventListener('click',stopAll);
+$('#kRec').addEventListener('click',async()=>{
+  if(recording){
+    recording=false;$('#kRec').classList.remove('on');
+    playing=false;$('#kPlay').classList.remove('on');cancelAnimationFrame(rafId);
+    await stopRecording();
+  }else{
+    if(!leakFingerprint){
+      toast('כדאי לכייל קודם — לחץ ⚙ כיול זליגה');
+    }
+    const ok=await startRecording();
+    if(ok){recording=true;$('#kRec').classList.add('on');
+      playing=true;$('#kPlay').classList.add('on');
+      posSec=0;rafLast=performance.now();rafId=requestAnimationFrame(playLoop);}
+  }
+});
+$('#bup').addEventListener('click',()=>{bpm=Math.min(240,bpm+1);$('#bv').textContent=bpm;persist();});
+$('#bdn').addEventListener('click',()=>{bpm=Math.max(40,bpm-1);$('#bv').textContent=bpm;persist();});
+$('#ck').addEventListener('click',()=>{clickOn=!clickOn;$('#ck').classList.toggle('on',clickOn);persist();});
+
+/* ZOOM */
+const ZL=[1,1.5,3,6,12,24,48,96];
+function fitToScreen(){pxPerSec=($('#wc').offsetWidth||300)/TOTAL;}
+function applyZoom(){pxPerSec=ZL[zi];build();
+  const wcEl=$('#wc');wcEl.scrollLeft=Math.max(0,posSec*pxPerSec-wcEl.offsetWidth*.2);
+  $('#rScroll').scrollLeft=wcEl.scrollLeft;updateZLbl();}
+function updateZLbl(){const vw=$('#wc').offsetWidth||300,vis=vw/pxPerSec;
+  if(vis>=TOTAL-5)$('#zlbl').textContent='כל הסשן';
+  else{const m=Math.floor(vis/60),s=Math.floor(vis%60);$('#zlbl').textContent=(m>0?m+'m ':'')+s+'s';}}
+$('#zin').addEventListener('click',()=>{if(zi<ZL.length-1){zi++;applyZoom();}});
+$('#zout').addEventListener('click',()=>{if(zi>0){zi--;applyZoom();}else{fitToScreen();build();updateZLbl();}});
+
+/* CALIBRATION UI */
+$('#calBtn').addEventListener('click',()=>{$('#calOv').classList.add('open');});
+$('#calGo').addEventListener('click',()=>{ $('#calGo').disabled=true; runCalibration().finally(()=>$('#calGo').disabled=false); });
+$('#calSkip').addEventListener('click',()=>$('#calOv').classList.remove('open'));
+
+/* AI placeholder */
+$('#aiBtn').addEventListener('click',()=>toast('טכנאי AI — בקרוב'));
+
+/* scroll sync */
+$('#wc').addEventListener('scroll',()=>{$('#rScroll').scrollLeft=$('#wc').scrollLeft;});
+
+/* toast */
+let toastT=null;
+function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2600);}
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════ */
+async function init(){
+  if(DEV_RESET){ try{ indexedDB.deleteDatabase(DB_NAME); }catch(e){} } // TEMP
+  await openDB();
+  if(!DEV_RESET) await restore();
+  fitToScreen();build();
+  if(!leakFingerprint){ $('#calBtn').className='cal-btn need'; }
+  requestAnimationFrame(()=>{fitToScreen();build();});
+}
+window.addEventListener('load',init);
+window.addEventListener('resize',()=>{if(zi===0)fitToScreen();build();});
+
+/* ════════════════════════════════════════════════════════════════
+   ═══ TEMP / רשימת ניקוי לפני production ═══
+     1. DEV_RESET → ודא false (כבר false)
+     2. LIVE_WAVE → אם בדיקת רגרסיית-זליגה נכשלה, false. אם עברה, אפשר להשאיר.
+     3. כל console.log עם // DBG — למחוק
+     4. (לא בקובץ הזה) /diag/* harnesses — למחוק אחרי אישור
+   ── לא מומש עדיין (מחוץ ל-scope של v2) ──
+     - Click Sync ויזואלי, mix-down/ייצוא master, אכיפת Pro (ערוץ 6),
+       טכנאי AI אמיתי, המרת זמזום→כלי.
+   ════════════════════════════════════════════════════════════════ */
+</script>
+</body>
+</html>
