@@ -341,7 +341,10 @@ $('btnRun').addEventListener('click', async () => {
 
     const taps = parseInt($('selL').value, 10);
     const mu = parseFloat($('selMu').value);
-    const epsilon = 1e-6;
+    const epsilon = 1e-2; // was 1e-6 — far too small for a sparse click reference; caused the
+                            // normalized step size to spike to ~5e5 during silent windows and
+                            // chase ordinary background noise into instability. Verified in
+                            // simulation: 1e-2 fixes it without hurting real bleed removal.
     const maxLag = Math.floor(SR * 0.05);
 
     const lag = findLag(clickBuffer, micRaw, maxLag);
