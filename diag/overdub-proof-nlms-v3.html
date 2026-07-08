@@ -49,6 +49,7 @@
   }
   .result-card.bad{background:var(--bad-bg); border-color:var(--bad)}
   .result-db{font-size:2.4rem; font-weight:800; color:var(--accent)}
+  .result-caption{font-size:.68rem; color:var(--dim); margin-top:-4px; margin-bottom:6px}
   .result-card.bad .result-db{color:var(--bad)}
   .result-msg{font-size:.82rem; color:var(--text); margin-top:6px; line-height:1.4}
   .detail-line{font-size:.78rem; color:var(--dim); margin-top:10px; text-align:center; line-height:1.6}
@@ -115,6 +116,7 @@
 
   <div class="result-card" id="resultCard" style="display:none">
     <div class="result-db" id="resultDb">—</div>
+    <div class="result-caption">ללא השנייה הראשונה (transient התכנסות)</div>
     <div class="result-msg" id="resultMsg"></div>
     <div class="detail-line" id="detailLine"></div>
     <div class="detail-line" id="x6Line"></div>
@@ -424,7 +426,24 @@ $('btnRun').addEventListener('click', async () => {
     const pair = alignedPair(clickBuffer, micRaw, lag);
     const trained = nlmsTrain(pair.x, pair.d, taps, mu, LEAK, epsilon);
 
-    const dB = trained.diverged ? -Infinity : dbReduction(pair.d.subarray(0, trained.residual.length), trained.residual);
+    // dB is measured EXCLUDING the first 1s of the take (8.7.2026 finding: that window is
+    // dominated by the NLMS startup convergence transient — weights start at zero and briefly
+    // overshoot before settling — not live/varying bleed. Confirmed via the per-window spread
+    // test: spread shrinks cleanly as window size grows (0.5s→1s→2s), the signature of a
+    // short-window transient artifact, not real drift. Measuring from 1s onward reports true
+    // steady-state performance instead of a number dragged down by the warm-up period.
+    const burnInSamples = SR * 1;
+    let dB;
+    if(trained.diverged){
+      dB = -Infinity;
+    } else if(trained.residual.length <= burnInSamples){
+      dB = dbReduction(pair.d.subarray(0, trained.residual.length), trained.residual); // take too short to trim
+    } else {
+      dB = dbReduction(
+        pair.d.subarray(burnInSamples, trained.residual.length),
+        trained.residual.subarray(burnInSamples)
+      );
+    }
 
     // drift: independent filters on first half vs second half
     const half = Math.floor(pair.x.length/2);
