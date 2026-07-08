@@ -116,11 +116,15 @@
     <div class="result-db" id="resultDb">—</div>
     <div class="result-msg" id="resultMsg"></div>
     <div class="detail-line" id="detailLine"></div>
+    <div class="detail-line" id="x6Line"></div>
   </div>
 
   <div class="play-row">
     <button class="play-btn" id="btnPlayRaw" disabled>🔊 גלם (עם זליגה)</button>
     <button class="play-btn" id="btnPlayClean" disabled>🔊 נקי (אחרי מחיקה)</button>
+  </div>
+  <div class="play-row">
+    <button class="play-btn" id="btnPlayX6" disabled>🔊 נקי × 6 (הערכה גסה, לא מדידה)</button>
   </div>
 
   <div class="wave-label">גלם — מה שהמיקרופון קלט</div>
@@ -130,6 +134,10 @@
 
   <div class="flag">
     ⚠ קובץ בדיקה זמני. מבחן B אינו תקף למדידת dB (מכיל תוכן חי) — משמש רק להדגמת ניקוי בפועל.
+    <br><br>
+    ⚠ ×6 הוא <b>הערכה גסה</b>, לא מדידה: היסט הזמן (~8ms) וג'יטר העוצמה (±15%) הם מספרים
+    משוערים, לא נמדדו מנתונים אמיתיים. גם לא מודל הפרשי טימבר/תדר בין ערוצים (נצפו בעבר). להחליף
+    במספרים אמיתיים כשיהיו הקלטות "יסודות" דו-ערוציות.
   </div>
 </div>
 
@@ -326,6 +334,32 @@ function playBuffer(samples, sr){
   src.start();
 }
 
+// Simulates summing N independent channels that each carry this same residual bleed pattern —
+// the real-world failure mode per the "almost clean = failure" criterion. Each copy gets a
+// small random sample offset (channels are never perfectly phase-locked in practice) and a
+// small random gain jitter, so this isn't just residual*N — it's closer to how uncorrelated
+// bleed actually stacks.
+// TEMP / PLACEHOLDER — the 8ms offset range and ±15% gain jitter below are an *assumed*
+// approximation, not measured data. Nobody has yet measured how real independent channels
+// actually differ in timing/level once "Yesodot" (2-channel overdub) produces real recordings.
+// This function also only models timing+level differences — it does NOT model timbre/frequency
+// differences between channel bleeds (already observed to vary in practice), so it's a partial
+// approximation even once the numbers below are replaced with measured ones.
+// TODO: once real 2-channel Yesodot recordings exist, replace maxOffset/gain jitter range with
+// values measured from actual alignment data, and reassess whether frequency-domain differences
+// need modeling too before this metric can be trusted as more than a rough first-pass check.
+function simulateChannelSum(residual, copies){
+  const maxOffset = 400; // samples (~8ms @ 48kHz) — ASSUMED, not measured. See TODO above.
+  const n = residual.length + maxOffset;
+  const out = new Float64Array(n);
+  for(let c=0; c<copies; c++){
+    const offset = Math.floor(Math.random()*maxOffset);
+    const gain = 0.85 + Math.random()*0.3; // ±15% level jitter — ASSUMED, not measured. See TODO above.
+    for(let i=0;i<residual.length;i++){ out[i+offset] += residual[i]*gain; }
+  }
+  return out;
+}
+
 // ---------- run ----------
 $('btnRun').addEventListener('click', async () => {
   $('btnRun').disabled = true;
@@ -363,6 +397,11 @@ $('btnRun').addEventListener('click', async () => {
     renderResult({ dB, drift, lag, taps, mu, mode });
 
     lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
+    lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
+    const x6Db = 20*Math.log10(rms(lastRun.cleanX6) + 1e-9);
+    const x1Db = 20*Math.log10(rms(trained.residual) + 1e-9);
+    $('x6Line').textContent = `שארית בודדת: ${x1Db.toFixed(1)}dBFS · הערכה גסה אחרי הכפלה ×6: ${x6Db.toFixed(1)}dBFS`;
+    $('btnPlayX6').disabled = false;
     drawWave($('cRaw'), lastRun.raw);
     drawWave($('cClean'), lastRun.clean);
     $('btnPlayRaw').disabled = false;
@@ -400,6 +439,7 @@ function renderResult({ dB, drift, lag, taps, mu, mode }){
 
 $('btnPlayRaw').addEventListener('click', () => lastRun && playBuffer(lastRun.raw, lastRun.sr));
 $('btnPlayClean').addEventListener('click', () => lastRun && playBuffer(lastRun.clean, lastRun.sr));
+$('btnPlayX6').addEventListener('click', () => lastRun && lastRun.cleanX6 && playBuffer(lastRun.cleanX6, lastRun.sr));
 
 if(DEV_RESET){ console.warn('DEV_RESET is true — must be false before any deploy.'); }
 </script>
