@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overdub Proof · NLMS v4 (Broadband Reference)</title>
+<style>
+  :root{
+    --bg:#ede2cd; --card:#e7dbc0; --line:#cdbd97;
+    --text:#2b2318; --dim:#6b5f47; --accent:#c07f10; --accent-bg:#f3dfb0;
+    --ok-bg:#fbf3e1; --bad-bg:#fbe4e0; --bad:#c0392b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:16px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    max-width:460px; margin-inline:auto;
+  }
+  h1{font-size:1.15rem; margin:4px 0 2px}
+  h1 .accent{color:var(--accent)}
+  .subtitle{color:var(--dim); font-size:.82rem; line-height:1.4; margin-bottom:14px}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:16px; margin-bottom:14px;
+  }
+  .toggle-row{display:flex; gap:8px; margin-bottom:14px}
+  .toggle{
+    flex:1; text-align:center; padding:12px 8px; border-radius:12px;
+    border:2px solid var(--line); background:var(--card); color:var(--text);
+    font-size:.85rem; cursor:pointer;
+  }
+  .toggle.selected{border-color:var(--accent); background:var(--accent-bg); font-weight:600}
+  .select-row{display:flex; gap:10px; margin-bottom:14px}
+  .select-field{flex:1}
+  .select-field label{display:block; font-size:.78rem; color:var(--dim); margin-bottom:4px}
+  select{
+    width:100%; padding:9px 8px; border-radius:10px; border:1px solid var(--line);
+    background:var(--ok-bg); color:var(--text); font-size:.88rem;
+  }
+  .instruction{font-size:.85rem; color:var(--text); line-height:1.5; margin-bottom:14px}
+  .run-btn{
+    width:100%; padding:16px; border:none; border-radius:12px; background:var(--accent);
+    color:#fff; font-size:1rem; font-weight:700; cursor:pointer;
+  }
+  .run-btn:disabled{opacity:.5; cursor:not-allowed}
+  .result-card{
+    background:var(--ok-bg); border:2px solid var(--accent); border-radius:16px;
+    padding:18px; text-align:center; margin-top:14px;
+  }
+  .result-card.bad{background:var(--bad-bg); border-color:var(--bad)}
+  .result-db{font-size:2.4rem; font-weight:800; color:var(--accent)}
+  .result-caption{font-size:.68rem; color:var(--dim); margin-top:-4px; margin-bottom:6px}
+  .result-card.bad .result-db{color:var(--bad)}
+  .result-msg{font-size:.82rem; color:var(--text); margin-top:6px; line-height:1.4}
+  .detail-line{font-size:.78rem; color:var(--dim); margin-top:10px; text-align:center; line-height:1.6}
+  #diagLine{white-space:pre-line; font-family:ui-monospace,monospace; font-size:.7rem; text-align:right}
+  .play-row{display:flex; gap:8px; margin-top:14px}
+  .play-btn{
+    flex:1; padding:10px; border-radius:10px; border:1px solid var(--line);
+    background:var(--card); color:var(--text); font-size:.82rem; cursor:pointer;
+  }
+  .play-btn:disabled{opacity:.45; cursor:not-allowed}
+  .wave-label{font-size:.76rem; color:var(--dim); margin-top:10px; margin-bottom:4px}
+  canvas.wave{
+    width:100%; height:56px; background:var(--ok-bg); border:1px solid var(--line);
+    border-radius:8px; display:block;
+  }
+  .status-line{font-size:.78rem; color:var(--dim); text-align:center; margin-top:8px; min-height:1.2em}
+  .flag{
+    font-size:.72rem; color:#8a6d1f; background:#f6ecd2; border:1px solid #ddc98a;
+    border-radius:8px; padding:8px 10px; margin-top:12px; line-height:1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>Overdub <span class="accent">Proof</span> · NLMS v4</h1>
+<p class="subtitle">
+  רפרנס רחב-פס (קיק+בס+הייהט) במקום קליק צר — בודק אם הפער מול 15.4dB ההיסטורי נובע
+  מרוחב-הפס של הרפרנס. כל שאר הלוגיקה (NLMS, epsilon, leak, יישור) זהה ל-v3.
+</p>
+
+<div class="card">
+  <div class="toggle-row">
+    <div class="toggle selected" id="toggleA">שקט (מדידה) · מבחן A</div>
+    <div class="toggle" id="toggleB">נגן עליו · מבחן B</div>
+  </div>
+
+  <div class="select-row">
+    <div class="select-field">
+      <label>אורך פילטר (L)</label>
+      <select id="selL">
+        <option value="512">512 · ~11ms</option>
+        <option value="1024" selected>1024 · ~21ms</option>
+        <option value="2048">2048 · ~43ms</option>
+        <option value="4096">4096 · ~85ms</option>
+        <option value="8192">8192 · ~171ms</option>
+      </select>
+    </div>
+    <div class="select-field">
+      <label>קצב התכנסות (μ)</label>
+      <select id="selMu">
+        <option value="0.3">0.3 · איטי</option>
+        <option value="0.5" selected>0.5 · ברירת מחדל</option>
+        <option value="0.9">0.9 · מהיר</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="instruction" id="instructionText">
+    חבר אוזניות, שב בשקט, נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק בפועל.
+  </p>
+
+  <button class="run-btn" id="btnRun">▶ הפעל</button>
+  <div class="status-line" id="statusLine"></div>
+
+  <div class="result-card" id="resultCard" style="display:none">
+    <div class="result-db" id="resultDb">—</div>
+    <div class="result-caption">ללא השנייה הראשונה (transient התכנסות)</div>
+    <div class="result-msg" id="resultMsg"></div>
+    <div class="detail-line" id="detailLine"></div>
+    <div class="detail-line" id="x6Line"></div>
+    <div class="detail-line" id="diagLine"></div>
+  </div>
+
+  <div class="play-row">
+    <button class="play-btn" id="btnPlayRaw" disabled>🔊 גלם (עם זליגה)</button>
+    <button class="play-btn" id="btnPlayClean" disabled>🔊 נקי (אחרי מחיקה)</button>
+  </div>
+  <div class="play-row">
+    <button class="play-btn" id="btnPlayX6" disabled>🔊 נקי × 6 (הערכה גסה, לא מדידה)</button>
+  </div>
+
+  <div class="wave-label">גלם — מה שהמיקרופון קלט</div>
+  <canvas class="wave" id="cRaw"></canvas>
+  <div class="wave-label">נקי — אחרי מחיקת הרקע</div>
+  <canvas class="wave" id="cClean"></canvas>
+
+  <div class="flag">
+    ⚠ קובץ בדיקה זמני. מבחן B אינו תקף למדידת dB (מכיל תוכן חי) — משמש רק להדגמת ניקוי בפועל.
+    <br><br>
+    ⚠ v4: השינוי היחיד מ-v3 הוא הרפרנס (רחב-פס במקום קליק). עוצמת מדיה 100% ושאר הלוגיקה
+    זהים ל-v3 בכוונה, כדי שכל הבדל בתוצאה יתייחס אך ורק לרוחב-הפס. להשוות ישירות מול תוצאות
+    v3 (SHA f11608a...), לא למדוד את v4 בבידוד.
+    <br><br>
+    ⚠ ×6 הוא <b>הערכה גסה</b>, לא מדידה: היסט הזמן (~8ms) וג'יטר העוצמה (±15%) הם מספרים
+    משוערים, לא נמדדו מנתונים אמיתיים. גם לא מודל הפרשי טימבר/תדר בין ערוצים (נצפו בעבר). להחליף
+    במספרים אמיתיים כשיהיו הקלטות "יסודות" דו-ערוציות.
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const DEV_RESET = false; // must stay false before any deploy
+
+const SR = 48000;
+const KICK_INTERVAL = 0.5; // seconds — matches the reference used in prior sessions
+const TAKE_DURATION = 5;   // seconds
+const LEAK = 1e-6;         // fixed, safe, always-on — silently prevents the L=4096+ divergence
+                            // seen previously; not exposed in UI to keep this a one-screen tool.
+
+let audioCtx = null;
+let micStream = null;
+let clickBuffer = null;
+let clickBlobUrl = null;
+let mode = 'A';
+let lastRun = null; // {raw, clean, sr}
+
+const $ = (id) => document.getElementById(id);
+
+// ---------- mode toggle ----------
+$('toggleA').addEventListener('click', () => setMode('A'));
+$('toggleB').addEventListener('click', () => setMode('B'));
+function setMode(m){
+  mode = m;
+  $('toggleA').classList.toggle('selected', m==='A');
+  $('toggleB').classList.toggle('selected', m==='B');
+  $('instructionText').textContent = m === 'A'
+    ? 'חבר אוזניות, שב בשקט, נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק בפועל.'
+    : 'חבר אוזניות ונגן/זמזם יחד עם הביט במשך 5 שניות — ה-dB כאן לא תקף למדידה, רק להדגמת ניקוי.';
+}
+
+// ---------- click track ----------
+// v4 CHANGE (only intentional difference from v3): reference is now a broadband beat
+// (kick+bass+hihat) instead of a narrow 1500Hz click, per the original design intent for
+// overdub-proof-nlms.html (bleed of real music during overdub, not just a click during the
+// initial guide pass). Everything else — NLMS core, epsilon, leak, lag search, x6, drift — is
+// unchanged from v3, so any performance difference vs v3's numbers isolates to this reference
+// signal (media volume is already fixed at 100% in both, so that variable is controlled).
+function synthesizeClickTrack(){
+  const n = Math.floor(TAKE_DURATION * SR);
+  const buf = new Float32Array(n);
+  const beatSamples = Math.floor(SR * KICK_INTERVAL);
+
+  // simple deterministic noise generator (seeded, not Math.random) so the reference is
+  // reproducible/known exactly, same requirement as the old click reference had.
+  let seed = 12345;
+  function noise(){ seed = (seed*1103515245 + 12345) & 0x7fffffff; return (seed/0x7fffffff)*2-1; }
+
+  for(let start = 0; start < n; start += beatSamples){
+    // kick: 60Hz sine, ~80ms exponential decay, gain 0.8
+    const kickLen = Math.floor(SR * 0.08);
+    for(let i = 0; i < kickLen && start+i < n; i++){
+      const env = Math.exp(-i / (SR*0.02));
+      buf[start+i] += Math.sin(2*Math.PI*60*(i/SR)) * env * 0.8;
+    }
+    // bass: 110Hz sine under the kick, ~150ms, gain 0.5
+    const bassLen = Math.floor(SR * 0.15);
+    for(let i = 0; i < bassLen && start+i < n; i++){
+      const env = Math.exp(-i / (SR*0.05));
+      buf[start+i] += Math.sin(2*Math.PI*110*(i/SR)) * env * 0.5;
+    }
+    // hihat: 15ms filtered noise burst (crude high-pass via first-difference), gain 0.4
+    const hatLen = Math.floor(SR * 0.015);
+    let prev = 0;
+    for(let i = 0; i < hatLen && start+i < n; i++){
+      const raw = noise();
+      const hp = raw - prev; // crude high-pass
+      prev = raw;
+      const env = 1 - (i/hatLen);
+      buf[start+i] += hp * env * 0.4;
+    }
+  }
+  // normalize peak to ~0.9 to match v3's reference level (keeps media-volume comparison fair)
+  let peak = 0;
+  for(let i=0;i<n;i++) peak = Math.max(peak, Math.abs(buf[i]));
+  const norm = peak > 0 ? 0.9/peak : 1;
+  for(let i=0;i<n;i++) buf[i] *= norm;
+  return buf;
+}
+
+function ensureClickTrack(){
+  if(clickBuffer) return;
+  clickBuffer = synthesizeClickTrack();
+  const blob = floatToWavBlob(clickBuffer, SR);
+  clickBlobUrl = URL.createObjectURL(blob);
+}
+
+function floatToWavBlob(samples, sampleRate){
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (o, s) => { for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + samples.length*2, true);
+  writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate*2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, samples.length*2, true);
+  let off = 44;
+  for(let i=0;i<samples.length;i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s < 0 ? s*0x8000 : s*0x7FFF, true);
+    off += 2;
+  }
+  return new Blob([view], { type:'audio/wav' });
+}
+
+// ---------- mic + recording ----------
+async function ensureMic(){
+  if(micStream) return;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: {
+    echoCancellation:false, noiseSuppression:false, autoGainControl:false
+  }});
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+}
+
+function recordTakeAgainstClick(){
+  return new Promise((resolve, reject) => {
+    const audioEl = new Audio(clickBlobUrl); // backing track ONLY via <audio>, never WebAudio output
+    const recorder = new MediaRecorder(micStream);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if(e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+      const arrayBuf = await blob.arrayBuffer();
+      const decoded = await audioCtx.decodeAudioData(arrayBuf);
+      resolve(decoded.getChannelData(0).slice());
+    };
+    recorder.onerror = reject;
+    audioEl.addEventListener('ended', () => setTimeout(() => recorder.stop(), 300));
+    recorder.start();
+    audioEl.play().catch(reject);
+  });
+}
+
+// ---------- DSP ----------
+function findLag(ref, mic, maxLagSamples){
+  const searchLen = Math.min(ref.length, mic.length, SR*1); // 1s is plenty (2 kicks at 0.5s interval)
+  const coarseStep = 16;
+  let bestLag = 0, bestScore = -Infinity;
+  for(let lag = -maxLagSamples; lag <= maxLagSamples; lag += coarseStep){
+    let sum = 0;
+    for(let i=0;i<searchLen;i++){ const j=i+lag; if(j<0||j>=mic.length) continue; sum += ref[i]*mic[j]; }
+    if(sum > bestScore){ bestScore = sum; bestLag = lag; }
+  }
+  let refined = bestLag, refinedScore = -Infinity;
+  for(let lag = bestLag-coarseStep; lag <= bestLag+coarseStep; lag++){
+    let sum = 0;
+    for(let i=0;i<searchLen;i++){ const j=i+lag; if(j<0||j>=mic.length) continue; sum += ref[i]*mic[j]; }
+    if(sum > refinedScore){ refinedScore = sum; refined = lag; }
+  }
+  return refined;
+}
+
+function alignedPair(ref, mic, lag){
+  const len = Math.max(0, Math.min(ref.length, mic.length - lag));
+  const x = new Float32Array(len), d = new Float32Array(len);
+  for(let i=0;i<len;i++){ x[i]=ref[i]; const j=i+lag; d[i] = (j>=0&&j<mic.length)?mic[j]:0; }
+  return { x, d };
+}
+
+function nlmsTrain(x, d, taps, mu, leak, epsilon){
+  const N = d.length;
+  const w = new Float64Array(taps);
+  const ring = new Float64Array(taps);
+  let ringPos = 0, energy = epsilon;
+  const residual = new Float64Array(N);
+  let diverged = false, divergedAt = -1;
+  for(let n=0; n<N; n++){
+    const newest = x[n] || 0, oldest = ring[ringPos];
+    energy += newest*newest - oldest*oldest;
+    ring[ringPos] = newest;
+    let y=0, idx=ringPos;
+    for(let i=0;i<taps;i++){ y += w[i]*ring[idx]; idx=(idx-1+taps)%taps; }
+    const e = d[n]-y;
+    residual[n] = e;
+    if(!isFinite(e) || !isFinite(y)){ diverged=true; divergedAt=n; break; }
+    const muN = mu / Math.max(energy, epsilon);
+    idx = ringPos;
+    for(let i=0;i<taps;i++){ w[i] = (1-leak)*w[i] + muN*e*ring[idx]; idx=(idx-1+taps)%taps; }
+    ringPos = (ringPos+1)%taps;
+  }
+  return { residual: residual.subarray(0, diverged?divergedAt:N), weights:w, diverged, divergedAt };
+}
+
+function cosineSim(a,b){
+  let dot=0,na=0,nb=0;
+  for(let i=0;i<a.length;i++){ dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
+  const denom = Math.sqrt(na*nb);
+  return denom>1e-12 ? dot/denom : 0;
+}
+
+function rms(arr){ let s=0; for(let i=0;i<arr.length;i++) s+=arr[i]*arr[i]; return Math.sqrt(s/arr.length); }
+function dbReduction(before, after){
+  const rb=rms(before), ra=rms(after);
+  if(ra<=1e-9) return Infinity;
+  return 20*Math.log10(rb/ra);
+}
+
+function drawWave(canvas, arr){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0,0,w,h);
+  const mid = h/2;
+  ctx.beginPath(); ctx.strokeStyle = '#c07f10'; ctx.lineWidth = 1;
+  const step = Math.max(1, Math.floor(arr.length / w));
+  for(let px=0; px<w; px++){
+    const idx = px*step;
+    let mx = 0;
+    for(let k=0;k<step && idx+k<arr.length;k++) mx = Math.max(mx, Math.abs(arr[idx+k]));
+    ctx.moveTo(px, mid - mx*mid*0.9);
+    ctx.lineTo(px, mid + mx*mid*0.9);
+  }
+  ctx.stroke();
+}
+
+function playBuffer(samples, sr){
+  if(!audioCtx) return;
+  const buf = audioCtx.createBuffer(1, samples.length, sr);
+  buf.copyToChannel(Float32Array.from(samples), 0);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audioCtx.destination);
+  src.start();
+}
+
+// Simulates summing N independent channels that each carry this same residual bleed pattern —
+// the real-world failure mode per the "almost clean = failure" criterion. Each copy gets a
+// small random sample offset (channels are never perfectly phase-locked in practice) and a
+// small random gain jitter, so this isn't just residual*N — it's closer to how uncorrelated
+// bleed actually stacks.
+// TEMP / PLACEHOLDER — the 8ms offset range and ±15% gain jitter below are an *assumed*
+// approximation, not measured data. Nobody has yet measured how real independent channels
+// actually differ in timing/level once "Yesodot" (2-channel overdub) produces real recordings.
+// This function also only models timing+level differences — it does NOT model timbre/frequency
+// differences between channel bleeds (already observed to vary in practice), so it's a partial
+// approximation even once the numbers below are replaced with measured ones.
+// TODO: once real 2-channel Yesodot recordings exist, replace maxOffset/gain jitter range with
+// values measured from actual alignment data, and reassess whether frequency-domain differences
+// need modeling too before this metric can be trusted as more than a rough first-pass check.
+function simulateChannelSum(residual, copies){
+  const maxOffset = 400; // samples (~8ms @ 48kHz) — ASSUMED, not measured. See TODO above.
+  const n = residual.length + maxOffset;
+  const out = new Float64Array(n);
+  for(let c=0; c<copies; c++){
+    const offset = Math.floor(Math.random()*maxOffset);
+    const gain = 0.85 + Math.random()*0.3; // ±15% level jitter — ASSUMED, not measured. See TODO above.
+    for(let i=0;i<residual.length;i++){ out[i+offset] += residual[i]*gain; }
+  }
+  return out;
+}
+
+// DIAGNOSTIC (8.7.2026): split the aligned take into fixed windows and measure dB reduction
+// in each, using the SAME already-trained frozen filter. Purpose: tell apart two hypotheses for
+// the run-to-run bimodal spread —
+//   (a) bleed is stable within a run but the noise floor differs between runs -> windows within
+//       one run will all show similar dB;
+//   (b) the bleed/electrical noise is itself unstable over time -> dB jumps between windows even
+//       inside a single 5s take, which would mean a frozen NLMS filter is the wrong approach and
+//       a continuously-adapting filter is needed.
+// NOTE: a single 1s window can be statistically noisy on its own (few low-freq cycles). So this
+// is run at 0.5s / 1s / 2s. If the within-run spread is consistent across all three window sizes,
+// the drift is real; if spread shrinks as the window grows, it's a short-window artifact, not
+// live bleed. If (b) turns out true, remember it also breaks the ×6 estimate optimistically:
+// each real channel would capture a DIFFERENT bleed state, so stacking is worse than the
+// fixed-jitter ×6 sim predicts.
+// TEMP diagnostic — remove or fold into a proper report once the hypothesis is settled.
+function perWindowDb(x, d, weights, winSamples){
+  const taps = weights.length;
+  const out = [];
+  for(let start=0; start+winSamples<=d.length; start+=winSamples){
+    const ring = new Float64Array(taps);
+    let ringPos=0, before=0, after=0;
+    for(let n=start; n<start+winSamples; n++){
+      ring[ringPos] = x[n]||0;
+      let y=0, idx=ringPos;
+      for(let i=0;i<taps;i++){ y+=weights[i]*ring[idx]; idx=(idx-1+taps)%taps; }
+      const e = d[n]-y;
+      before += d[n]*d[n];
+      after += e*e;
+      ringPos=(ringPos+1)%taps;
+    }
+    const rb=Math.sqrt(before/winSamples), ra=Math.sqrt(after/winSamples);
+    out.push(ra<=1e-9 ? Infinity : 20*Math.log10(rb/ra));
+  }
+  return out;
+}
+
+// ---------- run ----------
+$('btnRun').addEventListener('click', async () => {
+  $('btnRun').disabled = true;
+  $('statusLine').textContent = '';
+  try{
+    await ensureMic();
+    ensureClickTrack();
+    $('statusLine').textContent = mode === 'A' ? 'שקט... מקליט 5 שניות' : 'נגן/זמזם... מקליט 5 שניות';
+
+    const micRaw = await recordTakeAgainstClick();
+    $('statusLine').textContent = 'מנתח...';
+
+    await new Promise(r => setTimeout(r, 20)); // let UI paint before the heavy loop
+
+    const taps = parseInt($('selL').value, 10);
+    const mu = parseFloat($('selMu').value);
+    const epsilon = 1e-2; // was 1e-6 — far too small for a sparse click reference; caused the
+                            // normalized step size to spike to ~5e5 during silent windows and
+                            // chase ordinary background noise into instability. Verified in
+                            // simulation: 1e-2 fixes it without hurting real bleed removal.
+    const maxLag = Math.floor(SR * 0.6); // was 0.05 — real device delays observed up to ~480ms
+
+    const lag = findLag(clickBuffer, micRaw, maxLag);
+    const pair = alignedPair(clickBuffer, micRaw, lag);
+    const trained = nlmsTrain(pair.x, pair.d, taps, mu, LEAK, epsilon);
+
+    // dB is measured EXCLUDING the first 1s of the take (8.7.2026 finding: that window is
+    // dominated by the NLMS startup convergence transient — weights start at zero and briefly
+    // overshoot before settling — not live/varying bleed. Confirmed via the per-window spread
+    // test: spread shrinks cleanly as window size grows (0.5s→1s→2s), the signature of a
+    // short-window transient artifact, not real drift. Measuring from 1s onward reports true
+    // steady-state performance instead of a number dragged down by the warm-up period.
+    const burnInSamples = SR * 1;
+    let dB;
+    if(trained.diverged){
+      dB = -Infinity;
+    } else if(trained.residual.length <= burnInSamples){
+      dB = dbReduction(pair.d.subarray(0, trained.residual.length), trained.residual); // take too short to trim
+    } else {
+      dB = dbReduction(
+        pair.d.subarray(burnInSamples, trained.residual.length),
+        trained.residual.subarray(burnInSamples)
+      );
+    }
+
+    // drift: independent filters on first half vs second half
+    const half = Math.floor(pair.x.length/2);
+    const r1 = nlmsTrain(pair.x.subarray(0,half), pair.d.subarray(0,half), taps, mu, LEAK, epsilon);
+    const r2 = nlmsTrain(pair.x.subarray(half), pair.d.subarray(half), taps, mu, LEAK, epsilon);
+    const drift = (r1.diverged || r2.diverged) ? null : cosineSim(r1.weights, r2.weights);
+
+    renderResult({ dB, drift, lag, taps, mu, mode });
+
+    lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
+    lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
+    const x6Db = 20*Math.log10(rms(lastRun.cleanX6) + 1e-9);
+    const x1Db = 20*Math.log10(rms(trained.residual) + 1e-9);
+    $('x6Line').textContent = `שארית בודדת: ${x1Db.toFixed(1)}dBFS · הערכה גסה אחרי הכפלה ×6: ${x6Db.toFixed(1)}dBFS`;
+
+    // DIAGNOSTICS (TEMP): raw input level + per-window dB at 3 window sizes, to explain
+    // run-to-run swings and separate real drift from short-window measurement noise.
+    const rawRms = rms(pair.d);
+    const rawDbfs = 20*Math.log10(rawRms + 1e-9);
+    let diagText = `גלם RMS: ${rawDbfs.toFixed(1)}dBFS`;
+    if(!trained.diverged){
+      const sizes = [[0.5,'0.5s'],[1,'1s'],[2,'2s'],[0.25,'0.25s']];
+      for(const [sec,label] of sizes){
+        const wins = perWindowDb(pair.x, pair.d, trained.weights, Math.floor(SR*sec));
+        if(!wins.length) continue;
+        const finite = wins.filter(isFinite);
+        const spread = finite.length ? (Math.max(...finite) - Math.min(...finite)) : 0;
+        const txt = wins.map(v => isFinite(v) ? v.toFixed(1) : '∞').join('·');
+        diagText += `\nחלון ${label}: [${txt}] פיזור ${spread.toFixed(1)}dB`;
+        // v4 addition, approved spec: on the 0.25s breakdown (20 windows over 5s), compute
+        // variance specifically over windows 5-16 (indices 4-15) — deliberately excluding the
+        // first 4 windows (first ~1s, the convergence transient) AND the tail windows (17-20),
+        // to test whether the "plateau" is genuinely flat at fine resolution or still sloping.
+        if(sec === 0.25 && wins.length >= 16){
+          const core = wins.slice(4, 16).filter(isFinite);
+          if(core.length){
+            const mean = core.reduce((a,b)=>a+b,0) / core.length;
+            const variance = core.reduce((a,b)=>a+(b-mean)*(b-mean),0) / core.length;
+            diagText += `\nפלטו (חלונות 5-16), n=${core.length}: ממוצע ${mean.toFixed(2)}dB · variance ${variance.toFixed(3)}`;
+          }
+        }
+      }
+    }
+    $('diagLine').textContent = diagText;
+
+    $('btnPlayX6').disabled = false;
+    drawWave($('cRaw'), lastRun.raw);
+    drawWave($('cClean'), lastRun.clean);
+    $('btnPlayRaw').disabled = false;
+    $('btnPlayClean').disabled = false;
+    $('statusLine').textContent = '';
+  }catch(err){
+    $('statusLine').textContent = 'שגיאה: ' + err.message;
+  }
+  $('btnRun').disabled = false;
+});
+
+function renderResult({ dB, drift, lag, taps, mu, mode }){
+  const card = $('resultCard');
+  card.style.display = 'block';
+  const dbEl = $('resultDb'), msgEl = $('resultMsg'), detailEl = $('detailLine');
+
+  const collapsed = !isFinite(dB) || dB < 5;
+  card.classList.toggle('bad', collapsed);
+  dbEl.textContent = isFinite(dB) ? `${dB.toFixed(1)} dB` : '‑‑ dB';
+
+  if(mode === 'B'){
+    msgEl.textContent = 'מבחן B מכיל תוכן חי — ה-dB לא תקף להשוואה, רק להדגמת ניקוי בפועל.';
+  } else if(collapsed){
+    msgEl.textContent = 'התכנסות נכשלה — L גדול מדי ביחס לנתונים, לא תוצאה תקפה. נסה L קטן יותר.';
+  } else if(dB < 15){
+    msgEl.textContent = 'קצר מדי / ייתכן לא-ליניארי, או דומה ל-Wiener.';
+  } else {
+    msgEl.textContent = 'שיפור מעל Wiener (-12dB), אך לא מלא — נסה L/μ אחר.';
+  }
+
+  const driftTxt = drift === null ? 'n/a' :
+    `${drift.toFixed(3)} — פילטר ${drift > 0.85 ? 'יציב' : 'זז'} (transfer ${drift > 0.85 ? 'קבוע' : 'משתנה בזמן'})`;
+  detailEl.textContent = `דריפט: ${driftTxt} · L=${taps} μ=${mu} · השהיה: ${Math.round(lag/SR*1000)}ms`;
+}
+
+$('btnPlayRaw').addEventListener('click', () => lastRun && playBuffer(lastRun.raw, lastRun.sr));
+$('btnPlayClean').addEventListener('click', () => lastRun && playBuffer(lastRun.clean, lastRun.sr));
+$('btnPlayX6').addEventListener('click', () => lastRun && lastRun.cleanX6 && playBuffer(lastRun.cleanX6, lastRun.sr));
+
+if(DEV_RESET){ console.warn('DEV_RESET is true — must be false before any deploy.'); }
+</script>
+</body>
+</html>
