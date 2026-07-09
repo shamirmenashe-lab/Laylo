@@ -121,6 +121,9 @@
     <div class="detail-line" id="detailLine"></div>
     <div class="detail-line" id="x6Line"></div>
     <div class="detail-line" id="diagLine"></div>
+    <div class="detail-line" id="timingLine"></div>
+    <div class="detail-line" id="driftTimeLine"></div>
+    <div class="detail-line" id="rmsTimeLine"></div>
   </div>
 
   <div class="play-row">
@@ -232,16 +235,24 @@ function recordTakeAgainstClick(){
     const audioEl = new Audio(clickBlobUrl); // backing track ONLY via <audio>, never WebAudio output
     const recorder = new MediaRecorder(micStream);
     const chunks = [];
+    // TIMING (added 9.7.2026): pure instrumentation only — measures the real gap between when
+    // recording actually starts firing vs when audio playback actually starts firing. Does NOT
+    // touch recording behaviour or DSP. t1/t3 = the call sites; t2/t4 = the real fired events.
+    const timing = { t1:null, t2:null, t3:null, t4:null };
+    recorder.addEventListener('start', () => { if(timing.t2===null) timing.t2 = performance.now(); });
+    audioEl.addEventListener('playing', () => { if(timing.t4===null) timing.t4 = performance.now(); });
     recorder.ondataavailable = (e) => { if(e.data.size) chunks.push(e.data); };
     recorder.onstop = async () => {
       const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
       const arrayBuf = await blob.arrayBuffer();
       const decoded = await audioCtx.decodeAudioData(arrayBuf);
-      resolve(decoded.getChannelData(0).slice());
+      resolve({ samples: decoded.getChannelData(0).slice(), timing });
     };
     recorder.onerror = reject;
     audioEl.addEventListener('ended', () => setTimeout(() => recorder.stop(), 300));
+    timing.t1 = performance.now();
     recorder.start();
+    timing.t3 = performance.now();
     audioEl.play().catch(reject);
   });
 }
@@ -409,7 +420,9 @@ $('btnRun').addEventListener('click', async () => {
     ensureClickTrack();
     $('statusLine').textContent = mode === 'A' ? 'שקט... מקליט 5 שניות' : 'נגן/זמזם... מקליט 5 שניות';
 
-    const micRaw = await recordTakeAgainstClick();
+    const take = await recordTakeAgainstClick();
+    const micRaw = take.samples;
+    const timing = take.timing;
     $('statusLine').textContent = 'מנתח...';
 
     await new Promise(r => setTimeout(r, 20)); // let UI paint before the heavy loop
@@ -451,7 +464,7 @@ $('btnRun').addEventListener('click', async () => {
     const r2 = nlmsTrain(pair.x.subarray(half), pair.d.subarray(half), taps, mu, LEAK, epsilon);
     const drift = (r1.diverged || r2.diverged) ? null : cosineSim(r1.weights, r2.weights);
 
-    renderResult({ dB, drift, lag, taps, mu, mode });
+    renderResult({ dB, drift, lag, taps, mu, mode, timing });
 
     lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
     lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
@@ -477,6 +490,41 @@ $('btnRun').addEventListener('click', async () => {
     }
     $('diagLine').textContent = diagText;
 
+    // DRIFT-OVER-TIME (TEMP, added 9.7.2026): the metric Claude actually asked for — catches
+    // the moment the filter's transfer turns NEGATIVE (like image 5's -0.468). Splits the
+    // aligned pair into running 1s windows, trains an INDEPENDENT filter per window, then reports
+    // cosine similarity of each window's weights vs the PREVIOUS window. A value going negative =
+    // the transfer flipped between those two seconds. This is the same measure as the existing
+    // half-vs-half drift, just resolved over time. (Uses the same taps/mu/LEAK/epsilon — no DSP
+    // change; only extra offline analysis passes on already-recorded data.)
+    if(!trained.diverged){
+      const segN = Math.floor(SR * 1); // 1s analysis windows
+      const segWeights = [];
+      for(let start=0; start+segN<=pair.x.length; start+=segN){
+        const r = nlmsTrain(pair.x.subarray(start,start+segN), pair.d.subarray(start,start+segN), taps, mu, LEAK, epsilon);
+        segWeights.push(r.diverged ? null : r.weights);
+      }
+      const cos = [];
+      for(let i=1;i<segWeights.length;i++){
+        cos.push((segWeights[i-1] && segWeights[i]) ? cosineSim(segWeights[i-1], segWeights[i]).toFixed(3) : 'div');
+      }
+      $('driftTimeLine').textContent = cos.length
+        ? 'דריפט לאורך זמן (cos בין חלונות 1s עוקבים): [' + cos.join(' · ') + '] — שלילי = ה-transfer התהפך'
+        : 'דריפט לאורך זמן: הריצה קצרה מדי לחלונות 1s';
+
+      // Supplementary (kept): residual RMS per 0.5s — shows where leakage energy actually sits.
+      const winN = Math.floor(SR * 0.5);
+      const res = trained.residual;
+      const seq = [];
+      for(let start=0; start+winN<=res.length; start+=winN){
+        seq.push((20*Math.log10(rms(res.subarray(start, start+winN))+1e-9)).toFixed(1));
+      }
+      $('rmsTimeLine').textContent = 'שארית RMS לאורך זמן (0.5s): [' + seq.join(' · ') + '] dBFS';
+    } else {
+      $('driftTimeLine').textContent = '';
+      $('rmsTimeLine').textContent = '';
+    }
+
     $('btnPlayX6').disabled = false;
     drawWave($('cRaw'), lastRun.raw);
     drawWave($('cClean'), lastRun.clean);
@@ -489,7 +537,7 @@ $('btnRun').addEventListener('click', async () => {
   $('btnRun').disabled = false;
 });
 
-function renderResult({ dB, drift, lag, taps, mu, mode }){
+function renderResult({ dB, drift, lag, taps, mu, mode, timing }){
   const card = $('resultCard');
   card.style.display = 'block';
   const dbEl = $('resultDb'), msgEl = $('resultMsg'), detailEl = $('detailLine');
@@ -511,6 +559,17 @@ function renderResult({ dB, drift, lag, taps, mu, mode }){
   const driftTxt = drift === null ? 'n/a' :
     `${drift.toFixed(3)} — פילטר ${drift > 0.85 ? 'יציב' : 'זז'} (transfer ${drift > 0.85 ? 'קבוע' : 'משתנה בזמן'})`;
   detailEl.textContent = `דריפט: ${driftTxt} · L=${taps} μ=${mu} · השהיה: ${Math.round(lag/SR*1000)}ms`;
+
+  // TIMING display (added 9.7.2026) — pure instrumentation, next to lag/dB as requested.
+  if(timing){
+    const recDelay = (timing.t2!=null && timing.t1!=null) ? (timing.t2 - timing.t1) : null;
+    const playDelay = (timing.t4!=null && timing.t3!=null) ? (timing.t4 - timing.t3) : null;
+    const startGap = (timing.t4!=null && timing.t2!=null) ? (timing.t4 - timing.t2) : null; // real gap rec→play
+    const fmt = v => v==null ? 'n/a' : `${v.toFixed(1)}ms`;
+    $('timingLine').textContent = `תזמון: הקלטה t2-t1=${fmt(recDelay)} · ניגון t4-t3=${fmt(playDelay)} · פער אמיתי t4-t2=${fmt(startGap)}`;
+  } else {
+    $('timingLine').textContent = '';
+  }
 }
 
 $('btnPlayRaw').addEventListener('click', () => lastRun && playBuffer(lastRun.raw, lastRun.sr));
