@@ -144,12 +144,12 @@
     ⚠ קובץ בדיקה זמני. מבחן B אינו תקף למדידת dB (מכיל תוכן חי) — משמש רק להדגמת ניקוי בפועל.
     <br><br>
     ⚠ ×6 הוא <b>הערכה גסה</b>, לא מדידה: היסט הזמן (~8ms) וג'יטר העוצמה (±15%) הם מספרים
-    משוערים, לא נמדדו מנתונים אמיתיים. גם לא מודל הפרשי טימבר/תדר בין ערוצים (נצפו בעבר). להחליף
-    במספרים אמיתיים כשיהיו הקלטות "יסודות" דו-ערוציות.
+    משוערים, לא נמדדו מנתונים אמיתיים.
     <br><br>
-    ⚠ TEMP (11.7.2026): נוסף Double-Talk Detector (DTD) ניסיוני — מקפיא עדכון משקלי הפילטר
-    בחלונות שבהם אנרגיית המיקרופון חורגת מהחציון של הריצה. סף (6dB) וגודל חלון (100ms) הם ניחוש
-    ראשוני, לא כוילו על נתונים אמיתיים. לבדוק ולכייל אחרי כמה סבבי ריצות.
+    ⚠ TEMP (11.7.2026): DTD גרסה 2 — מקפיא עדכון משקלים רק בחלונות שבהם <b>אין קליק ברפרנס</b>
+    אבל המיקרופון בכל זאת קולט אנרגיה חריגה. חלונות עם קליק ברפרנס תמיד לומדים, לא משנה כמה
+    חזקים. זה מתקן גרסה קודמת שגויה שהקפיאה בדיוק את רגעי הקליק. הסף (8dB מעל רצפת הרעש) עדיין
+    ניחוש ראשוני — לכייל אחרי סבב ריצות.
   </div>
 </div>
 
@@ -164,7 +164,8 @@ const TAKE_DURATION = 5;
 const LEAK = 1e-6;
 
 const DTD_WIN_MS = 100;
-const DTD_THRESHOLD_DB = 6;
+const DTD_REF_ACTIVE_DB = -80;
+const DTD_NOISE_MARGIN_DB = 8;
 
 let audioCtx = null;
 let micStream = null;
@@ -283,28 +284,47 @@ function alignedPair(ref, mic, lag){
   return { x, d };
 }
 
-function computeFreezeMask(d, sr, winMs, thresholdDb){
+function computeFreezeMask(x, d, sr, winMs, refActiveDb, noiseMarginDb){
   const winSamples = Math.max(1, Math.floor(sr * winMs / 1000));
   const nWin = Math.ceil(d.length / winSamples);
-  const winEnergyDb = new Float64Array(nWin);
+  const refEnergyDb = new Float64Array(nWin);
+  const micEnergyDb = new Float64Array(nWin);
+  const isRefActive = new Uint8Array(nWin);
+
   for(let wi=0; wi<nWin; wi++){
     const start = wi*winSamples, end = Math.min(d.length, start+winSamples);
-    let sum = 0;
-    for(let i=start;i<end;i++) sum += d[i]*d[i];
-    const rmsW = Math.sqrt(sum / Math.max(1, end-start));
-    winEnergyDb[wi] = 20*Math.log10(rmsW + 1e-9);
+    let sumX=0, sumD=0;
+    for(let i=start;i<end;i++){ sumX += x[i]*x[i]; sumD += d[i]*d[i]; }
+    const n = Math.max(1, end-start);
+    refEnergyDb[wi] = 20*Math.log10(Math.sqrt(sumX/n) + 1e-9);
+    micEnergyDb[wi] = 20*Math.log10(Math.sqrt(sumD/n) + 1e-9);
+    isRefActive[wi] = refEnergyDb[wi] > refActiveDb ? 1 : 0;
   }
-  const sorted = Array.from(winEnergyDb).sort((a,b)=>a-b);
-  const median = sorted.length ? sorted[Math.floor(sorted.length/2)] : 0;
-  const mask = new Uint8Array(d.length);
+
+  const widened = isRefActive.slice();
   for(let wi=0; wi<nWin; wi++){
-    const frozen = Math.abs(winEnergyDb[wi] - median) > thresholdDb;
+    if(isRefActive[wi]){
+      if(wi>0) widened[wi-1] = 1;
+      if(wi<nWin-1) widened[wi+1] = 1;
+    }
+  }
+
+  const silentMicDb = [];
+  for(let wi=0; wi<nWin; wi++){ if(!widened[wi]) silentMicDb.push(micEnergyDb[wi]); }
+  silentMicDb.sort((a,b)=>a-b);
+  const noiseFloor = silentMicDb.length ? silentMicDb[Math.floor(silentMicDb.length/2)] : -60;
+
+  const mask = new Uint8Array(d.length);
+  let frozenWindows = 0;
+  for(let wi=0; wi<nWin; wi++){
+    const frozen = !widened[wi] && (micEnergyDb[wi] - noiseFloor > noiseMarginDb);
     if(frozen){
+      frozenWindows++;
       const start = wi*winSamples, end = Math.min(d.length, start+winSamples);
       for(let i=start;i<end;i++) mask[i] = 1;
     }
   }
-  return mask;
+  return { mask, frozenWindows, totalWindows: nWin, noiseFloor };
 }
 
 function nlmsTrain(x, d, taps, mu, leak, epsilon, freezeMask){
@@ -334,10 +354,7 @@ function nlmsTrain(x, d, taps, mu, leak, epsilon, freezeMask){
     }
     ringPos = (ringPos+1)%taps;
   }
-  return {
-    residual: residual.subarray(0, diverged?divergedAt:N), weights:w, diverged, divergedAt,
-    frozenCount, totalCount:N
-  };
+  return { residual: residual.subarray(0, diverged?divergedAt:N), weights:w, diverged, divergedAt, frozenCount, totalCount:N };
 }
 
 function cosineSim(a,b){
@@ -438,7 +455,8 @@ $('btnRun').addEventListener('click', async () => {
     const lag = findLag(clickBuffer, micRaw, maxLag);
     const pair = alignedPair(clickBuffer, micRaw, lag);
 
-    const freezeMask = computeFreezeMask(pair.d, SR, DTD_WIN_MS, DTD_THRESHOLD_DB);
+    const dtd = computeFreezeMask(pair.x, pair.d, SR, DTD_WIN_MS, DTD_REF_ACTIVE_DB, DTD_NOISE_MARGIN_DB);
+    const freezeMask = dtd.mask;
 
     const trained = nlmsTrain(pair.x, pair.d, taps, mu, LEAK, epsilon, freezeMask);
 
@@ -462,8 +480,8 @@ $('btnRun').addEventListener('click', async () => {
 
     renderResult({ dB, drift, lag, taps, mu, mode, timing });
 
-    const frozenPct = trained.totalCount ? (100*trained.frozenCount/trained.totalCount) : 0;
-    $('dtdLine').textContent = `DTD: הוקפא ${frozenPct.toFixed(1)}% מהריצה (סף ${DTD_THRESHOLD_DB}dB, חלון ${DTD_WIN_MS}ms)`;
+    const frozenPct = dtd.totalWindows ? (100*dtd.frozenWindows/dtd.totalWindows) : 0;
+    $('dtdLine').textContent = `DTD v2: הוקפא ${frozenPct.toFixed(1)}% מהחלונות (${dtd.frozenWindows}/${dtd.totalWindows}) · רצפת רעש: ${dtd.noiseFloor.toFixed(1)}dBFS`;
 
     lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
     lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
@@ -566,6 +584,5 @@ $('btnPlayX6').addEventListener('click', () => lastRun && lastRun.cleanX6 && pla
 
 if(DEV_RESET){ console.warn('DEV_RESET is true — must be false before any deploy.'); }
 </script>
-
 </body>
 </html>
