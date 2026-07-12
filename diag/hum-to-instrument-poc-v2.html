@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POC: זמזום → כלי נגינה (v2)</title>
+<script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    background: #f4efe6;
+    color: #2b2416;
+    margin: 0;
+    padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 20px; margin: 8px 0 2px; }
+  .subtitle { font-size: 13px; color: #6b6250; margin-bottom: 14px; }
+  .banner {
+    background: #fff3cd; border: 1px solid #e0c56b; border-radius: 8px;
+    padding: 10px 12px; font-size: 12.5px; margin-bottom: 16px; line-height: 1.5;
+  }
+  button {
+    font-size: 16px; padding: 14px 10px; border-radius: 10px; border: none;
+    width: 100%; margin: 6px 0; font-weight: 600; cursor: pointer;
+  }
+  .btn-record { background: #b23b3b; color: #fff; }
+  .btn-record.recording { background: #6b1f1f; }
+  .btn-play { background: #8a6a1f; color: #fff; }
+  .btn-secondary { background: #e5ddc8; color: #2b2416; }
+  select {
+    width: 100%; padding: 12px; font-size: 16px; border-radius: 10px;
+    border: 1px solid #c9bd9c; background: #fff; margin: 6px 0;
+  }
+  .status { font-size: 13px; color: #6b6250; min-height: 18px; margin: 4px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #e0d8c3; }
+  th { color: #6b6250; font-weight: 600; font-size: 12px; }
+  .legato-warn { color: #b23b3b; font-weight: 600; }
+  .legato-ok { color: #3b7a3b; }
+  .section-label { font-size: 12px; color: #6b6250; margin: 16px 0 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>POC: זמזום → כלי נגינה</h1>
+<div class="subtitle">בדיקת היתכנות — לא חלק מ-overdub-proof-nlms-v3.html</div>
+
+<div class="banner">
+  <b>כלי בדיקה נפרד, חד-פעמי.</b> לא נוגע בקובץ הבליד/NLMS ולא בקוד הראשי של Laylo.
+  <b>v2:</b> תוקן זיהוי פיץ' רועש (חלון Hann + מדד-בהירות + תיקון שגיאת-אוקטבה + פילטר-חציון)
+  שגרם לקפיצות-שווא בין תווים. משכי התווים הם המשך המדויק שזוהה — אין קוונטיזציה לגריד קצב בשום שלב.
+  תיקון פיץ' עדיין <b>snap גס לתו הקרוב בלבד</b> — אין אוטוטיון להחלקה.
+</div>
+
+<button id="btnRecord" class="btn-record">🎤 התחל הקלטה</button>
+<div id="status" class="status">לחץ להקליט זמזום קצר (5–10 שניות, תו-אחר-תו)</div>
+
+<div class="section-label">כלי לניגון חוזר</div>
+<select id="instrumentSel">
+  <option value="32">בס (Acoustic Bass)</option>
+  <option value="40">כינור (Violin)</option>
+  <option value="42">צ'לו (Cello)</option>
+  <option value="68">אבוב (Oboe)</option>
+</select>
+
+<button id="btnPlayOriginal" class="btn-secondary" disabled>🔁 נגן הקלטה מקורית</button>
+<button id="btnPlayInstrument" class="btn-play" disabled>▶ נגן עם הכלי הנבחר</button>
+
+<div id="notesSection" style="display:none;">
+  <div class="section-label">תווים שזוהו</div>
+  <table id="notesTable">
+    <thead>
+      <tr><th>#</th><th>תו</th><th>התחלה (ש')</th><th>משך (ms)</th><th>יציבות</th></tr>
+    </thead>
+    <tbody id="notesBody"></tbody>
+  </table>
+</div>
+
+<script>
+// ===== Audio recording (no output during capture — matches Laylo constant) =====
+let mediaRecorder, recordedChunks = [];
+let audioCtx, playerAudioCtx, wafPlayer;
+let recordedBlob = null;
+let detectedNotes = [];
+let loadedInstruments = {}; // program -> {tone, name}
+const btnRecord = document.getElementById('btnRecord');
+const btnPlayOriginal = document.getElementById('btnPlayOriginal');
+const btnPlayInstrument = document.getElementById('btnPlayInstrument');
+const statusEl = document.getElementById('status');
+const instrumentSel = document.getElementById('instrumentSel');
+
+const INSTRUMENTS = {
+  32: { file: '0320_GeneralUserGS_sf2_file.js', varName: '_tone_0320_GeneralUserGS_sf2_file', label: 'בס' },
+  40: { file: '0400_GeneralUserGS_sf2_file.js', varName: '_tone_0400_GeneralUserGS_sf2_file', label: 'כינור' },
+  42: { file: '0420_GeneralUserGS_sf2_file.js', varName: '_tone_0420_GeneralUserGS_sf2_file', label: "צ'לו" },
+  68: { file: '0680_GeneralUserGS_sf2_file.js', varName: '_tone_0680_GeneralUserGS_sf2_file', label: 'אבוב' }
+};
+
+function ensurePlayer() {
+  if (!playerAudioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    playerAudioCtx = new AC();
+    wafPlayer = new WebAudioFontPlayer();
+  }
+}
+
+function loadInstrument(program) {
+  return new Promise((resolve) => {
+    ensurePlayer();
+    if (loadedInstruments[program]) { resolve(loadedInstruments[program]); return; }
+    const info = INSTRUMENTS[program];
+    const url = 'https://surikov.github.io/webaudiofontdata/sound/' + info.file;
+    wafPlayer.loader.startLoad(playerAudioCtx, url, info.varName);
+    wafPlayer.loader.waitLoad(function () {
+      const tone = window[info.varName];
+      loadedInstruments[program] = tone;
+      resolve(tone);
+    });
+  });
+}
+
+btnRecord.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    // getUserMedia BEFORE any audio output — no backing track here, this POC is capture-only
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      btnRecord.textContent = '🎤 התחל הקלטה';
+      btnRecord.classList.remove('recording');
+      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+      btnPlayOriginal.disabled = false;
+      statusEl.textContent = 'מנתח תווים...';
+      await analyzeRecording(recordedBlob);
+    };
+    mediaRecorder.start();
+    btnRecord.textContent = '⏹ עצור הקלטה';
+    btnRecord.classList.add('recording');
+    statusEl.textContent = 'מקליט... זמזם תו-אחר-תו';
+  } catch (err) {
+    statusEl.textContent = 'שגיאת הרשאת מיקרופון: ' + err.message;
+  }
+});
+
+btnPlayOriginal.addEventListener('click', () => {
+  if (!recordedBlob) return;
+  const audio = new Audio(URL.createObjectURL(recordedBlob));
+  audio.play();
+});
+
+btnPlayInstrument.addEventListener('click', async () => {
+  if (detectedNotes.length === 0) return;
+  const program = parseInt(instrumentSel.value, 10);
+  statusEl.textContent = 'טוען כלי...';
+  const tone = await loadInstrument(program);
+  ensurePlayer();
+  if (playerAudioCtx.state === 'suspended') await playerAudioCtx.resume();
+  statusEl.textContent = 'מנגן...';
+  const startAt = playerAudioCtx.currentTime + 0.15;
+  const firstNoteTime = detectedNotes[0].start;
+  detectedNotes.forEach(note => {
+    const when = startAt + (note.start - firstNoteTime);
+    wafPlayer.queueWaveTable(
+      playerAudioCtx, playerAudioCtx.destination, tone,
+      when, note.midi, note.duration * 1.05, 0.7
+    );
+  });
+});
+
+// ===== Offline analysis after stop() — all DSP happens post-capture =====
+async function analyzeRecording(blob) {
+  const arrBuf = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const decodeCtx = new AC();
+  const audioBuffer = await decodeCtx.decodeAudioData(arrBuf);
+
+  // Downsample to 16kHz mono — enough for melodic pitch range, keeps autocorrelation fast
+  const targetRate = 16000;
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * targetRate), targetRate);
+  const src = offlineCtx.createBufferSource();
+  src.buffer = audioBuffer;
+  src.connect(offlineCtx.destination);
+  src.start();
+  const rendered = await offlineCtx.startRendering();
+  const data = rendered.getChannelData(0);
+
+  const frameSize = 1024;
+  const hop = 128; // finer time resolution — captures 16ths/dotted durations accurately
+  const minFreq = 70, maxFreq = 1000;
+  const minLag = Math.floor(targetRate / maxFreq);
+  const maxLag = Math.ceil(targetRate / minFreq);
+  const CLARITY_THRESH = 0.35; // min peak-correlation confidence to trust a pitch reading
+
+  const hannWindow = new Float32Array(frameSize);
+  for (let i = 0; i < frameSize; i++) {
+    hannWindow[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (frameSize - 1));
+  }
+
+  const rawFrames = [];
+  let prevFreq = -1;
+  for (let start = 0; start + frameSize <= data.length; start += hop) {
+    const raw = data.subarray(start, start + frameSize);
+    const windowed = new Float32Array(frameSize);
+    for (let i = 0; i < frameSize; i++) windowed[i] = raw[i] * hannWindow[i];
+
+    let rms = 0;
+    for (let i = 0; i < raw.length; i++) rms += raw[i] * raw[i];
+    rms = Math.sqrt(rms / raw.length);
+
+    let freq = -1;
+    if (rms > 0.015) {
+      freq = autocorrelatePitch(windowed, targetRate, minLag, maxLag, CLARITY_THRESH, prevFreq);
+    }
+    if (freq > 0) prevFreq = freq;
+    const t = start / targetRate;
+    const midi = freq > 0 ? 69 + 12 * Math.log2(freq / 440) : null;
+    rawFrames.push({ t, freq, rms, midi, voiced: freq > 0 });
+  }
+
+  // Median-filter the pitch track (window of 5) to kill single-frame glitches
+  // before they get mistaken for real note changes. Real transitions survive
+  // this because they persist across many consecutive frames; noise doesn't.
+  const frames = medianFilterMidi(rawFrames, 5);
+
+  detectedNotes = segmentNotes(frames, hop / targetRate);
+  renderNotes(detectedNotes);
+
+  btnPlayInstrument.disabled = detectedNotes.length === 0;
+  statusEl.textContent = detectedNotes.length > 0
+    ? ('זוהו ' + detectedNotes.length + ' תווים')
+    : 'לא זוהו תווים ברורים — נסה לזמזם חזק וברור יותר';
+}
+
+function medianFilterMidi(frames, windowSize) {
+  const half = Math.floor(windowSize / 2);
+  return frames.map((f, i) => {
+    if (!f.voiced) return f;
+    const nearby = [];
+    for (let j = Math.max(0, i - half); j <= Math.min(frames.length - 1, i + half); j++) {
+      if (frames[j].voiced) nearby.push(frames[j].midi);
+    }
+    if (nearby.length === 0) return f;
+    return Object.assign({}, f, { midi: median(nearby) });
+  });
+}
+
+// Normalized autocorrelation with Hann windowing, clarity gating, parabolic
+// interpolation, and octave-error correction (prefers the candidate lag
+// closest to the previous frame's pitch when a sub/super-harmonic is nearly
+// as strong — the classic ACF octave-jump failure mode).
+function autocorrelatePitch(buf, sampleRate, minLag, maxLag, clarityThresh, prevFreq) {
+  const SIZE = buf.length;
+  const c = new Float64Array(maxLag + 2);
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < SIZE - lag; i++) sum += buf[i] * buf[i + lag];
+    c[lag] = sum;
+  }
+  const c0 = c[minLag] || 1e-9; // rough energy reference for clarity scoring
+
+  // Collect local peaks in the correlation function (candidates for pitch period)
+  const peaks = [];
+  for (let lag = minLag + 1; lag < maxLag; lag++) {
+    if (c[lag] > c[lag - 1] && c[lag] >= c[lag + 1]) peaks.push(lag);
+  }
+  if (peaks.length === 0) return -1;
+
+  peaks.sort((a, b) => c[b] - c[a]);
+  const best = peaks[0];
+  const clarity = c[best] / c0;
+  if (clarity < clarityThresh) return -1;
+
+  // Octave-error correction: if a candidate near best/2 or best*2 is almost
+  // as strong AND closer to the previous frame's pitch, prefer it.
+  let chosen = best;
+  if (prevFreq > 0) {
+    const prevLag = sampleRate / prevFreq;
+    for (const cand of peaks.slice(0, 5)) {
+      if (c[cand] > 0.85 * c[best] && Math.abs(cand - prevLag) < Math.abs(chosen - prevLag)) {
+        chosen = cand;
+      }
+    }
+  }
+
+  const x1 = c[chosen - 1] || 0, x2 = c[chosen], x3 = c[chosen + 1] || 0;
+  const denom = (x1 + x3 - 2 * x2);
+  let refinedLag = chosen;
+  if (denom !== 0) refinedLag = chosen - 0.5 * (x3 - x1) / denom;
+  if (refinedLag <= 0) return -1;
+  return sampleRate / refinedLag;
+}
+
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function stddev(arr) {
+  const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const variance = arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length;
+  return Math.sqrt(variance);
+}
+
+// Segments consecutive voiced frames into discrete notes.
+// A new note starts when smoothed pitch jumps > 0.6 semitone, or on a silence gap.
+function segmentNotes(frames, frameDur) {
+  const notes = [];
+  let cur = null;
+  const JUMP_THRESH = 0.6;
+  const MIN_NOTE_DUR = 0.08;
+
+  function finalize(c) {
+    if (!c || c.midis.length === 0) return;
+    const dur = (c.times[c.times.length - 1] + frameDur) - c.times[0];
+    if (dur < MIN_NOTE_DUR) return;
+    const med = Math.round(median(c.midis));
+    notes.push({
+      midi: med,
+      start: c.times[0],
+      duration: dur,
+      stability: stddev(c.midis)
+    });
+  }
+
+  for (const f of frames) {
+    if (f.voiced) {
+      if (!cur) {
+        cur = { midis: [f.midi], times: [f.t] };
+      } else {
+        const recentMedian = median(cur.midis.slice(-5));
+        if (Math.abs(f.midi - recentMedian) > JUMP_THRESH) {
+          finalize(cur);
+          cur = { midis: [f.midi], times: [f.t] };
+        } else {
+          cur.midis.push(f.midi);
+          cur.times.push(f.t);
+        }
+      }
+    } else {
+      if (cur) { finalize(cur); cur = null; }
+    }
+  }
+  finalize(cur);
+  return notes;
+}
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function midiToName(midi) {
+  const name = NOTE_NAMES[midi % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  return name + octave;
+}
+
+function renderNotes(notes) {
+  const body = document.getElementById('notesBody');
+  const section = document.getElementById('notesSection');
+  body.innerHTML = '';
+  if (notes.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  notes.forEach((n, i) => {
+    const tr = document.createElement('tr');
+    const stabilityClass = n.stability < 0.4 ? 'legato-ok' : 'legato-warn';
+    const stabilityLabel = n.stability < 0.4 ? 'נקי' : ('לא יציב (' + n.stability.toFixed(2) + ')');
+    tr.innerHTML =
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + midiToName(n.midi) + '</td>' +
+      '<td>' + n.start.toFixed(2) + '</td>' +
+      '<td>' + Math.round(n.duration * 1000) + '</td>' +
+      '<td class="' + stabilityClass + '">' + stabilityLabel + '</td>';
+    body.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
