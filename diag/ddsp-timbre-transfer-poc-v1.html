@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POC: DDSP — המרת טימבר רציפה</title>
+<!-- Official dependency chain per Google Magenta's own ddsp_tone_transfer demo -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.58/Tone.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/1.2.8/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    background: #f4efe6; color: #2b2416; margin: 0; padding: 16px;
+    max-width: 480px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; margin: 8px 0 2px; }
+  .subtitle { font-size: 13px; color: #6b6250; margin-bottom: 14px; }
+  .banner {
+    background: #e3ecf7; border: 1px solid #a9c2e0; border-radius: 8px;
+    padding: 10px 12px; font-size: 12.5px; margin-bottom: 16px; line-height: 1.55;
+  }
+  button {
+    font-size: 16px; padding: 14px 10px; border-radius: 10px; border: none;
+    width: 100%; margin: 6px 0; font-weight: 600; cursor: pointer;
+  }
+  .btn-record { background: #b23b3b; color: #fff; }
+  .btn-record.recording { background: #6b1f1f; }
+  .btn-secondary { background: #e5ddc8; color: #2b2416; }
+  .btn-instrument { background: #2c4f7c; color: #fff; }
+  .btn-instrument:disabled, .btn-record:disabled, .btn-secondary:disabled { opacity: 0.4; }
+  .status { font-size: 13px; color: #6b6250; min-height: 34px; margin: 4px 0 10px; line-height: 1.5; }
+  .section-label { font-size: 12px; color: #6b6250; margin: 16px 0 4px; font-weight: 600; }
+  audio { width: 100%; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>POC: DDSP — המרת טימבר רציפה</h1>
+<div class="subtitle">כלי בדיקה נפרד — לא Path A (סמפלים/תווים), זה Path B</div>
+
+<div class="banner">
+  <b>שונה לגמרי מה-POC הקודם.</b> כאן <b>אין</b> זיהוי-תו, <b>אין</b> MIDI, <b>אין</b> קוונטיזציה בכלל.
+  הקול שלך נשאר כמו שהוא — עקומת פיץ' ועוצמה רציפה — ומוזרם ישירות לרשת נוירונים (DDSP, Google Magenta)
+  שמסנתזת אותו מחדש בטימבר של כלי אחר. לגאטו, גליסנדו, פייד, ויברטו — כל מה שהקלטת עובר בדיוק כמו שהוא.
+  <br><br>
+  <b>מגבלה אמיתית:</b> יש רק 4 כלים עם מודל מאומן-מראש: כינור, סקסופון-טנור, חצוצרה, חליל.
+  לא בס, לא צ'לו, לא אבוב — אלה דורשים אימון מודל נפרד (לא POC של היום).
+  <br><br>
+  <b>טעינה ראשונה איטית</b> — מוריד ספריות TensorFlow + מודל (עשרות MB). על WiFi חלש זה יכול לקחת דקה-שתיים.
+</div>
+
+<button id="btnRecord" class="btn-record">🎤 התחל הקלטה</button>
+<div id="status" class="status">לחץ להקליט את הקול שלך (2-8 שניות, כל דבר — לגאטו, פדים, מה שתרצה)</div>
+
+<button id="btnPlayOriginal" class="btn-secondary" disabled>🔁 נגן הקלטה מקורית</button>
+
+<div class="section-label">המרה לכלי (DDSP)</div>
+<button id="btnViolin" class="btn-instrument" disabled>🎻 כינור</button>
+<button id="btnSax" class="btn-instrument" disabled>🎷 סקסופון טנור</button>
+<button id="btnTrumpet" class="btn-instrument" disabled>🎺 חצוצרה</button>
+<button id="btnFlute" class="btn-instrument" disabled>🪈 חליל</button>
+
+<audio id="resultPlayer" controls style="display:none;"></audio>
+
+<script>
+const PRESET_MODEL_URL = 'https://storage.googleapis.com/magentadata/js/checkpoints/ddsp';
+const MODELS = {
+  violin: 'violin',
+  sax: 'tenor_saxophone',
+  trumpet: 'trumpet',
+  flute: 'flute'
+};
+
+const btnRecord = document.getElementById('btnRecord');
+const btnPlayOriginal = document.getElementById('btnPlayOriginal');
+const statusEl = document.getElementById('status');
+const resultPlayer = document.getElementById('resultPlayer');
+const instrumentButtons = {
+  violin: document.getElementById('btnViolin'),
+  sax: document.getElementById('btnSax'),
+  trumpet: document.getElementById('btnTrumpet'),
+  flute: document.getElementById('btnFlute')
+};
+
+let mediaRecorder, recordedChunks = [];
+let recordedBlob = null;
+let audioCtx = null;
+let spice = null;
+let audioFeatures = null;
+let spiceReady = false;
+
+async function ensureSpice() {
+  if (spiceReady) return;
+  statusEl.textContent = "טוען מודל SPICE (זיהוי פיץ'')... פעם ראשונה איטית.";
+  spice = new mm.SPICE();
+  await spice.initialize();
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  spiceReady = true;
+}
+
+btnRecord.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    // getUserMedia BEFORE any audio output — capture-only, no filters on the source itself
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      btnRecord.textContent = '🎤 התחל הקלטה';
+      btnRecord.classList.remove('recording');
+      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+      btnPlayOriginal.disabled = false;
+      await extractFeatures(recordedBlob);
+    };
+    mediaRecorder.start();
+    btnRecord.textContent = '⏹ עצור הקלטה';
+    btnRecord.classList.add('recording');
+    statusEl.textContent = 'מקליט... הקלט בדיוק כמו רשמקול, שר/זמזם חופשי';
+  } catch (err) {
+    statusEl.textContent = 'שגיאת הרשאת מיקרופון: ' + err.message;
+  }
+});
+
+btnPlayOriginal.addEventListener('click', () => {
+  if (!recordedBlob) return;
+  new Audio(URL.createObjectURL(recordedBlob)).play();
+});
+
+async function extractFeatures(blob) {
+  await ensureSpice();
+  statusEl.textContent = "מחלץ עקומת פיץ'/עוצמה מהמקור (SPICE)...";
+  const arrBuf = await blob.arrayBuffer();
+  const audioBuffer = await audioCtx.decodeAudioData(arrBuf);
+  audioFeatures = await spice.getAudioFeatures(audioBuffer);
+  Object.values(instrumentButtons).forEach(b => b.disabled = false);
+  statusEl.textContent = 'זוהתה עקומה. בחר כלי להמרה — התהליך יורד מודל ייעודי לכלי (יכול לקחת זמן בפעם הראשונה).';
+}
+
+async function convert(modelKey) {
+  if (!audioFeatures) return;
+  Object.values(instrumentButtons).forEach(b => b.disabled = true);
+  statusEl.textContent = 'טוען מודל ' + modelKey + ' ומסנתז... זה יכול לקחת כמה עשרות שניות.';
+  try {
+    const checkpointUrl = PRESET_MODEL_URL + '/' + MODELS[modelKey];
+    const ddsp = new mm.DDSP(checkpointUrl);
+    await ddsp.initialize();
+    const synthesized = await ddsp.synthesize(audioFeatures);
+    const wavBlob = encodeWAV(synthesized, audioCtx.sampleRate);
+    resultPlayer.src = URL.createObjectURL(wavBlob);
+    resultPlayer.style.display = 'block';
+    resultPlayer.play();
+    ddsp.dispose();
+    statusEl.textContent = 'הושלם — ' + modelKey + '. אפשר להשוות מול "נגן הקלטה מקורית".';
+  } catch (err) {
+    statusEl.textContent = 'שגיאה בסינתזה: ' + err.message;
+  } finally {
+    Object.values(instrumentButtons).forEach(b => b.disabled = false);
+  }
+}
+
+instrumentButtons.violin.addEventListener('click', () => convert('violin'));
+instrumentButtons.sax.addEventListener('click', () => convert('sax'));
+instrumentButtons.trumpet.addEventListener('click', () => convert('trumpet'));
+instrumentButtons.flute.addEventListener('click', () => convert('flute'));
+
+// ===== WAV encoding (from Google's own ddsp_tone_transfer demo) =====
+function floatTo16BitPCM(output, offset, input) {
+  for (let i = 0; i < input.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+}
+function writeString(view, offset, str) {
+  for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+}
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  floatTo16BitPCM(view, 44, samples);
+  return new Blob([view], { type: 'audio/wav' });
+}
+</script>
+</body>
+</html>
