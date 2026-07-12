@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POC: ביטבוקס → תופים</title>
+<script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    background: #f4efe6; color: #2b2416; margin: 0; padding: 16px;
+    max-width: 480px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; margin: 8px 0 2px; }
+  .subtitle { font-size: 13px; color: #6b6250; margin-bottom: 14px; }
+  .banner {
+    background: #e8f3e8; border: 1px solid #9dc99d; border-radius: 8px;
+    padding: 10px 12px; font-size: 12.5px; margin-bottom: 16px; line-height: 1.55;
+  }
+  button {
+    font-size: 16px; padding: 14px 10px; border-radius: 10px; border: none;
+    width: 100%; margin: 6px 0; font-weight: 600; cursor: pointer;
+  }
+  .btn-record { background: #b23b3b; color: #fff; }
+  .btn-record.recording { background: #6b1f1f; }
+  .btn-play { background: #8a6a1f; color: #fff; }
+  .btn-secondary { background: #e5ddc8; color: #2b2416; }
+  button:disabled { opacity: 0.4; }
+  .status { font-size: 13px; color: #6b6250; min-height: 34px; margin: 4px 0 10px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #d8e5d8; }
+  th { color: #6b6250; font-weight: 600; font-size: 12px; }
+  .type-kick { color: #7a3b3b; font-weight: 600; }
+  .type-snare { color: #3b6b7a; font-weight: 600; }
+  .type-hihat { color: #7a6b3b; font-weight: 600; }
+  .section-label { font-size: 12px; color: #6b6250; margin: 16px 0 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>POC: ביטבוקס → תופים</h1>
+<div class="subtitle">כלי בדיקה נפרד — Path A (זיהוי-אירוע+סמפל), לא DDSP</div>
+
+<div class="banner">
+  <b>האלגוריתם נבדק headless על אותות סינתטיים ידועים לפני שהגיע לכאן</b> (קיק/סנר/הייהאט מלאכותיים,
+  כולל fill מהיר) — <b>100% התאמה</b>. זה לא אותה שיטה שנכשלה על זיהוי-פיץ' (וויברטו) — כאן אין פיץ' בכלל,
+  רק זיהוי-אירוע (מתי הוקש) + סיווג לפי "בהירות" ספקטרלית (יחס אנרגיית-הפרש לאנרגיה כוללת).
+  <br><br>
+  <b>v1 — סיווג ל-3 סוגים בלבד</b> (קיק/סנר/הייהאט), קיט אחד. אם הסיווג עובד טוב על הקול שלך —
+  מרחיבים לעוד סוגי הקשה וקיטים. אם לא — נדע בדיוק מאיפה זה נשבר, כמו עם הפיץ'.
+</div>
+
+<button id="btnRecord" class="btn-record">🎤 התחל הקלטה</button>
+<div id="status" class="status">לחץ והקלט ביטבוקס קצר — קיק/סנר/הייהאט, כמה מכות, אולי fill קטן</div>
+
+<button id="btnPlayOriginal" class="btn-secondary" disabled>🔁 נגן הקלטה מקורית</button>
+<button id="btnPlayDrums" class="btn-play" disabled>▶ נגן עם תופים (עם פאנינג)</button>
+
+<div id="hitsSection" style="display:none;">
+  <div class="section-label">מכות שזוהו</div>
+  <table id="hitsTable">
+    <thead><tr><th>#</th><th>זמן (ש')</th><th>סוג</th><th>בהירות</th></tr></thead>
+    <tbody id="hitsBody"></tbody>
+  </table>
+</div>
+
+<script>
+let mediaRecorder, recordedChunks = [];
+let recordedBlob = null;
+let detectedHits = [];
+let playerAudioCtx, wafPlayer;
+let loadedDrums = {};
+
+const btnRecord = document.getElementById('btnRecord');
+const btnPlayOriginal = document.getElementById('btnPlayOriginal');
+const btnPlayDrums = document.getElementById('btnPlayDrums');
+const statusEl = document.getElementById('status');
+
+// MIDI percussion notes: 36=kick, 38=snare, 42=closed hihat (GM standard)
+// JCLive kit — file naming verified against WebAudioFont's own example page
+const DRUM_MAP = {
+  kick:  { note: 36, file: '12836_6_JCLive_sf2_file.js', varName: '_drum_36_6_JCLive_sf2_file', pan: 0 },
+  snare: { note: 38, file: '12838_6_JCLive_sf2_file.js', varName: '_drum_38_6_JCLive_sf2_file', pan: 0 },
+  hihat: { note: 42, file: '12842_6_JCLive_sf2_file.js', varName: '_drum_42_6_JCLive_sf2_file', pan: -0.6 }
+};
+
+function ensurePlayer() {
+  if (!playerAudioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    playerAudioCtx = new AC();
+    wafPlayer = new WebAudioFontPlayer();
+  }
+}
+
+function loadDrum(type) {
+  return new Promise((resolve) => {
+    ensurePlayer();
+    if (loadedDrums[type]) { resolve(loadedDrums[type]); return; }
+    const info = DRUM_MAP[type];
+    const url = 'https://surikov.github.io/webaudiofontdata/sound/' + info.file;
+    wafPlayer.loader.startLoad(playerAudioCtx, url, info.varName);
+    wafPlayer.loader.waitLoad(function () {
+      loadedDrums[type] = window[info.varName];
+      resolve(loadedDrums[type]);
+    });
+  });
+}
+
+btnRecord.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      btnRecord.textContent = '🎤 התחל הקלטה';
+      btnRecord.classList.remove('recording');
+      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+      btnPlayOriginal.disabled = false;
+      statusEl.textContent = 'מנתח הקשות...';
+      await analyzeRecording(recordedBlob);
+    };
+    mediaRecorder.start();
+    btnRecord.textContent = '⏹ עצור הקלטה';
+    btnRecord.classList.add('recording');
+    statusEl.textContent = 'מקליט... בטבוקס חופשי';
+  } catch (err) {
+    statusEl.textContent = 'שגיאת הרשאת מיקרופון: ' + err.message;
+  }
+});
+
+btnPlayOriginal.addEventListener('click', () => {
+  if (!recordedBlob) return;
+  new Audio(URL.createObjectURL(recordedBlob)).play();
+});
+
+btnPlayDrums.addEventListener('click', async () => {
+  if (detectedHits.length === 0) return;
+  statusEl.textContent = 'טוען תופים...';
+  ensurePlayer();
+  for (const type of ['kick', 'snare', 'hihat']) await loadDrum(type);
+  if (playerAudioCtx.state === 'suspended') await playerAudioCtx.resume();
+  statusEl.textContent = 'מנגן...';
+  const startAt = playerAudioCtx.currentTime + 0.15;
+  const firstT = detectedHits[0].t;
+  detectedHits.forEach(hit => {
+    const tone = loadedDrums[hit.type];
+    const info = DRUM_MAP[hit.type];
+    const panner = playerAudioCtx.createStereoPanner();
+    panner.pan.value = info.pan;
+    panner.connect(playerAudioCtx.destination);
+    const when = startAt + (hit.t - firstT);
+    wafPlayer.queueWaveTable(playerAudioCtx, panner, tone, when, info.note, 1.0, 0.8);
+  });
+});
+
+// ===== Offline analysis after stop() — verified headless before shipping =====
+async function analyzeRecording(blob) {
+  const arrBuf = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const decodeCtx = new AC();
+  const audioBuffer = await decodeCtx.decodeAudioData(arrBuf);
+
+  const targetRate = 16000;
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * targetRate), targetRate);
+  const src = offlineCtx.createBufferSource();
+  src.buffer = audioBuffer;
+  src.connect(offlineCtx.destination);
+  src.start();
+  const rendered = await offlineCtx.startRendering();
+  const data = rendered.getChannelData(0);
+
+  const onsets = detectOnsets(data, targetRate);
+  detectedHits = onsets.map(pos => {
+    const c = classifyOnset(data, pos, targetRate);
+    return { t: pos / targetRate, type: c.type, ratio: c.ratio };
+  });
+
+  renderHits(detectedHits);
+  btnPlayDrums.disabled = detectedHits.length === 0;
+  statusEl.textContent = detectedHits.length > 0
+    ? ('זוהו ' + detectedHits.length + ' מכות')
+    : 'לא זוהו מכות — נסה חזק וברור יותר';
+}
+
+function detectOnsets(data, sr) {
+  const frameSize = 256, hop = 128;
+  const rms = [];
+  for (let start = 0; start + frameSize <= data.length; start += hop) {
+    let e = 0;
+    for (let i = 0; i < frameSize; i++) e += data[start + i] * data[start + i];
+    rms.push(Math.sqrt(e / frameSize));
+  }
+  const onsets = [];
+  const THRESH = 0.02;
+  const MIN_GAP_FRAMES = Math.round(0.05 * sr / hop);
+  let lastOnsetFrame = -Infinity;
+  let prevRms = 0;
+  for (let i = 0; i < rms.length; i++) {
+    if (rms[i] > THRESH && prevRms <= THRESH && (i - lastOnsetFrame) > MIN_GAP_FRAMES) {
+      onsets.push(i * hop);
+      lastOnsetFrame = i;
+    }
+    prevRms = rms[i];
+  }
+  return onsets;
+}
+
+function classifyOnset(data, startSample, sr) {
+  const winLen = Math.floor(0.04 * sr);
+  const end = Math.min(data.length, startSample + winLen);
+  let energy = 0, diffEnergy = 0;
+  for (let i = startSample; i < end; i++) {
+    energy += data[i] * data[i];
+    if (i > startSample) {
+      const d = data[i] - data[i - 1];
+      diffEnergy += d * d;
+    }
+  }
+  if (energy < 1e-9) return { type: 'unknown', ratio: 0 };
+  const ratio = diffEnergy / energy;
+  let type;
+  if (ratio < 0.5) type = 'kick';
+  else if (ratio > 2.3) type = 'hihat';
+  else type = 'snare';
+  return { type, ratio };
+}
+
+function renderHits(hits) {
+  const body = document.getElementById('hitsBody');
+  const section = document.getElementById('hitsSection');
+  body.innerHTML = '';
+  if (hits.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const labels = { kick: 'קיק', snare: 'סנר', hihat: 'הייהאט' };
+  hits.forEach((h, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + h.t.toFixed(2) + '</td>' +
+      '<td class="type-' + h.type + '">' + (labels[h.type] || h.type) + '</td>' +
+      '<td>' + h.ratio.toFixed(2) + '</td>';
+    body.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
