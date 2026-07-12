@@ -43,11 +43,18 @@
     color:#fff; font-size:1rem; font-weight:700; cursor:pointer;
   }
   .run-btn:disabled{opacity:.5; cursor:not-allowed}
+  .sim-btn{
+    width:100%; padding:14px; border-radius:12px; background:var(--ok-bg);
+    color:var(--text); font-size:.92rem; font-weight:700; cursor:pointer;
+    border:2px solid var(--accent); margin-top:10px;
+  }
+  .sim-btn:disabled{opacity:.5; cursor:not-allowed}
   .result-card{
     background:var(--ok-bg); border:2px solid var(--accent); border-radius:16px;
     padding:18px; text-align:center; margin-top:14px;
   }
   .result-card.bad{background:var(--bad-bg); border-color:var(--bad)}
+  .result-card.sim{border-style:dashed}
   .result-db{font-size:2.4rem; font-weight:800; color:var(--accent)}
   .result-caption{font-size:.68rem; color:var(--dim); margin-top:-4px; margin-bottom:6px}
   .result-card.bad .result-db{color:var(--bad)}
@@ -68,6 +75,10 @@
   .status-line{font-size:.78rem; color:var(--dim); text-align:center; margin-top:8px; min-height:1.2em}
   .flag{
     font-size:.72rem; color:#8a6d1f; background:#f6ecd2; border:1px solid #ddc98a;
+    border-radius:8px; padding:8px 10px; margin-top:12px; line-height:1.4;
+  }
+  .sim-flag{
+    font-size:.72rem; color:#1f5f8a; background:#e2eef6; border:1px solid #8ac0dd;
     border-radius:8px; padding:8px 10px; margin-top:12px; line-height:1.4;
   }
 </style>
@@ -112,14 +123,16 @@
   </p>
 
   <button class="run-btn" id="btnRun">▶ הפעל</button>
+  <button class="sim-btn" id="btnSim">🧪 סימולציה: רעש עולה (לא מקליט, מיידי)</button>
   <div class="status-line" id="statusLine"></div>
 
   <div class="result-card" id="resultCard" style="display:none">
     <div class="result-db" id="resultDb">—</div>
-    <div class="result-caption">ללא השנייה הראשונה (transient התכנסות)</div>
+    <div class="result-caption" id="resultCaption">ללא השנייה הראשונה (transient התכנסות)</div>
     <div class="result-msg" id="resultMsg"></div>
     <div class="detail-line" id="detailLine"></div>
     <div class="detail-line" id="dtdLine"></div>
+    <div class="detail-line" id="simCrossLine"></div>
     <div class="detail-line" id="x6Line"></div>
     <div class="detail-line" id="diagLine"></div>
     <div class="detail-line" id="timingLine"></div>
@@ -146,10 +159,15 @@
     ⚠ ×6 הוא <b>הערכה גסה</b>, לא מדידה: היסט הזמן (~8ms) וג'יטר העוצמה (±15%) הם מספרים
     משוערים, לא נמדדו מנתונים אמיתיים.
     <br><br>
-    ⚠ TEMP (11.7.2026): DTD גרסה 2 — מקפיא עדכון משקלים רק בחלונות שבהם <b>אין קליק ברפרנס</b>
-    אבל המיקרופון בכל זאת קולט אנרגיה חריגה. חלונות עם קליק ברפרנס תמיד לומדים, לא משנה כמה
-    חזקים. זה מתקן גרסה קודמת שגויה שהקפיאה בדיוק את רגעי הקליק. הסף (8dB מעל רצפת הרעש) עדיין
-    ניחוש ראשוני — לכייל אחרי סבב ריצות.
+    ⚠ TEMP (11.7.2026): DTD גרסה 2 — מקפיא עדכון משקלים רק בחלונות שבהם אין קליק ברפרנס
+    אבל המיקרופון בכל זאת קולט אנרגיה חריגה. הסף (8dB מעל רצפת הרעש) ניחוש ראשוני.
+  </div>
+
+  <div class="sim-flag">
+    🧪 TEMP (12.7.2026): מצב "סימולציה" לא מקליט כלום — בונה הד מדומה (הקליק עצמו, עם השהיה
+    וגיין קבועים, לא נמדדים) ומוסיף עליו רעש שעולה ליניארית מ-80- עד 0dBFS לאורך 5 השניות.
+    משמש רק לכיול/הבנת הסף של ה-DTD בבידוד — <b>לא בודק את הזליגה החשמלית האמיתית של הטלפון</b>,
+    זה עדיין דורש הקלטה אמיתית עם כפתור "הפעל" הרגיל.
   </div>
 </div>
 
@@ -166,6 +184,11 @@ const LEAK = 1e-6;
 const DTD_WIN_MS = 100;
 const DTD_REF_ACTIVE_DB = -80;
 const DTD_NOISE_MARGIN_DB = 8;
+
+const SIM_ECHO_GAIN = 0.35;
+const SIM_ECHO_DELAY_SEC = 0.35;
+const SIM_RAMP_START_DB = -80;
+const SIM_RAMP_END_DB = 0;
 
 let audioCtx = null;
 let micStream = null;
@@ -284,6 +307,31 @@ function alignedPair(ref, mic, lag){
   return { x, d };
 }
 
+function dbToAmp(db){ return Math.pow(10, db/20); }
+
+function buildSimulatedPair(){
+  const x = clickBuffer;
+  const N = x.length;
+  const d = new Float64Array(N);
+  const delaySamples = Math.floor(SR * SIM_ECHO_DELAY_SEC);
+  for(let n=0; n<N; n++){
+    const srcIdx = n - delaySamples;
+    d[n] = srcIdx>=0 ? x[srcIdx]*SIM_ECHO_GAIN : 0;
+  }
+  for(let n=0; n<N; n++){
+    const t = n / N;
+    const rampDb = SIM_RAMP_START_DB + (SIM_RAMP_END_DB - SIM_RAMP_START_DB) * t;
+    const amp = dbToAmp(rampDb);
+    d[n] += (Math.random()*2-1) * amp;
+  }
+  return { x: Float32Array.from(x), d: Float32Array.from(d) };
+}
+
+function simRampCrossingTimeSec(targetDb){
+  const t = (targetDb - SIM_RAMP_START_DB) / (SIM_RAMP_END_DB - SIM_RAMP_START_DB);
+  return Math.max(0, Math.min(TAKE_DURATION, t * TAKE_DURATION));
+}
+
 function computeFreezeMask(x, d, sr, winMs, refActiveDb, noiseMarginDb){
   const winSamples = Math.max(1, Math.floor(sr * winMs / 1000));
   const nWin = Math.ceil(d.length / winSamples);
@@ -316,15 +364,18 @@ function computeFreezeMask(x, d, sr, winMs, refActiveDb, noiseMarginDb){
 
   const mask = new Uint8Array(d.length);
   let frozenWindows = 0;
+  let firstFrozenWinIdx = -1;
   for(let wi=0; wi<nWin; wi++){
     const frozen = !widened[wi] && (micEnergyDb[wi] - noiseFloor > noiseMarginDb);
     if(frozen){
       frozenWindows++;
+      if(firstFrozenWinIdx === -1) firstFrozenWinIdx = wi;
       const start = wi*winSamples, end = Math.min(d.length, start+winSamples);
       for(let i=start;i<end;i++) mask[i] = 1;
     }
   }
-  return { mask, frozenWindows, totalWindows: nWin, noiseFloor };
+  const firstFrozenSec = firstFrozenWinIdx>=0 ? (firstFrozenWinIdx*winSamples)/sr : null;
+  return { mask, frozenWindows, totalWindows: nWin, noiseFloor, firstFrozenSec };
 }
 
 function nlmsTrain(x, d, taps, mu, leak, epsilon, freezeMask){
@@ -432,128 +483,163 @@ function perWindowDb(x, d, weights, winSamples){
   return out;
 }
 
+function analyzeAndRender(x, d, timing, isSim){
+  const taps = parseInt($('selL').value, 10);
+  const mu = parseFloat($('selMu').value);
+  const epsilon = 1e-2;
+  const maxLag = Math.floor(SR * 0.6);
+
+  const lag = findLag(clickBuffer, d, maxLag);
+  const pair = alignedPair(clickBuffer, d, lag);
+
+  const dtd = computeFreezeMask(pair.x, pair.d, SR, DTD_WIN_MS, DTD_REF_ACTIVE_DB, DTD_NOISE_MARGIN_DB);
+  const freezeMask = dtd.mask;
+
+  const trained = nlmsTrain(pair.x, pair.d, taps, mu, LEAK, epsilon, freezeMask);
+
+  const burnInSamples = SR * 1;
+  let dB;
+  if(trained.diverged){
+    dB = -Infinity;
+  } else if(trained.residual.length <= burnInSamples){
+    dB = dbReduction(pair.d.subarray(0, trained.residual.length), trained.residual);
+  } else {
+    dB = dbReduction(
+      pair.d.subarray(burnInSamples, trained.residual.length),
+      trained.residual.subarray(burnInSamples)
+    );
+  }
+
+  const half = Math.floor(pair.x.length/2);
+  const r1 = nlmsTrain(pair.x.subarray(0,half), pair.d.subarray(0,half), taps, mu, LEAK, epsilon, freezeMask.subarray(0,half));
+  const r2 = nlmsTrain(pair.x.subarray(half), pair.d.subarray(half), taps, mu, LEAK, epsilon, freezeMask.subarray(half));
+  const drift = (r1.diverged || r2.diverged) ? null : cosineSim(r1.weights, r2.weights);
+
+  renderResult({ dB, drift, lag, taps, mu, mode, timing, isSim });
+
+  const frozenPct = dtd.totalWindows ? (100*dtd.frozenWindows/dtd.totalWindows) : 0;
+  $('dtdLine').textContent = `DTD v2: הוקפא ${frozenPct.toFixed(1)}% מהחלונות (${dtd.frozenWindows}/${dtd.totalWindows}) · רצפת רעש: ${dtd.noiseFloor.toFixed(1)}dBFS`;
+
+  if(isSim){
+    const theoreticalCrossSec = simRampCrossingTimeSec(dtd.noiseFloor + DTD_NOISE_MARGIN_DB);
+    const actualFreezeSec = dtd.firstFrozenSec;
+    $('simCrossLine').textContent =
+      `🧪 סף חצה תיאורטית ב-${theoreticalCrossSec.toFixed(2)}s (רעש ${dtd.noiseFloor.toFixed(1)}+${DTD_NOISE_MARGIN_DB}dB) · ` +
+      `DTD הקפיא בפועל לראשונה ב-${actualFreezeSec!=null ? actualFreezeSec.toFixed(2)+'s' : 'מעולם לא'}`;
+  } else {
+    $('simCrossLine').textContent = '';
+  }
+
+  lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
+  lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
+  const x6Db = 20*Math.log10(rms(lastRun.cleanX6) + 1e-9);
+  const x1Db = 20*Math.log10(rms(trained.residual) + 1e-9);
+  $('x6Line').textContent = `שארית בודדת: ${x1Db.toFixed(1)}dBFS · הערכה גסה אחרי הכפלה ×6: ${x6Db.toFixed(1)}dBFS`;
+
+  const rawRms = rms(pair.d);
+  const rawDbfs = 20*Math.log10(rawRms + 1e-9);
+  let diagText = `גלם RMS: ${rawDbfs.toFixed(1)}dBFS`;
+  if(!trained.diverged){
+    const sizes = [[0.5,'0.5s'],[1,'1s'],[2,'2s']];
+    for(const [sec,label] of sizes){
+      const wins = perWindowDb(pair.x, pair.d, trained.weights, Math.floor(SR*sec));
+      if(!wins.length) continue;
+      const finite = wins.filter(isFinite);
+      const spread = finite.length ? (Math.max(...finite) - Math.min(...finite)) : 0;
+      const txt = wins.map(v => isFinite(v) ? v.toFixed(1) : '∞').join('·');
+      diagText += `\nחלון ${label}: [${txt}] פיזור ${spread.toFixed(1)}dB`;
+    }
+  }
+  $('diagLine').textContent = diagText;
+
+  if(!trained.diverged){
+    const segN = Math.floor(SR * 1);
+    const segWeights = [];
+    for(let start=0; start+segN<=pair.x.length; start+=segN){
+      const r = nlmsTrain(pair.x.subarray(start,start+segN), pair.d.subarray(start,start+segN), taps, mu, LEAK, epsilon, freezeMask.subarray(start,start+segN));
+      segWeights.push(r.diverged ? null : r.weights);
+    }
+    const cos = [];
+    for(let i=1;i<segWeights.length;i++){
+      cos.push((segWeights[i-1] && segWeights[i]) ? cosineSim(segWeights[i-1], segWeights[i]).toFixed(3) : 'div');
+    }
+    $('driftTimeLine').textContent = cos.length
+      ? 'דריפט לאורך זמן (cos בין חלונות 1s עוקבים): [' + cos.join(' · ') + '] — שלילי = ה-transfer התהפך'
+      : 'דריפט לאורך זמן: הריצה קצרה מדי לחלונות 1s';
+
+    const winN = Math.floor(SR * 0.5);
+    const res = trained.residual;
+    const seq = [];
+    for(let start=0; start+winN<=res.length; start+=winN){
+      seq.push((20*Math.log10(rms(res.subarray(start, start+winN))+1e-9)).toFixed(1));
+    }
+    $('rmsTimeLine').textContent = 'שארית RMS לאורך זמן (0.5s): [' + seq.join(' · ') + '] dBFS';
+  } else {
+    $('driftTimeLine').textContent = '';
+    $('rmsTimeLine').textContent = '';
+  }
+
+  $('btnPlayX6').disabled = false;
+  drawWave($('cRaw'), lastRun.raw);
+  drawWave($('cClean'), lastRun.clean);
+  $('btnPlayRaw').disabled = false;
+  $('btnPlayClean').disabled = false;
+}
+
 $('btnRun').addEventListener('click', async () => {
   $('btnRun').disabled = true;
+  $('btnSim').disabled = true;
   $('statusLine').textContent = '';
   try{
     await ensureMic();
     ensureClickTrack();
     $('statusLine').textContent = mode === 'A' ? 'שקט... מקליט 5 שניות' : 'נגן/זמזם... מקליט 5 שניות';
-
     const take = await recordTakeAgainstClick();
-    const micRaw = take.samples;
     const timing = take.timing;
     $('statusLine').textContent = 'מנתח...';
-
     await new Promise(r => setTimeout(r, 20));
-
-    const taps = parseInt($('selL').value, 10);
-    const mu = parseFloat($('selMu').value);
-    const epsilon = 1e-2;
-    const maxLag = Math.floor(SR * 0.6);
-
-    const lag = findLag(clickBuffer, micRaw, maxLag);
-    const pair = alignedPair(clickBuffer, micRaw, lag);
-
-    const dtd = computeFreezeMask(pair.x, pair.d, SR, DTD_WIN_MS, DTD_REF_ACTIVE_DB, DTD_NOISE_MARGIN_DB);
-    const freezeMask = dtd.mask;
-
-    const trained = nlmsTrain(pair.x, pair.d, taps, mu, LEAK, epsilon, freezeMask);
-
-    const burnInSamples = SR * 1;
-    let dB;
-    if(trained.diverged){
-      dB = -Infinity;
-    } else if(trained.residual.length <= burnInSamples){
-      dB = dbReduction(pair.d.subarray(0, trained.residual.length), trained.residual);
-    } else {
-      dB = dbReduction(
-        pair.d.subarray(burnInSamples, trained.residual.length),
-        trained.residual.subarray(burnInSamples)
-      );
-    }
-
-    const half = Math.floor(pair.x.length/2);
-    const r1 = nlmsTrain(pair.x.subarray(0,half), pair.d.subarray(0,half), taps, mu, LEAK, epsilon, freezeMask.subarray(0,half));
-    const r2 = nlmsTrain(pair.x.subarray(half), pair.d.subarray(half), taps, mu, LEAK, epsilon, freezeMask.subarray(half));
-    const drift = (r1.diverged || r2.diverged) ? null : cosineSim(r1.weights, r2.weights);
-
-    renderResult({ dB, drift, lag, taps, mu, mode, timing });
-
-    const frozenPct = dtd.totalWindows ? (100*dtd.frozenWindows/dtd.totalWindows) : 0;
-    $('dtdLine').textContent = `DTD v2: הוקפא ${frozenPct.toFixed(1)}% מהחלונות (${dtd.frozenWindows}/${dtd.totalWindows}) · רצפת רעש: ${dtd.noiseFloor.toFixed(1)}dBFS`;
-
-    lastRun = { raw: pair.d, clean: trained.residual, sr: SR };
-    lastRun.cleanX6 = simulateChannelSum(trained.residual, 6);
-    const x6Db = 20*Math.log10(rms(lastRun.cleanX6) + 1e-9);
-    const x1Db = 20*Math.log10(rms(trained.residual) + 1e-9);
-    $('x6Line').textContent = `שארית בודדת: ${x1Db.toFixed(1)}dBFS · הערכה גסה אחרי הכפלה ×6: ${x6Db.toFixed(1)}dBFS`;
-
-    const rawRms = rms(pair.d);
-    const rawDbfs = 20*Math.log10(rawRms + 1e-9);
-    let diagText = `גלם RMS: ${rawDbfs.toFixed(1)}dBFS`;
-    if(!trained.diverged){
-      const sizes = [[0.5,'0.5s'],[1,'1s'],[2,'2s']];
-      for(const [sec,label] of sizes){
-        const wins = perWindowDb(pair.x, pair.d, trained.weights, Math.floor(SR*sec));
-        if(!wins.length) continue;
-        const finite = wins.filter(isFinite);
-        const spread = finite.length ? (Math.max(...finite) - Math.min(...finite)) : 0;
-        const txt = wins.map(v => isFinite(v) ? v.toFixed(1) : '∞').join('·');
-        diagText += `\nחלון ${label}: [${txt}] פיזור ${spread.toFixed(1)}dB`;
-      }
-    }
-    $('diagLine').textContent = diagText;
-
-    if(!trained.diverged){
-      const segN = Math.floor(SR * 1);
-      const segWeights = [];
-      for(let start=0; start+segN<=pair.x.length; start+=segN){
-        const r = nlmsTrain(pair.x.subarray(start,start+segN), pair.d.subarray(start,start+segN), taps, mu, LEAK, epsilon, freezeMask.subarray(start,start+segN));
-        segWeights.push(r.diverged ? null : r.weights);
-      }
-      const cos = [];
-      for(let i=1;i<segWeights.length;i++){
-        cos.push((segWeights[i-1] && segWeights[i]) ? cosineSim(segWeights[i-1], segWeights[i]).toFixed(3) : 'div');
-      }
-      $('driftTimeLine').textContent = cos.length
-        ? 'דריפט לאורך זמן (cos בין חלונות 1s עוקבים): [' + cos.join(' · ') + '] — שלילי = ה-transfer התהפך'
-        : 'דריפט לאורך זמן: הריצה קצרה מדי לחלונות 1s';
-
-      const winN = Math.floor(SR * 0.5);
-      const res = trained.residual;
-      const seq = [];
-      for(let start=0; start+winN<=res.length; start+=winN){
-        seq.push((20*Math.log10(rms(res.subarray(start, start+winN))+1e-9)).toFixed(1));
-      }
-      $('rmsTimeLine').textContent = 'שארית RMS לאורך זמן (0.5s): [' + seq.join(' · ') + '] dBFS';
-    } else {
-      $('driftTimeLine').textContent = '';
-      $('rmsTimeLine').textContent = '';
-    }
-
-    $('btnPlayX6').disabled = false;
-    drawWave($('cRaw'), lastRun.raw);
-    drawWave($('cClean'), lastRun.clean);
-    $('btnPlayRaw').disabled = false;
-    $('btnPlayClean').disabled = false;
+    analyzeAndRender(clickBuffer, take.samples, timing, false);
     $('statusLine').textContent = '';
   }catch(err){
     $('statusLine').textContent = 'שגיאה: ' + err.message;
   }
   $('btnRun').disabled = false;
+  $('btnSim').disabled = false;
 });
 
-function renderResult({ dB, drift, lag, taps, mu, mode, timing }){
+$('btnSim').addEventListener('click', async () => {
+  $('btnRun').disabled = true;
+  $('btnSim').disabled = true;
+  $('statusLine').textContent = 'בונה סימולציה...';
+  try{
+    ensureClickTrack();
+    await new Promise(r => setTimeout(r, 10));
+    const sim = buildSimulatedPair();
+    analyzeAndRender(clickBuffer, sim.d, null, true);
+    $('statusLine').textContent = '';
+  }catch(err){
+    $('statusLine').textContent = 'שגיאה: ' + err.message;
+  }
+  $('btnRun').disabled = false;
+  $('btnSim').disabled = false;
+});
+
+function renderResult({ dB, drift, lag, taps, mu, mode, timing, isSim }){
   const card = $('resultCard');
   card.style.display = 'block';
-  const dbEl = $('resultDb'), msgEl = $('resultMsg'), detailEl = $('detailLine');
+  card.classList.toggle('sim', !!isSim);
+  const dbEl = $('resultDb'), msgEl = $('resultMsg'), detailEl = $('detailLine'), capEl = $('resultCaption');
 
   const collapsed = !isFinite(dB) || dB < 5;
   card.classList.toggle('bad', collapsed);
   dbEl.textContent = isFinite(dB) ? `${dB.toFixed(1)} dB` : '‑‑ dB';
+  capEl.textContent = isSim ? '🧪 סימולציה — לא הקלטה אמיתית' : 'ללא השנייה הראשונה (transient התכנסות)';
 
-  if(mode === 'B'){
+  if(isSim){
+    msgEl.textContent = collapsed
+      ? 'הרעש העולה גרם לקריסה — ראה למטה מתי בדיוק ה-DTD הגיב.'
+      : 'הפילטר שרד את הרעש העולה עד רמה זו.';
+  } else if(mode === 'B'){
     msgEl.textContent = 'מבחן B מכיל תוכן חי — ה-dB לא תקף להשוואה, רק להדגמת ניקוי בפועל.';
   } else if(collapsed){
     msgEl.textContent = 'התכנסות נכשלה — L גדול מדי ביחס לנתונים, לא תוצאה תקפה. נסה L קטן יותר.';
