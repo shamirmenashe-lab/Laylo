@@ -483,13 +483,20 @@ function perWindowDb(x, d, weights, winSamples){
   return out;
 }
 
-function analyzeAndRender(x, d, timing, isSim){
+// TEMP (SIM fix, 12.7.2026): analyzeAndRender now accepts an optional knownLagSamples.
+// For simulation runs we pass the delay we ourselves fabricated (SIM_ECHO_DELAY_SEC), instead
+// of running findLag(). Reason: the synthetic echo repeats at the SAME 0.5s interval as the
+// click train, so blind cross-correlation search can lock onto a periodic-ambiguity sidelobe
+// (a wrong delay that looks almost as good as the true one) once noise is added — this caused
+// the previous 0.0%-frozen bug, not a threshold problem. Real recordings still use findLag()
+// as before; this bypass ONLY applies to simulation, where the true delay is already known.
+function analyzeAndRender(x, d, timing, isSim, knownLagSamples){
   const taps = parseInt($('selL').value, 10);
   const mu = parseFloat($('selMu').value);
   const epsilon = 1e-2;
   const maxLag = Math.floor(SR * 0.6);
 
-  const lag = findLag(clickBuffer, d, maxLag);
+  const lag = (knownLagSamples != null) ? knownLagSamples : findLag(clickBuffer, d, maxLag);
   const pair = alignedPair(clickBuffer, d, lag);
 
   const dtd = computeFreezeMask(pair.x, pair.d, SR, DTD_WIN_MS, DTD_REF_ACTIVE_DB, DTD_NOISE_MARGIN_DB);
@@ -524,7 +531,7 @@ function analyzeAndRender(x, d, timing, isSim){
     const theoreticalCrossSec = simRampCrossingTimeSec(dtd.noiseFloor + DTD_NOISE_MARGIN_DB);
     const actualFreezeSec = dtd.firstFrozenSec;
     $('simCrossLine').textContent =
-      `🧪 סף חצה תיאורטית ב-${theoreticalCrossSec.toFixed(2)}s (רעש ${dtd.noiseFloor.toFixed(1)}+${DTD_NOISE_MARGIN_DB}dB) · ` +
+      `🧪 השהיה ידועה: ${(lag/SR*1000).toFixed(0)}ms (לא נחפשה) · סף חצה תיאורטית ב-${theoreticalCrossSec.toFixed(2)}s (רעש ${dtd.noiseFloor.toFixed(1)}+${DTD_NOISE_MARGIN_DB}dB) · ` +
       `DTD הקפיא בפועל לראשונה ב-${actualFreezeSec!=null ? actualFreezeSec.toFixed(2)+'s' : 'מעולם לא'}`;
   } else {
     $('simCrossLine').textContent = '';
@@ -594,11 +601,13 @@ $('btnRun').addEventListener('click', async () => {
     await ensureMic();
     ensureClickTrack();
     $('statusLine').textContent = mode === 'A' ? 'שקט... מקליט 5 שניות' : 'נגן/זמזם... מקליט 5 שניות';
+
     const take = await recordTakeAgainstClick();
     const timing = take.timing;
     $('statusLine').textContent = 'מנתח...';
     await new Promise(r => setTimeout(r, 20));
-    analyzeAndRender(clickBuffer, take.samples, timing, false);
+
+    analyzeAndRender(clickBuffer, take.samples, timing, false, null);
     $('statusLine').textContent = '';
   }catch(err){
     $('statusLine').textContent = 'שגיאה: ' + err.message;
@@ -615,7 +624,8 @@ $('btnSim').addEventListener('click', async () => {
     ensureClickTrack();
     await new Promise(r => setTimeout(r, 10));
     const sim = buildSimulatedPair();
-    analyzeAndRender(clickBuffer, sim.d, null, true);
+    const knownLag = Math.floor(SR * SIM_ECHO_DELAY_SEC); // TEMP (SIM fix): use fabricated delay directly
+    analyzeAndRender(clickBuffer, sim.d, null, true, knownLag);
     $('statusLine').textContent = '';
   }catch(err){
     $('statusLine').textContent = 'שגיאה: ' + err.message;
