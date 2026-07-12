@@ -49,6 +49,11 @@
     border:2px solid var(--accent); margin-top:10px;
   }
   .sim-btn:disabled{opacity:.5; cursor:not-allowed}
+  .mic-btn{
+    width:100%; padding:12px; border-radius:12px; background:var(--card);
+    color:var(--text); font-size:.85rem; font-weight:600; cursor:pointer;
+    border:1px solid var(--line); margin-top:8px; margin-bottom:14px;
+  }
   .result-card{
     background:var(--ok-bg); border:2px solid var(--accent); border-radius:16px;
     padding:18px; text-align:center; margin-top:14px;
@@ -118,6 +123,14 @@
     </div>
   </div>
 
+  <div class="select-row" style="margin-bottom:8px">
+    <div class="select-field" style="flex:2">
+      <label>מיקרופון (למניעת מעבר אוטומטי לאוזניה)</label>
+      <select id="selMic"><option value="">לחץ "רענן" למטה</option></select>
+    </div>
+  </div>
+  <button class="mic-btn" id="btnRefreshMics">🔄 רענן רשימת מיקרופונים</button>
+
   <p class="instruction" id="instructionText">
     חבר אוזניות, שב בשקט, נשמיע ביט ונקליט 5 שניות — נמדוד כמה מהזליגה אפשר למחוק בפועל.
   </p>
@@ -159,8 +172,12 @@
     ⚠ ×6 הוא <b>הערכה גסה</b>, לא מדידה: היסט הזמן (~8ms) וג'יטר העוצמה (±15%) הם מספרים
     משוערים, לא נמדדו מנתונים אמיתיים.
     <br><br>
-    ⚠ TEMP (11.7.2026): DTD גרסה 2 — מקפיא עדכון משקלים רק בחלונות שבהם אין קליק ברפרנס
+    ⚠ TEMP (11.7.2026): DTD גרסה 2 — מקפיא עדכון משקלים רק בחלונות שאין בהם קליק ברפרנס
     אבל המיקרופון בכל זאת קולט אנרגיה חריגה. הסף (8dB מעל רצפת הרעש) ניחוש ראשוני.
+    <br><br>
+    ⚠ TEMP (12.7.2026): בורר מיקרופון — כופה מיקרופון ספציפי (deviceId) במקום לסמוך על
+    בחירה אוטומטית של המערכת, שעלולה לעבור לאוזניה חיצונית עם מיקרופון משלה (כמו JBL Tune 310C)
+    בלי שים לב. שורת "מיקרופון בפועל" בתוצאה מאשרת מה באמת נעשה בו שימוש.
   </div>
 
   <div class="sim-flag">
@@ -196,6 +213,9 @@ let clickBuffer = null;
 let clickBlobUrl = null;
 let mode = 'A';
 let lastRun = null;
+
+let selectedMicId = '';
+let actualMicUsed = '';
 
 const $ = (id) => document.getElementById(id);
 
@@ -251,12 +271,62 @@ function floatToWavBlob(samples, sampleRate){
 }
 
 async function ensureMic(){
-  if(micStream) return;
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: {
-    echoCancellation:false, noiseSuppression:false, autoGainControl:false
-  }});
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+  const constraints = {
+    audio: {
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+      ...(selectedMicId ? { deviceId: { exact: selectedMicId } } : {})
+    }
+  };
+  if(micStream){
+    const track = micStream.getAudioTracks()[0];
+    const curId = track ? track.getSettings().deviceId : null;
+    if(track && (!selectedMicId || curId === selectedMicId)) {
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+      return;
+    }
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+  }
+  micStream = await navigator.mediaDevices.getUserMedia(constraints);
+  const track = micStream.getAudioTracks()[0];
+  actualMicUsed = track ? (track.label || track.getSettings().deviceId || 'לא ידוע') : 'לא ידוע';
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
 }
+
+async function refreshMicList(){
+  try{
+    await ensureMic();
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    const sel = $('selMic');
+    sel.innerHTML = '';
+    const defOpt = document.createElement('option');
+    defOpt.value = ''; defOpt.textContent = 'ברירת מחדל (לא ודאי — המערכת בוחרת)';
+    sel.appendChild(defOpt);
+    mics.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `מיקרופון (${d.deviceId.slice(0,6)})`;
+      if(d.deviceId === selectedMicId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    $('statusLine').textContent = `נמצאו ${mics.length} מיקרופונים. פעיל כרגע: ${actualMicUsed}`;
+  }catch(err){
+    $('statusLine').textContent = 'שגיאה ברענון מיקרופונים: ' + err.message;
+  }
+}
+
+$('btnRefreshMics').addEventListener('click', refreshMicList);
+$('selMic').addEventListener('change', async (e) => {
+  selectedMicId = e.target.value;
+  if(micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  try{
+    await ensureMic();
+    $('statusLine').textContent = `מיקרופון נבחר. פעיל בפועל: ${actualMicUsed}`;
+  }catch(err){
+    $('statusLine').textContent = 'שגיאה בבחירת מיקרופון: ' + err.message;
+  }
+});
 
 function recordTakeAgainstClick(){
   return new Promise((resolve, reject) => {
@@ -483,13 +553,6 @@ function perWindowDb(x, d, weights, winSamples){
   return out;
 }
 
-// TEMP (SIM fix, 12.7.2026): analyzeAndRender now accepts an optional knownLagSamples.
-// For simulation runs we pass the delay we ourselves fabricated (SIM_ECHO_DELAY_SEC), instead
-// of running findLag(). Reason: the synthetic echo repeats at the SAME 0.5s interval as the
-// click train, so blind cross-correlation search can lock onto a periodic-ambiguity sidelobe
-// (a wrong delay that looks almost as good as the true one) once noise is added — this caused
-// the previous 0.0%-frozen bug, not a threshold problem. Real recordings still use findLag()
-// as before; this bypass ONLY applies to simulation, where the true delay is already known.
 function analyzeAndRender(x, d, timing, isSim, knownLagSamples){
   const taps = parseInt($('selL').value, 10);
   const mu = parseFloat($('selMu').value);
@@ -624,7 +687,7 @@ $('btnSim').addEventListener('click', async () => {
     ensureClickTrack();
     await new Promise(r => setTimeout(r, 10));
     const sim = buildSimulatedPair();
-    const knownLag = Math.floor(SR * SIM_ECHO_DELAY_SEC); // TEMP (SIM fix): use fabricated delay directly
+    const knownLag = Math.floor(SR * SIM_ECHO_DELAY_SEC);
     analyzeAndRender(clickBuffer, sim.d, null, true, knownLag);
     $('statusLine').textContent = '';
   }catch(err){
@@ -662,6 +725,7 @@ function renderResult({ dB, drift, lag, taps, mu, mode, timing, isSim }){
   const driftTxt = drift === null ? 'n/a' :
     `${drift.toFixed(3)} — פילטר ${drift > 0.85 ? 'יציב' : 'זז'} (transfer ${drift > 0.85 ? 'קבוע' : 'משתנה בזמן'})`;
   detailEl.textContent = `דריפט: ${driftTxt} · L=${taps} μ=${mu} · השהיה: ${Math.round(lag/SR*1000)}ms`;
+  detailEl.textContent += ` · מיקרופון בפועל: ${actualMicUsed || 'לא נבדק'}`;
 
   if(timing){
     const recDelay = (timing.t2!=null && timing.t1!=null) ? (timing.t2 - timing.t1) : null;
